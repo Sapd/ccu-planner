@@ -1,0 +1,30 @@
+{
+  "query": "query GetBrowseSkusByFilter($query: SearchQuery, $storeFront: String = \"pledge\") {\n  store(browse: true, name: $storeFront) {\n    listing: search(query: $query) {\n      resources {\n        id slug name title subtitle url excerpt type\n        media { thumbnail { storeSmall slideshow } }\n        nativePrice { amount discounted discountDescription }\n        stock { unlimited show available backOrder qty level }\n        tags { name }\n        ... on TySku { label isWarbond isPackage isVip isDirectCheckout }\n      }\n      count totalCount\n    }\n  }\n}",
+  "products": [
+    3,
+    9,
+    41,
+    45,
+    46,
+    60,
+    65,
+    67,
+    72,
+    222,
+    268,
+    270,
+    289
+  ],
+  "facets": {
+    "paints": [
+      "filters-paint-limited-time",
+      "filters-paint-premium",
+      "filters-paint-standard"
+    ],
+    "extras-gear": [
+      "filters-gear-armor",
+      "filters-gear-clothing",
+      "filters-gear-equipment"
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+:root {
+  --own: #64748b; --now: #3ddc97; --wait: #a78bfa; --warn: #f0883e;
+  /* Amber: a CCU or chain that is reserved (held for a goal). Purple stays for "wait" only. */
+  --held: #f5c451;
+  --focus: var(--accent);
+  /* Neutral accent for primary buttons and navigation; green/grey/purple stay reserved for buy now / own / wait. */
+  --accent: #4cc2ff; --on-accent: #04121c;
+  --bg-gradient: radial-gradient(ellipse at 30% 0%, #1d2b4a 0%, #0a0e16 70%);
+  --bg: #0a0e16;
+  --text: #e8eef7; --muted: #b9c4d6; /* on the glass panels: about 9:1, enough for 12px text */
+  --glass: rgba(255, 255, 255, 0.06); --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(10px);
+  --radius: 14px;
+  --font: 'Inter Variable', system-ui, sans-serif;
+  --link: #8ab4ff;
+  /* One content column for every page; Goals and Graphs use the wide one. */
+  --page-width: 1280px; --page-width-wide: 1500px;
+  /* Stacking layers, low to high. Use these names, never a bare number. */
+  --z-sticky: 5; --z-strip: 6; --z-popover: 10; --z-bar: 20; --z-modal: 50;
+  color-scheme: dark;
+}
+html, body { margin: 0; min-height: 100vh; background: var(--bg) var(--bg-gradient) fixed; color: var(--text); font: 14px/1.45 var(--font); }
+a { color: var(--link); }
+button { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--glass-border); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+button:disabled { opacity: 0.5; cursor: default; }
+/* Primary buttons keep the accent colour on hover (the generic hover rule above would grey them out). */
+button.primary, button.primary:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 700; }
+button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+input, select, textarea { font: inherit; color: var(--text); background: rgba(8, 12, 20, 0.6); border: 1px solid var(--glass-border); border-radius: 6px; padding: 4px 8px; }
+/* A disabled field stays visible: dashed, lighter border and a lighter fill, so it reads as "not available" and not as missing. */
+input:disabled, select:disabled, textarea:disabled { opacity: 1; color: var(--muted); background: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.4); cursor: not-allowed; }
+/* The one chip style: .chip-btn for filter and choice chips (add .active for the chosen one), .tag for read-only labels. */
+.chip-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: rgba(8, 12, 20, 0.55); border: 1px solid var(--glass-border); color: var(--text); }
+.chip-btn.active { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+.chip-btn.active:hover:not(:disabled) { background: var(--accent); }
+.tag { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--muted); border: 1px solid var(--glass-border); background: rgba(8, 12, 20, 0.4); white-space: nowrap; }
+table { border-collapse: collapse; }
+th, td { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+th { color: var(--muted); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}

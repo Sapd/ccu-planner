@@ -1,0 +1,86 @@
+{
+  "catalog": {
+    "fetchedAt": "2026-11-01T00:00:00.000Z",
+    "app": {},
+    "manufacturers": [],
+    "ships": [
+      { "id": 1, "name": "Alpha", "manufacturer": "Test", "flyableStatus": "Flyable", "owned": false, "msrp": 5000, "skus": [{ "id": 5100 }] },
+      { "id": 2, "name": "Beta", "manufacturer": "Test", "flyableStatus": "Concept", "owned": false, "msrp": 7500, "skus": [] },
+      { "id": 3, "name": "Gamma", "manufacturer": "Test", "flyableStatus": "Flyable", "owned": false, "msrp": 10000, "skus": [] }
+    ]
+  },
+  "details": {
+    "fetchedAt": "2026-11-01T00:00:00.000Z",
+    "details": {
+      "1": { "probedFrom": 1, "skus": [{ "id": 5100, "title": "Alpha Standard Edition", "limitedTimeOffer": false, "items": [{ "id": 1001, "title": "Alpha Module" }] }] },
+      "2": { "probedFrom": 2, "skus": [{ "id": 5001, "title": "Beta Standard Upgrade", "limitedTimeOffer": false, "items": [{ "id": 2001, "title": "Beta Module" }] }] },
+      "3": { "probedFrom": 3, "skus": [{ "id": 5002, "title": "Gamma Warbond Upgrade", "limitedTimeOffer": true, "items": [{ "id": 3001, "title": "Gamma Module" }] }] }
+    },
+    "shipItem": {},
+    "unresolved": []
+  },
+  "upgrades": [
+    {
+      "fetchedAt": "2026-11-01T00:00:00.000Z",
+      "fromId": 1,
+      "fromName": "Alpha",
+      "pricing": {},
+      "targets": [
+        { "toId": 2, "toName": "Beta", "skus": [{ "id": 5001, "available": true, "upgradeUsdCents": 2500 }] },
+        { "toId": 3, "toName": "Gamma", "skus": [{ "id": 5002, "available": true, "upgradeUsdCents": 2000 }] }
+      ]
+    }
+  ],
+  "hangar": {
+    "lastSync": "2026-11-01T00:00:00.000Z",
+    "lastFullSync": "2026-11-01T00:00:00.000Z",
+    "entries": {
+      "9001": {
+        "firstSeen": "2026-11-01T00:00:00.000Z",
+        "lastSeen": "2026-11-01T00:00:00.000Z",
+        "data": {
+          "pledgeId": 9001, "name": "Alpha to Beta CCU", "value": 2500, "canGift": true, "canReclaim": false,
+          "upgrade": { "match_items": [{ "id": 1001, "name": "Alpha Module" }], "target_items": [{ "id": 2001, "name": "Beta Module" }] }
+        }
+      },
+      "9002": {
+        "firstSeen": "2026-11-01T00:00:00.000Z",
+        "lastSeen": "2026-11-01T00:00:00.000Z",
+        "data": {
+          "pledgeId": 9002, "name": "Mystery CCU", "value": 1000, "canGift": false, "canReclaim": true,
+          "upgrade": { "match_items": [{ "id": 7001, "name": "Unknown Part" }], "target_items": [{ "id": 7002, "name": "Other Part" }] }
+        }
+      },
+      "9003": {
+        "firstSeen": "2026-11-01T00:00:00.000Z",
+        "lastSeen": "2026-11-01T00:00:00.000Z",
+        "data": {
+          "pledgeId": 9003, "name": "Alpha to Nope CCU", "value": 1000, "canGift": false, "canReclaim": false,
+          "upgrade": { "match_items": [{ "id": 1001, "name": "Alpha Module" }], "target_items": [{ "id": 9000, "name": "Nope" }] }
+        }
+      },
+      "9004": {
+        "firstSeen": "2026-10-01T00:00:00.000Z",
+        "lastSeen": "2026-10-01T00:00:00.000Z",
+        "goneSince": "2026-10-02T00:00:00.000Z",
+        "data": {
+          "pledgeId": 9004, "name": "Melted CCU", "value": 1000, "canGift": false, "canReclaim": false,
+          "upgrade": { "match_items": [{ "id": 7001, "name": "Unknown Part" }], "target_items": [{ "id": 7002, "name": "Other Part" }] }
+        }
+      },
+      "9005": {
+        "firstSeen": "2026-11-01T00:00:00.000Z",
+        "lastSeen": "2026-11-01T00:00:00.000Z",
+        "data": { "pledgeId": 9005, "name": "Alpha Ship", "value": 50, "canGift": false, "canReclaim": false, "upgrade": null }
+      }
+    }
+  },
+  "buyback": {
+    "lastSync": "2026-11-01T00:00:00.000Z",
+    "lastFullSync": "2026-11-01T00:00:00.000Z",
+    "entries": { "7001": { "pledgeId": 7001, "name": "Beta Standard Edition", "value": 1000 } }
+  },
+  "history": "",
+  "plans": null,
+  "overrides": null
+}

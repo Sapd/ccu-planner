@@ -1,0 +1,6 @@
+{
+  "initShipUpgrade": "query initShipUpgrade {\n  ships { id name manufacturer { id name } focus type flyableStatus owned msrp link\n    skus { id title available price body unlimitedStock availableStock } }\n  manufacturers { id name }\n  app { version env pricing { currencyCode currencySymbol exchangeRate exponent taxRate isTaxInclusive } mode isAnonymous buyback { credit } }\n}",
+  "filterShips": "query filterShips($fromId: Int, $toId: Int, $fromFilters: [FilterConstraintValues], $toFilters: [FilterConstraintValues]) {\n  from(to: $toId, filters: $fromFilters) { ships { id } }\n  to(from: $fromId, filters: $toFilters) {\n    ships { id skus { id price upgradePrice unlimitedStock showStock available availableStock } }\n  }\n}",
+  "getPrice": "query getPrice($from: Int!, $to: Int!) { price(from: $from, to: $to) { amount nativeAmount } }",
+  "getShipDetails": "query getShipDetails($id: Int!, $fromShipId: Int) {\n  ship(id: $id, from: $fromShipId) {\n    id skus { id title price upgradePrice unlimitedStock showStock available availableStock limitedTimeOffer body items { id title } }\n  }\n}"
+}

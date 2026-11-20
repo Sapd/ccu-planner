@@ -1,0 +1,122 @@
+[
+  [
+    "<meta name=\"csrf-token\" content=\"csrf\"><p>Hangar</p>",
+    false
+  ],
+  [
+    "<form class=\"js-signin-form\">",
+    true
+  ],
+  [
+    "<FORM CLASS=\"JS-SIGNIN-FORM\">",
+    true
+  ],
+  [
+    "<form action='/en/signin'>",
+    true
+  ],
+  [
+    "<FORM method=\"post\" ACTION = \"/en/sign-in\">",
+    true
+  ],
+  [
+    "<form\n action = /en/login >",
+    true
+  ],
+  [
+    "<form action=\"https://auth.robertsspaceindustries.com/signin?next=/en/account/pledges\">",
+    true
+  ],
+  [
+    "<form action=\"/en/account/pledges\">",
+    false
+  ],
+  [
+    "<a href=\"/en/signin\">Sign in</a>",
+    false
+  ],
+  [
+    "<form data-action=\"/en/signin\" action=\"/en/account/pledges\">",
+    false
+  ],
+  [
+    "<formaction=\"/en/signin\">",
+    false
+  ],
+  [
+    "<form action=\"/en/LOGIN\">",
+    true
+  ],
+  [
+    "<form action=\"/en/signin-other\">",
+    false
+  ],
+  [
+    "<form class=\"a js-signin-form b\" action=\"/x\">",
+    true
+  ],
+  [
+    "<form class=js-signin-form>",
+    true
+  ],
+  [
+    "<form class=\"js-signin-form-extra\">",
+    false
+  ],
+  [
+    "<div class=\"js-signin-form\">",
+    false
+  ],
+  [
+    "<script>var s=\"js-signin-form\"</script>",
+    false
+  ],
+  [
+    "<form action=\"/signin/\">",
+    true
+  ],
+  [
+    "<form action=\"/connect/login\">",
+    true
+  ],
+  [
+    "<form action=\"/signin#top\">",
+    true
+  ],
+  [
+    "<form action=\"/connect/login?next=/en/account/pledges\">",
+    true
+  ],
+  [
+    "<form action=\"signin\">",
+    true
+  ],
+  [
+    "<form action=/en/signin>",
+    true
+  ],
+  [
+    "<form action=\"/en/account/login-history\" method=\"get\"><input name=\"q\"></form><meta name=\"csrf-token\" content=\"c\">",
+    false
+  ],
+  [
+    "<form action=\"/en/account/logout\" method=\"post\">",
+    false
+  ],
+  [
+    "<form action=\"/en/newsletter/subscribe\" class=\"newsletter\">",
+    false
+  ],
+  [
+    "<form action=\"/en/search\" role=\"search\">",
+    false
+  ],
+  [
+    "<form action=\"/en/account/login-history/\">",
+    false
+  ],
+  [
+    "<form action=\"/en/account/pledges?from=/signin\">",
+    false
+  ]
+]

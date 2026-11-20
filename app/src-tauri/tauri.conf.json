@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CCU Planner",
+  "version": "0.1.0",
+  "identifier": "eu.sapd.ccuplanner",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{
+      "label": "main",
+      "title": "CCU Planner",
+      "width": 1400,
+      "height": 900,
+      "minWidth": 1000,
+      "minHeight": 700
+    }],
+    "security": {
+      "assetProtocol": { "enable": true, "scope": ["$APPDATA/data/images/**"] },
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; connect-src ipc: http://ipc.localhost; worker-src 'self'; base-uri 'self'; form-action 'none'",
+      "devCsp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost http://localhost:1420; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; worker-src 'self' http://localhost:1420; base-uri 'self'; form-action 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": ["app", "dmg", "nsis", "appimage", "deb"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.png"],
+    "license": "GPL-3.0-only",
+    "publisher": "Denis Arnst",
+    "copyright": "© 2026 Denis Arnst",
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": null
+    },
+    "windows": {
+      "nsis": { "installMode": "currentUser" }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZGNTc2QUUxMUEyNEQzOTQKUldTVTB5UWE0V3BYYis4enVIRDU4c3Y1Mkpjb1BEd01odDdLZndhMFVjNE1FYkV5Y245djhaZ0YK",
+      "endpoints": ["https://github.com/Sapd/ccu-planner/releases/latest/download/latest.json"]
+    }
+  }
+}

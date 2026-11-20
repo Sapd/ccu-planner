@@ -1,0 +1,7 @@
+{
+  "_note": "Reviewed hangar item ID -> upgrade-tool ship ID mappings that offer details and exact names cannot resolve. Exact IDs only, never name similarity.",
+  "items": {
+    "2860": { "shipId": 105, "itemName": "Reliant Mako - News Van", "shipName": "Reliant Mako" },
+    "2859": { "shipId": 106, "itemName": "Reliant Sen - Researcher", "shipName": "Reliant Sen" }
+  }
+}

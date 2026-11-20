@@ -1,0 +1,76 @@
+{
+  "chains": [
+    {
+      "name": "Carrack -> Odyssey",
+      "fromShipName": "Carrack",
+      "toShipName": "Odyssey",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Arrastra",
+      "fromShipName": "Pulse",
+      "toShipName": "Arrastra",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Cutter Rambler -> Constellation Mk V Centaurus",
+      "fromShipName": "Cutter Rambler",
+      "toShipName": "Constellation Mk V Centaurus",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Endeavor",
+      "fromShipName": "Cutter Rambler",
+      "toShipName": "Endeavor",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Cutter Rambler -> Carrack",
+      "fromShipName": "Cutter Rambler",
+      "toShipName": "Carrack",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "600i Explorer",
+      "fromShipName": "Pulse",
+      "toShipName": "600i Explorer",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Pulse -> Galaxy",
+      "fromShipName": "Pulse",
+      "toShipName": "Galaxy",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Orion",
+      "fromShipName": "Pulse",
+      "toShipName": "Orion",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    },
+    {
+      "name": "Ironclad",
+      "fromShipName": "Cutter Rambler",
+      "toShipName": "Ironclad",
+      "options": {
+        "optimizationTarget": "longTerm"
+      }
+    }
+  ]
+}

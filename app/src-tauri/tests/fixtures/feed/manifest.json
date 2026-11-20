@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-11-20T12:00:00.000Z",
+  "files": {
+    "events.json": {
+      "sha256": "0d7dfa78d6df7ea80c354e353b7255483e2b92d49d058b6984fd31302a6ea4fe",
+      "size": 34
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "load": {
+    "catalog": {"ships": [{"id": 1, "name": "Fixture Scout"}, {"id": 2, "name": "Fixture Freighter"}]},
+    "details": {"details": [{"id": 1, "name": "Fixture Scout"}]},
+    "upgrades": [{"id": "a"}, {"id": "b"}],
+    "hangar": [{"id": 1001, "name": "Standard Edition - Fixture Scout"}],
+    "buyback": [],
+    "history": "{\"offer\":1}\n{\"offer\":2}\n",
+    "plans": {"rev": 3, "chains": []},
+    "planSnapshots": null,
+    "overrides": {"rev": 1, "ships": {}},
+    "images": {"images": {}},
+    "saleHistory": {"ships": {}},
+    "saleEvents": {"rev": 2, "events": []},
+    "warbondPrices": {"pairs": {}}
+  },
+  "importCopied": [
+    "ship-details.json", "hangar.json", "buyback.json", "plans.json", "price-overrides.json",
+    "ship-images.json", "offer-history.jsonl", "sale-history.json", "sale-events.json",
+    "warbond-prices.json", "upgrades/a.json", "upgrades/b.json", "images/1-l.webp", "images/1-s.webp",
+    "catalog.json"
+  ],
+  "importRejected": ["session.json", "secret.txt", "profile/private.json", "upgrades/notes.txt", "images/2-s.png"],
+  "saves": [
+    {"name": "plans", "file": "plans.json", "rev": 3},
+    {"name": "overrides", "file": "price-overrides.json", "rev": 1},
+    {"name": "sale-events", "file": "sale-events.json", "rev": 2}
+  ]
+}

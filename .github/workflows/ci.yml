@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  node-tests:
+    name: Node tests (root)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+      - run: npm ci
+      # The view tests import app/src/lib, which needs the app's own packages.
+      - run: npm ci
+        working-directory: app
+      - run: npm test
+
+  node-tests-windows:
+    name: Node tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+      - run: npm ci
+      # The view tests import app/src/lib, which needs the app's own packages.
+      - run: npm ci
+        working-directory: app
+      - run: npm test
+
+  frontend-build:
+    name: Frontend build (app)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+      # The app bundles src/ from the repository root (src/parse.mjs uses cheerio), so the root needs its packages too.
+      - run: npm ci
+        working-directory: .
+      - run: npm ci
+      - run: npx vite build
+
+  rust:
+    name: Rust tests and clippy (app/src-tauri)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Tauri Linux system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+      # tauri::generate_context! needs the frontend build (frontendDist ../dist) to exist; it bundles root src/ too.
+      - name: Build the frontend
+        working-directory: app
+        run: |
+          npm ci --prefix ..
+          npm ci
+          npx vite build
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup default stable
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: app/src-tauri
+      - name: cargo test
+        working-directory: app/src-tauri
+        run: cargo test
+      - name: cargo clippy
+        working-directory: app/src-tauri
+        run: cargo clippy -- -D warnings

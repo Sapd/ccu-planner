@@ -1,0 +1,26 @@
+<script>
+  import { onMount } from 'svelte';
+  import { ui, load } from './lib/state.svelte.js';
+  import { loadPending, applyPending } from './lib/pending-import.svelte.js';
+  import Shell from './lib/Shell.svelte';
+  import SyncMenu from './lib/SyncMenu.svelte';
+  import ImportScreen from './lib/ImportScreen.svelte';
+
+  onMount(async () => { await loadPending(); await load(); await applyPending(); });
+</script>
+
+{#if !ui.loaded}
+  <p class="status">Loading…</p>
+{:else if ui.app}
+  <Shell />
+{:else}
+  {#if ui.notice}<p class="status error">{ui.notice}</p>{/if}
+  <header class="first-sync"><strong>CCU Planner</strong><SyncMenu /></header>
+  <ImportScreen />
+{/if}
+
+<style>
+  .first-sync { display: flex; align-items: center; gap: 16px; padding: 16px 24px; }
+  .status { padding: 24px; color: var(--muted); }
+  .error { color: #f85149; }
+</style>

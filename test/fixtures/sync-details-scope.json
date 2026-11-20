@@ -1,0 +1,19 @@
+{
+  "before": [
+    { "toId": 2, "skus": [{ "id": 200, "available": true, "upgradeUsdCents": 1000 }] },
+    { "toId": 6, "skus": [{ "id": 600, "available": true, "upgradeUsdCents": 1000 }] }
+  ],
+  "after": [
+    { "id": 2, "skus": [{ "id": 200, "available": true, "upgradePrice": 1000 }] },
+    { "id": 3, "skus": [{ "id": 300, "available": true, "upgradePrice": 1000 }] },
+    { "id": 4, "skus": [{ "id": 400, "available": false, "upgradePrice": 1000 }] },
+    { "id": 5, "skus": [{ "id": 500, "available": true, "upgradePrice": 1000 }, { "id": 501, "available": true, "upgradePrice": 1000 }] }
+  ],
+  "knownSkus": [300],
+  "legacyRequests": [
+    ["initShipUpgrade", {}],
+    ["filterShips", { "fromFilters": [], "toFilters": [] }],
+    ["filterShips", { "fromId": 1, "fromFilters": [], "toFilters": [] }],
+    ["getShipDetails", { "id": 5, "fromShipId": 1 }]
+  ]
+}

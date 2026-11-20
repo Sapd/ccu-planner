@@ -1,0 +1,158 @@
+name: Release
+
+# Push a tag vX.Y.Z (equal to the version in app/src-tauri/tauri.conf.json) to build macOS and Windows
+# and attach the files to a DRAFT GitHub release. Publishing the draft by hand makes it the update for
+# every installed app (the app reads releases/latest/download/latest.json).
+# "Run workflow" (workflow_dispatch) builds both platforms for a dry run and publishes nothing; a dry run has no signing key and no update
+# artifacts (the key lives in the environment "release", which only v* tags may use, behind a required reviewer).
+# The signing key (TAURI_SIGNING_PRIVATE_KEY) is an environment secret and is passed to the one step that builds and signs, nowhere else.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    name: Check version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+      # On a tag run the tag must equal the version in every file and the tagged commit must be on main; on a manual run the files must agree.
+      - name: Tag matches the app version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::the tagged commit is not on main"; exit 1; }
+            node scripts/version.mjs --check "$REF_NAME"
+          else
+            node scripts/version.mjs --check
+          fi
+
+  create-release:
+    name: Create draft release
+    needs: check-version
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+    steps:
+      # Created once here so the two platform jobs cannot race to create two drafts. A re-run of the workflow for the same tag reuses the draft that
+      # is already there (its assets are replaced by the builds); a tag that already has a published release stops here.
+      - name: Create the draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          existing=$(gh api --paginate "repos/$REPO/releases" --jq ".[] | select(.tag_name == \"$TAG\") | \"\(.id) \(.draft)\"")
+          if [ -n "$existing" ]; then
+            if [ "$(printf '%s\n' "$existing" | wc -l)" -ne 1 ] || [ "${existing#* }" != "true" ]; then
+              echo "::error::a release for $TAG already exists and is not a single draft; resolve it by hand"
+              exit 1
+            fi
+            id="${existing% *}"
+          else
+            id=$(gh api "repos/$REPO/releases" -f tag_name="$TAG" -f name="CCU Planner $TAG" \
+              -F draft=true -F generate_release_notes=true \
+              -f body="Draft built by the Release workflow. Check the assets, then publish. See the commits for what changed." \
+              --jq .id)
+          fi
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: [check-version, create-release]
+    # Run after create-release, and also on a manual dry run where create-release is skipped.
+    if: ${{ !cancelled() && needs.check-version.result == 'success' && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped') }}
+    permissions:
+      contents: write
+    # Only a tag run signs: it uses the environment "release" (v* tags only, required reviewer) that holds the updater key. A dry run has none.
+    environment: ${{ github.ref_type == 'tag' && 'release' || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal
+            os: macos-latest
+            args: --target universal-apple-darwin
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: Windows
+            os: windows-latest
+            args: ''
+            rust_targets: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+      - name: Rust toolchain
+        shell: bash
+        env:
+          RUST_TARGETS: ${{ matrix.rust_targets }}
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          if [ -n "$RUST_TARGETS" ]; then
+            IFS=, read -ra targets <<< "$RUST_TARGETS"
+            rustup target add "${targets[@]}"
+          fi
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: app/src-tauri
+      # The app bundles src/ from the repository root (e.g. src/parse.mjs uses cheerio), so both need their packages.
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+      # A dry run has no key, so it builds without update artifacts.
+      - name: Dry run without update artifacts
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: node -e "const fs=require('fs');const f='app/src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(f,'utf8'));c.bundle.createUpdaterArtifacts=false;fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n')"
+      # The only step that sees the signing key: it runs the frontend build, the cargo build and the signing, so everything in those is trusted with it.
+      # Everything before (dependency installs, toolchain, caches) runs without it.
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          projectPath: app
+          args: ${{ matrix.args }}
+          # Tag runs attach to the draft made above; a manual run has no tag/release and uploads
+          # the bundles as workflow artifacts instead.
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseDraft: true
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          uploadWorkflowArtifacts: ${{ github.ref_type != 'tag' }}

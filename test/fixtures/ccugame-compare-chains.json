@@ -1,0 +1,42 @@
+{
+  "chains": [
+    {
+      "name": "Orion",
+      "fromShipName": "Pulse",
+      "toShipName": "Orion",
+      "missing": 8000,
+      "options": { "fromType": "all", "optimizationTarget": "longTerm", "account": "Fixture" },
+      "chain": [
+        { "origin": "all-ships", "name": "Pulse", "requiredCredits": 3000 },
+        { "origin": "missing", "shipFrom": "Pulse", "shipTo": "Orion", "requiredCredits": 5000 }
+      ]
+    },
+    {
+      "name": "Galaxy",
+      "fromShipName": "Pulse",
+      "toShipName": "Galaxy",
+      "missing": 2500,
+      "options": { "fromType": "manual", "optimizationTarget": "longTerm", "account": "Fixture" },
+      "chain": [
+        { "origin": "hangar", "name": "Pulse", "requiredCredits": 0, "insurance": "LTI" },
+        { "origin": "missing", "shipFrom": "Pulse", "shipTo": "Galaxy", "requiredCredits": 2500 }
+      ]
+    },
+    {
+      "name": "Prospector",
+      "fromShipName": "Pulse",
+      "toShipName": "Prospector",
+      "missing": 7000,
+      "options": { "fromType": "manual", "optimizationTarget": "longTerm", "account": "Fixture" },
+      "chain": [{ "origin": "hangar", "name": "Pulse", "requiredCredits": 0 }]
+    },
+    {
+      "name": "Mystery",
+      "fromShipName": "Pulse",
+      "toShipName": "Mystery Ship",
+      "missing": 100,
+      "options": { "fromType": "manual", "optimizationTarget": "longTerm" },
+      "chain": []
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+name: Data feed
+
+# Builds the signed data feed (sale events and the public RSI store catalog with its pictures) and publishes it to GitHub Pages at
+# https://sapd.github.io/ccu-planner/feed/ every hour. It is an artifact deployment: nothing is committed to the repository.
+# The manifest is signed with the FEED_SIGNING_KEY secret (a key of its own, not the updater key); the app embeds the public half.
+# That secret is an environment secret of the environment "feed" (deployments only from main), present in one step only. The cache the build
+# restores is untrusted: scripts/build-feed.mjs validates every file in it before anything is signed.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time; a run that is still going is finished, not cancelled (a cancelled deploy can leave the site half-updated).
+concurrency:
+  group: data-feed
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the feed
+    # A run from any other branch does nothing; the environment's own branch rule (main only) backs this up.
+    if: github.ref == 'refs/heads/main'
+    environment: feed
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --omit=dev
+      # The previous run's catalog and pictures: only new pictures are downloaded from RSI. The key carries a hash of this workflow file and of the
+      # code that reads and signs the cache, and the restore prefix is that exact hash: a cache written by other code (or restored for it) is never used.
+      # Entries are scoped to the ref by GitHub; this one only ever runs on main.
+      - name: Restore the feed cache
+        id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .feed-cache
+          key: feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/logic/*.mjs') }}-${{ github.run_id }}
+          restore-keys: |
+            feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/logic/*.mjs') }}-
+      - name: Build and sign the feed
+        id: build
+        env:
+          FEED_SIGNING_KEY: ${{ secrets.FEED_SIGNING_KEY }}
+        run: node scripts/build-feed.mjs --out feed-site --cache .feed-cache
+      - name: Save the feed cache
+        if: always() && steps.build.outputs.cache-changed == 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .feed-cache
+          key: feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/logic/*.mjs') }}-${{ github.run_id }}
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: feed-site
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
