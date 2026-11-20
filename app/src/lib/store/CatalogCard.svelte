@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import RsiLink from '../RsiLink.svelte';
   import { backend } from '../backend.js';
 
@@ -22,12 +23,12 @@
   <h3 class="title" title={card.title}>{card.title}</h3>
   <p class="price">
     <b>{card.price}</b>
-    {#if card.was}<s><span class="sr">was </span>{card.was}</s> <span class="off">{card.off}</span>{/if}
-    {#if card.soldOut}<span class="muted">Sold out</span>{/if}
+    {#if card.was}<s><span class="sr">{t('was')} </span>{card.was}</s> <span class="off">{card.off}</span>{/if}
+    {#if card.soldOut}<span class="muted">{t('Sold out')}</span>{/if}
   </p>
   <div class="foot">
-    <span class="tags">{#each card.tags as t (t)}<span class="tag">{t}</span>{/each}</span>
-    <RsiLink href={card.url} label="View on RSI" aria="View {card.title} on RSI" />
+    <span class="tags">{#each card.tags as tag (tag)}<span class="tag">{t(tag)}</span>{/each}</span>
+    <RsiLink href={card.url} label={t('View on RSI')} aria={t('View {title} on RSI', { title: card.title })} />
   </div>
 </article>
 

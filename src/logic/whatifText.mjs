@@ -1,4 +1,5 @@
 // Plain sentences for whatif.mjs results (the Add goal preview, "Without this goal", "If I buy this"). Pure.
+import { loc } from './i18n.mjs';
 import { usd } from './format.mjs';
 
 /** +$125 / -$30 / $0 for a cents change. */
@@ -15,24 +16,26 @@ const routeNotes = (r) => [
 ].filter(Boolean);
 
 /** Other goals' line: "Other goals: +$125 (Orion +$90, Carrack +$35)." or "Other goals: no change." */
-export function otherGoalsText(r) {
+function otherGoalsTextEn(r) {
   const moved = withDelta(r);
   const notes = routeNotes(r);
   const base = moved.length ? `Other goals: ${signed(moved.reduce((n, d) => n + d.delta, 0))} (${parts(moved)})` : 'Other goals: no change';
   return `${[base, ...notes].join('; ')}.`;
 }
+export const otherGoalsText = loc('otherGoalsText', otherGoalsTextEn);
 
 /** The Add goal preview: "Liberator: $90. Other goals: +$125 (Orion +$90, Carrack +$35). Total +$215." */
-export function addGoalText(r) {
+function addGoalTextEn(r) {
   const goal = r.added[0];
   if (!goal) return null;
   if (goal.cash == null) return `${goal.name}: no route found, so there is nothing to buy. ${otherGoalsText(r)}`;
   const own = `${goal.name}: ${usd(goal.cash)}`;
   return `${own}. ${otherGoalsText(r)} Total ${signed(r.grand.delta)}.`;
 }
+export const addGoalText = loc('addGoalText', addGoalTextEn);
 
 /** "Without this goal": "Without Liberator: other goals -$125 (Orion -$90, Carrack -$35). Total -$215 with its own $90." */
-export function removeGoalText(r) {
+function removeGoalTextEn(r) {
   const goal = r.removed[0];
   if (!goal) return null;
   const moved = withDelta(r);
@@ -41,6 +44,7 @@ export function removeGoalText(r) {
   const own = goal.cash != null ? ` Total ${signed(r.grand.delta)} with its own ${usd(goal.cash)}.` : '';
   return `Without ${goal.name}: ${[others, ...notes].join('; ')}.${own}`;
 }
+export const removeGoalText = loc('removeGoalText', removeGoalTextEn);
 
 const planOf = (deltas) => {
   const names = deltas.filter((d) => d.delta != null && d.delta < 0).map((d) => d.name); // only goals whose cost went down
@@ -53,7 +57,7 @@ const planOf = (deltas) => {
  * - the same money: "1 copy ($50): buying it now pays $50 of Odyssey's plan early; the total stays the same."
  * - you pay more: "1 copy ($50): saves $30 on Odyssey's plan but costs $50 now: $20 more overall."
  */
-export function buyRowText(row) {
+function buyRowTextEn(row) {
   const copies = `${row.copies} cop${row.copies === 1 ? 'y' : 'ies'} (${usd(row.spent)})`;
   if (row.usedCopies === 0 && row.plannedBy?.length) {
     const who = row.plannedBy.length === 1 ? `${row.plannedBy[0]}'s plan` : `the plans of ${row.plannedBy.join(' and ')}`;
@@ -66,6 +70,7 @@ export function buyRowText(row) {
   const who = parts(row.deltas.filter((d) => d.delta != null && d.delta < 0)); // only goals whose cost went down, like planOf
   return `${copies}: goals get ${usd(row.saved)} cheaper${who ? ` (${who})` : ''}; you come out ${usd(-row.net)} ahead.`;
 }
+export const buyRowText = loc('buyRowText', buyRowTextEn);
 
 /**
  * The outcome sentence of a Today buy card, worked out from the plan alone (no search): the step is in the plan of the goals it
@@ -73,7 +78,7 @@ export function buyRowText(row) {
  * stays behind "Why?" for the rare case where a copy would be shared differently.
  * @param {{ cash: number, goals: string[], lock?: boolean, outside?: string[] }} row goal names are the card's "for" goals; `outside`: those whose reserved chain does not have this step (the total is then not the same, so nothing is promised)
  */
-export function plannedBuyText({ cash, goals, lock = false, outside = [] }) {
+function plannedBuyTextEn({ cash, goals, lock = false, outside = [] }) {
   const names = [...new Set(goals)];
   if (!names.length) return null;
   // A step the goal's reserved chain does not have is only part of its proposed chain: buying it does not pay the reserved plan.
@@ -84,9 +89,10 @@ export function plannedBuyText({ cash, goals, lock = false, outside = [] }) {
     ? `Buying now locks ${usd(cash)} of ${plan} at today's price. Your total at today's prices stays the same.`
     : `Buying now pays ${usd(cash)} of ${plan} early. Your total stays the same.`;
 }
+export const plannedBuyText = loc('plannedBuyText', plannedBuyTextEn);
 
 /** The sentence under the copy picker: what an extra copy adds. */
-export function buyVerdictText(effect) {
+function buyVerdictTextEn(effect) {
   const [one, two] = effect.rows;
   if (!one) return null;
   if (one.saved <= 0) return null; // the row above already says so
@@ -94,6 +100,7 @@ export function buyVerdictText(effect) {
   if (two) return `A 2nd copy saves another ${usd(two.extraSaved)}.`;
   return null;
 }
+export const buyVerdictText = loc('buyVerdictText', buyVerdictTextEn);
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
@@ -103,7 +110,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
  * @param {object} r checkOffer result
  * @param {(id: number) => string} shipName
  */
-export function offerCheckLines(r, shipName, { effect = true } = {}) {
+function offerCheckLinesEn(r, shipName, { effect = true } = {}) {
   const lines = [];
   const kindWord = (k) => (k === 'warbond' ? 'Warbond' : 'Standard');
   lines.push(r.store.length ? `The store sells ${shipName(r.offer.from)} → ${shipName(r.offer.to)} today as ${r.store.map((s) => `${kindWord(s.kind)} ${usd(s.cash)}`).join(' and ')}.` : `The store does not sell ${shipName(r.offer.from)} → ${shipName(r.offer.to)} today.`);
@@ -119,6 +126,7 @@ export function offerCheckLines(r, shipName, { effect = true } = {}) {
   lines.push(buyRowText({ copies: 1, spent: e.purchase.spent, saved: 0 - e.totalDelta, net: e.net, usedCopies: e.usedCopies, deltas: e.deltas }));
   return lines;
 }
+export const offerCheckLines = loc('offerCheckLines', offerCheckLinesEn);
 
 /**
  * The verdict tile of an offer check: one tone, one headline, one sentence. `net` is what you pay overall (the price minus
@@ -126,7 +134,7 @@ export function offerCheckLines(r, shipName, { effect = true } = {}) {
  * @param {object} r checkOffer result
  * @returns {{ tone: 'good'|'neutral'|'bad', head: string, text: string }}
  */
-export function offerTile(r) {
+function offerTileEn(r) {
   const e = r.effect;
   const spent = e.purchase.spent;
   const saved = 0 - e.totalDelta;
@@ -143,3 +151,4 @@ export function offerTile(r) {
   if (e.net === 0 && saved > 0) return { tone: 'neutral', head: 'No saving', text: `Pays ${usd(saved)} of ${planOf(e.deltas)} early. Your total stays the same.` };
   return { tone: 'neutral', head: 'Not needed', text: r.verdict };
 }
+export const offerTile = loc('offerTile', offerTileEn);

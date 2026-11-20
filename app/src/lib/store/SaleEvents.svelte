@@ -1,6 +1,7 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { noEventsNoticeStore } from '$logic/describe.mjs';
-  import { isDay } from '$logic/availability.mjs';
+  import { isDay, dayText } from '$logic/availability.mjs';
   import { eventSource, feedIsStale } from '$logic/feed.mjs';
   import { dispatch, ui } from '../state.svelte.js';
   import Fold from '../goals/Fold.svelte';
@@ -14,7 +15,7 @@
   let evFrom = $state('');
   let evTo = $state('');
   let busy = $state(false);
-  const evProblem = $derived(!evName.trim() ? 'Enter a name.' : !isDay(evFrom) || !isDay(evTo) ? 'Dates are YYYY-MM-DD.' : evFrom > evTo ? 'The event cannot end before it starts.' : null);
+  const evProblem = $derived(!evName.trim() ? t('Enter a name.') : !isDay(evFrom) || !isDay(evTo) ? t('Dates are YYYY-MM-DD.') : evFrom > evTo ? t('The event cannot end before it starts.') : null);
   async function addEvent(e) {
     e.preventDefault();
     if (evProblem || busy) return;
@@ -26,23 +27,23 @@
 </script>
 
 <div class="saleevents">
-  <p class="muted">Upgrades bought only because of an event may disappear after it. Events marked "CCU Planner feed" are kept up to date for you; an event you add with the same name or dates replaces the feed's.</p>
-  <div class="how"><Fold title="How we decide"><p class="muted">Melt and buy-later treat a ship as regular only once a sync saw it on sale on at least 2 days, 7 or more days apart, outside every event.</p></Fold></div>
-  {#if feedStale}<p class="note" data-hint="feed-stale">The CCU Planner feed has not been updated since {ui.feed.generatedAt.slice(0, 10)}, so its sale events may be out of date. Add events yourself if you know of one.</p>{/if}
+  <p class="muted">{t('Upgrades bought only because of an event may disappear after it. Events marked "CCU Planner feed" are kept up to date for you; an event you add with the same name or dates replaces the feed\'s.')}</p>
+  <div class="how"><Fold title={t('How we decide')}><p class="muted">{t('Melt and buy-later treat a ship as regular only once a sync saw it on sale on at least 2 days, 7 or more days apart, outside every event.')}</p></Fold></div>
+  {#if feedStale}<p class="note" data-hint="feed-stale">{t('The CCU Planner feed has not been updated since {date}, so its sale events may be out of date. Add events yourself if you know of one.', { date: ui.feed.generatedAt.slice(0, 10) })}</p>{/if}
   {#if noEventsNoticeStore(app.saleEvents)}<p class="note" data-hint="no-events">{noEventsNoticeStore(app.saleEvents)}</p>{/if}
   {#each events as ev (ev.id)}
     <div class="row" data-event={ev.id}>
-      <span>{ev.name} · {ev.from} to {ev.to} <small class="src" data-source={eventSource(ev)}>{eventSource(ev) === 'feed' ? 'CCU Planner feed' : 'added by you'}</small></span>
-      {#if eventSource(ev) === 'you'}<button type="button" onclick={() => removeEvent(ev.id)} aria-label="Remove sale event {ev.name}">Remove</button>{/if}
+      <span>{ev.name} · {t('{from} to {to}', { from: dayText(ev.from), to: dayText(ev.to) })} <small class="src" data-source={eventSource(ev)}>{eventSource(ev) === 'feed' ? t('CCU Planner feed') : t('added by you')}</small></span>
+      {#if eventSource(ev) === 'you'}<button type="button" onclick={() => removeEvent(ev.id)} aria-label={t('Remove sale event {name}', { name: ev.name })}>{t('Remove')}</button>{/if}
     </div>
   {:else}
-    <p class="muted">No sale events set.</p>
+    <p class="muted">{t('No sale events set.')}</p>
   {/each}
   <form class="add" onsubmit={addEvent}>
-    <label>Name <input bind:value={evName} placeholder="e.g. Anniversary sale" /></label>
-    <label>From <input bind:value={evFrom} placeholder="YYYY-MM-DD" /></label>
-    <label>To <input bind:value={evTo} placeholder="YYYY-MM-DD" /></label>
-    <button type="submit" class="primary" disabled={!!evProblem || busy}>Add sale event</button>
+    <label>{t('Name')} <input bind:value={evName} placeholder={t('e.g. Anniversary sale')} /></label>
+    <label>{t('From')} <input bind:value={evFrom} placeholder={t('YYYY-MM-DD')} /></label>
+    <label>{t('Until')} <input bind:value={evTo} placeholder={t('YYYY-MM-DD')} /></label>
+    <button type="submit" class="primary" disabled={!!evProblem || busy}>{t('Add sale event')}</button>
     {#if evProblem && (evName || evFrom || evTo)}<p class="muted prob">{evProblem}</p>{/if}
   </form>
 </div>

@@ -1,4 +1,5 @@
 <script>
+  import { t, tn } from '$logic/i18n.mjs';
   import { incomingCount } from '$logic/planner.mjs';
   import { sessionOf } from '$logic/session.mjs';
   import { noRouteMessage, noMatchesText, IMPORT_BUTTON, LEVEL_TEXT, ACCEPT_HELP, goalStatusText, acceptedDriftNote, changesDeltaText, plannedTotalText, PLANNED_TOTAL_BASIS } from '$logic/describe.mjs';
@@ -44,7 +45,7 @@
   let strip = $state(null);
   // The open goal's chip stays visible in the strip when the strip scrolls sideways.
   $effect(() => { currentId; tick().then(() => strip?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' })); });
-  const noRouteTitle = (g) => noRouteMessage(ships.get(g.targetId)?.name ?? 'unknown ship', incomingCount(app.graph, g.targetId));
+  const noRouteTitle = (g) => noRouteMessage(ships.get(g.targetId)?.name ?? t('unknown ship'), incomingCount(app.graph, g.targetId));
 
   // The open goal: the selected one, else the first.
   const currentId = $derived(app.plans.chains[ui.selected] ? ui.selected : (session.levels()[0]?.ids[0] ?? null));
@@ -93,15 +94,15 @@
 <div class="goals" class:hasback={!!ui.back}>
   {#snippet searchBox()}
     {#if v.goals.length >= SEARCH_MIN}
-      <SearchBox bind:value={query} label="Search goals" placeholder="Search goals by ship" shown={goalsShown.length} total={v.goals.length} />
+      <SearchBox bind:value={query} label={t('Search goals')} placeholder={t('Search goals by ship')} shown={goalsShown.length} total={v.goals.length} />
     {/if}
   {/snippet}
   {#snippet tail()}
     {#if fleet}
       <p class="total" data-planned-total><b>{plannedTotalText(fleet.totalCash, v.goals)}</b> · {tableSummary(v.goals.length, v.goals.reduce((n, g) => n + g.buyCount, 0))}{#if changes} · <button type="button" class="link" onclick={openChanges}>{changesDeltaText(changes)}</button>{/if}</p>
       {#if v.goals.some((g) => g.acceptedCash != null) || drift.length}
-        <details class="how"><summary>How the total adds up</summary>
-          {#if v.goals.some((g) => g.acceptedCash != null)}<p class="help">{PLANNED_TOTAL_BASIS}</p>{/if}
+        <details class="how"><summary>{t('How the total adds up')}</summary>
+          {#if v.goals.some((g) => g.acceptedCash != null)}<p class="help">{t(PLANNED_TOTAL_BASIS)}</p>{/if}
           {#if drift.length}<p class="help">{acceptedDriftNote(drift)}</p>{/if}
         </details>
       {/if}
@@ -119,10 +120,10 @@
 
   <div class="narrowonly head">
     {@render searchBox()}
-    <div class="strip" bind:this={strip} role="group" aria-label="Switch between your goals">
+    <div class="strip" bind:this={strip} role="group" aria-label={t('Switch between your goals')}>
       {#each levels as l (l.priority)}
-        <div class="lvl" role="group" aria-label={LEVEL_TEXT[l.priority].title}>
-          <span class="lvlname">{LEVEL_TEXT[l.priority].title}</span>
+        <div class="lvl" role="group" aria-label={t(LEVEL_TEXT[l.priority].title)}>
+          <span class="lvlname">{t(LEVEL_TEXT[l.priority].title)}</span>
           <div class="chips">
             {#each l.goals as g (g.goalId)}
               <button type="button" class="chipgoal {tone(g)}" aria-pressed={g.goalId === currentId} class:active={g.goalId === currentId} title={goalStatusText(g)} onclick={() => pick(g.goalId)}>
@@ -141,15 +142,15 @@
     {#if previewing}
       <GlassPanel>
         <div class="preview" role="region" aria-labelledby="reserve-all-head" data-bulk-preview>
-          <p class="help" id="reserve-all-head" tabindex="-1" bind:this={previewHead}><b>{preview.length === 1 ? 'This goal' : `These ${preview.length} goals`} would be reserved.</b> {ACCEPT_HELP}</p>
+          <p class="help" id="reserve-all-head" tabindex="-1" bind:this={previewHead}><b>{preview.length === 1 ? t('This goal would be reserved.') : t('These {n} goals would be reserved.', { n: preview.length })}</b> {t(ACCEPT_HELP)}</p>
           {#each preview as g (g.chainId)}
             <div class="pgoal"><b>{g.goalName}</b>
-              {#if g.lines.length}<ul>{#each g.lines as line, n (n)}<li>{line}</li>{/each}</ul>{:else}<span class="help"> · {NOTHING_HELD}</span>{/if}
+              {#if g.lines.length}<ul>{#each g.lines as line, n (n)}<li>{line}</li>{/each}</ul>{:else}<span class="help"> · {t(NOTHING_HELD)}</span>{/if}
             </div>
           {/each}
           <div class="btns">
-            <button type="button" class="primary" disabled={accepting || !preview.length} onclick={acceptAll}>Reserve {preview.length === 1 ? 'this chain' : `${preview.length} chains`}</button>
-            <button type="button" onclick={closePreview}>Cancel</button>
+            <button type="button" class="primary" disabled={accepting || !preview.length} onclick={acceptAll}>{preview.length === 1 ? t('Reserve this chain') : t('Reserve {n} chains', { n: preview.length })}</button>
+            <button type="button" onclick={closePreview}>{t('Cancel')}</button>
           </div>
         </div>
       </GlassPanel>
@@ -168,7 +169,7 @@
     {:else if !adding && !importing && !previewing}
       <GlassPanel>
         <Explainer inline />
-        <p class="empty">No goals yet. Press “+ New goal” to pick the ship you want.</p>
+        <p class="empty">{t('No goals yet. Press “+ New goal” to pick the ship you want.')}</p>
       </GlassPanel>
     {/if}
   </div>

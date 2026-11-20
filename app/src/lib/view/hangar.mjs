@@ -10,6 +10,7 @@ import { usd } from '../../../../src/logic/format.mjs';
 import { hasPriceOverrides, pricedShips } from '../../../../src/logic/prices.mjs';
 import { shipAvailability, localToday, ongoingEvent } from '../../../../src/logic/availability.mjs';
 import { sessionOf } from '../../../../src/logic/session.mjs';
+import { N_ } from '../../../../src/logic/i18n.mjs';
 
 /** One row per owned CCU copy. `review` items stay as they are. */
 export function hangarRows(data, plans) {
@@ -111,21 +112,24 @@ export function availabilityRows(app, today = localToday()) {
 
 /** Category chips of the Hangar tab. `cats` are the pledge categories each chip covers (null = all). */
 export const PLEDGE_CHIPS = [
-  { id: 'ships', label: 'Ships and packages', cats: ['ship', 'package'] },
-  { id: 'ccu', label: 'CCUs', cats: ['ccu'] },
-  { id: 'others', label: 'All other pledges', cats: ['paint', 'equipment', 'other'] },
-  { id: 'paint', label: 'Paints', cats: ['paint'] },
-  { id: 'equipment', label: 'Equipment', cats: ['equipment'] },
-  { id: 'other', label: 'Other', cats: ['other'] },
-  { id: 'all', label: 'All', cats: null },
+  { id: 'ships', label: N_('Ships and packages'), cats: ['ship', 'package'] },
+  { id: 'ccu', label: N_('CCUs'), cats: ['ccu'] },
+  { id: 'others', label: N_('All other pledges'), cats: ['paint', 'equipment', 'other'] },
+  { id: 'paint', label: N_('Paints'), cats: ['paint'] },
+  { id: 'equipment', label: N_('Equipment'), cats: ['equipment'] },
+  { id: 'other', label: N_('Other'), cats: ['other'] },
+  { id: 'all', label: N_('All'), cats: null },
 ];
 
 /** The three views of the Hangar, as the switch at the top shows them. */
 export const HANGAR_VIEWS = [
-  { id: 'ships', label: 'Ships' },
-  { id: 'ccu', label: 'Upgrades' },
-  { id: 'other', label: 'Other pledges' },
+  { id: 'ships', label: N_('Ships') },
+  { id: 'ccu', label: N_('Upgrades') },
+  { id: 'other', label: N_('Other pledges') },
 ];
+/** How a pledge category is named (shown through t()). */
+export const PLEDGE_CATEGORY = { ship: N_('ship'), package: N_('package'), ccu: N_('ccu'), paint: N_('paint'), equipment: N_('equipment'), other: N_('other') };
+
 /** Summary strip numbers plus a pledge count per chip id. */
 export function pledgeOverview(pledges) {
   const summary = hangarSummary(pledges);

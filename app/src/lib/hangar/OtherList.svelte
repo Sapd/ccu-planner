@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { valueLabel } from '../view/hangar.mjs';
   import RsiLink from '../RsiLink.svelte';
   import { hangarUrl } from '$logic/links.mjs';
@@ -9,8 +10,8 @@
 </script>
 
 <div class="wrap">
-  <table aria-label="Other pledges">
-    <thead><tr><th scope="col">Pledge</th><th scope="col">Contains</th><th scope="col">Added</th><th scope="col" class="num">Value</th><th scope="col"><span class="sr">Marks and link</span></th></tr></thead>
+  <table aria-label={t('Other pledges')}>
+    <thead><tr><th scope="col">{t('Pledge')}</th><th scope="col">{t('Contains')}</th><th scope="col">{t('Added')}</th><th scope="col" class="num">{t('Value')}</th><th scope="col"><span class="sr">{t('Marks and link')}</span></th></tr></thead>
     <tbody>
       {#each items as { item: p, key } (key)}
         <tr data-pledge={p.pledgeId} data-category={p.category}>
@@ -18,7 +19,7 @@
           <td class="muted contains" title={contains(p)}>{contains(p)}</td>
           <td class="muted nowrap">{p.created ?? ''}</td>
           <td class="num">{valueLabel(p.value)}</td>
-          <td class="marks">{#if p.giftable}<span class="tag" title="You can gift this pledge to another account">Giftable</span>{/if}{#if p.reclaimable}<span class="tag" title="If you melt it, RSI lets you buy it back later">Reclaimable</span>{/if}<RsiLink href={hangarUrl()} label="Hangar" aria="Open {p.name} in the RSI hangar" /></td>
+          <td class="marks">{#if p.giftable}<span class="tag" title={t('You can gift this pledge to another account')}>{t('Giftable')}</span>{/if}{#if p.reclaimable}<span class="tag" title={t('If you melt it, RSI lets you buy it back later')}>{t('Reclaimable')}</span>{/if}<RsiLink href={hangarUrl()} label={t('Hangar')} aria={t('Open {name} in the RSI hangar', { name: p.name })} /></td>
         </tr>
       {/each}
     </tbody>

@@ -1,12 +1,13 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { SECTIONS, SECTION_LABEL } from '../view/nav.mjs';
 
   let { current, onselect } = $props();
 </script>
 
-<nav aria-label="Sections">
+<nav aria-label={t('Sections')}>
   {#each SECTIONS as s (s)}
-    <button type="button" class:active={current === s} aria-current={current === s ? 'page' : undefined} onclick={() => onselect(s)}>{SECTION_LABEL[s]}</button>
+    <button type="button" class:active={current === s} aria-current={current === s ? 'page' : undefined} onclick={() => onselect(s)}>{t(SECTION_LABEL[s])}</button>
   {/each}
 </nav>
 

@@ -1,4 +1,5 @@
 // "CCUs you own into this ship": the owned CCUs whose target is the ship, and what each copy is used for. Pure.
+import { t } from './i18n.mjs';
 import { sessionFor } from './session.mjs';
 import { goalNamer } from './ships.mjs';
 import { localToday } from './availability.mjs';
@@ -21,7 +22,7 @@ export function ownedInto(app, shipId, { goalId = null, day = localToday() } = {
   const { plans, graph, data } = session;
   const ships = data?.ships ?? null;
   const namer = goalNamer(plans, ships);
-  const shipName = (id) => ships?.get(id)?.name ?? 'unknown ship';
+  const shipName = (id) => ships?.get(id)?.name ?? t('unknown ship');
 
   const holders = new Map(); // copyId -> goal id
   for (const [id, entry] of session.shared) for (const s of entry.route?.steps ?? []) if (s.copyId) holders.set(s.copyId, id);

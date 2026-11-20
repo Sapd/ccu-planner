@@ -1,4 +1,5 @@
 <script>
+  import { t, tn } from '$logic/i18n.mjs';
   import { onMount } from 'svelte';
   import * as echarts from 'echarts/core';
   import { BarChart } from 'echarts/charts';
@@ -29,7 +30,7 @@
   const ship = (id) => ships.get(id) ?? null;
   const view = $derived(meltView(app));
   const p = $derived(view.plan);
-  const lines = $derived(meltPlanLinesApp(p, name, (id) => (app.plans.chains[id] ? goalLabel(app.plans.chains[id], ships) : 'a goal')));
+  const lines = $derived(meltPlanLinesApp(p, name, (id) => (app.plans.chains[id] ? goalLabel(app.plans.chains[id], ships) : t('a goal'))));
   const idle = $derived(!p.finishChains.length && !p.locks.length);
   const searching = $derived(query.trim() !== '');
   let keptOpen = $state(false);
@@ -46,7 +47,7 @@
   let creditError = $state(null);
   async function commitCredit() {
     const cents = parseCreditUsd(creditText);
-    if (cents == null) { creditError = 'Enter a dollar amount, zero or more.'; return; }
+    if (cents == null) { creditError = t('Enter a dollar amount, zero or more.'); return; }
     creditError = null;
     if (cents !== stored) {
       if (busy) return;
@@ -85,50 +86,50 @@
 
 <GlassPanel class="worthmelt" id="worth-melting" aria-labelledby="melt-title">
   <div class="top">
-    <h2 id="melt-title">Worth melting</h2>
-    {#if p.candidates.length}<span class="total">{usd(p.candidateCredit)} store credit · {p.candidates.length} CCU{p.candidates.length === 1 ? '' : 's'}</span>{/if}
+    <h2 id="melt-title">{t('Worth melting')}</h2>
+    {#if p.candidates.length}<span class="total">{t('{amount} store credit', { amount: usd(p.candidateCredit) })} · {tn(p.candidates.length, '{n} CCU', '{n} CCUs')}</span>{/if}
   </div>
   <p class="head">{meltHeadlinePlain({ count: p.candidates.length, credit: p.candidateCredit })}</p>
-  <div class="how"><Fold title="How we decide"><p class="muted">{meltHeadline(p, view.hasOverrides)}</p></Fold></div>
-  {#if noEventsNoticeApp(app.saleEvents)}<p class="warn" data-hint="no-events">{noEventsNoticeApp(app.saleEvents)} <button type="button" onclick={() => { ui.storeTab = 'upgrades'; goSection('store'); }}>Open Store</button></p>{/if}
+  <div class="how"><Fold title={t('How we decide')}><p class="muted">{meltHeadline(p, view.hasOverrides)}</p></Fold></div>
+  {#if noEventsNoticeApp(app.saleEvents)}<p class="warn" data-hint="no-events">{noEventsNoticeApp(app.saleEvents)} <button type="button" onclick={() => { ui.storeTab = 'upgrades'; goSection('store'); }}>{t('Open Store')}</button></p>{/if}
   {#if view.hintEvent}<p class="muted" data-hint="event">{meltEventHint(view.hintEvent)}</p>{/if}
   {#if meltWithoutNote(view.without)}<p class="muted">{meltWithoutNote(view.without)}</p>{/if}
 
-  <label class="credit">Store credit available $
-    <input type="text" inputmode="decimal" bind:value={creditText} onchange={commitCredit} aria-label="Store credit in dollars" aria-invalid={creditError ? 'true' : undefined} />
+  <label class="credit">{t('Store credit available $')}
+    <input type="text" inputmode="decimal" bind:value={creditText} onchange={commitCredit} aria-label={t('Store credit in dollars')} aria-invalid={creditError ? 'true' : undefined} />
   </label>
   {#if creditError}<p class="err" role="alert">{creditError}</p>{/if}
 
-  <h3>Plan</h3>
+  <h3>{t('Plan')}</h3>
   {#if idle}
-    <p class="muted">{MELT_IDLE_APP} Set a goal to finish mode to plan a melt.</p>
+    <p class="muted">{t(MELT_IDLE_APP)} {t('Set a goal to finish mode to plan a melt.')}</p>
   {:else}
     {#each lines as l, i (i)}<p class="line">{l}</p>{/each}
     {#each p.melt as m (m.copy.copyId)}
       <div class="pick" data-copy={m.copy.copyId} data-from={m.copy.from} data-to={m.copy.to}><ShipThumb ship={ship(m.copy.from)} size="xs" /><ShipThumb ship={ship(m.copy.to)} size="xs" /><span>{meltPickLineApp(m, name)}</span></div>
     {/each}
-    {#if p.melt.length}<p class="muted">{MELT_NOTE} Re-sync the hangar afterwards.</p>{/if}
+    {#if p.melt.length}<p class="muted">{t(MELT_NOTE)} {t('Re-sync the hangar afterwards.')}</p>{/if}
   {/if}
 
-  <h3>Candidates ({searching ? `${candidates.length} of ${p.candidates.length}` : p.candidates.length})</h3>
-  {#if p.candidates.length}<p class="muted">{MELT_CANDIDATE_PLAIN}</p>{/if}
+  <h3>{t('Candidates ({count})', { count: searching ? t('{shown} of {total}', { shown: candidates.length, total: p.candidates.length }) : p.candidates.length })}</h3>
+  {#if p.candidates.length}<p class="muted">{t(MELT_CANDIDATE_PLAIN)}</p>{/if}
   <div class="chart" bind:this={el} hidden={!bars.length}></div>
-  {#if !bars.length}<p class="muted">{searching && p.candidates.length ? noMatchesText(query) : 'No candidates.'}</p>{/if}
+  {#if !bars.length}<p class="muted">{searching && p.candidates.length ? noMatchesText(query) : t('No candidates.')}</p>{/if}
   <table>
     <tbody>
       {#each candidates as c (c.copy.copyId)}
         <tr data-copy={c.copy.copyId} data-from={c.copy.from} data-to={c.copy.to}>
           <td><span class="pair"><ShipThumb ship={ship(c.copy.from)} size="xs" /><ShipThumb ship={ship(c.copy.to)} size="xs" /><span>{name(c.copy.from)} → {name(c.copy.to)}</span></span></td>
           <td class="num">{usd(c.paid)}</td>
-          <td class="muted">Standard today {usd(c.standardNow)}</td>
-          <td><RsiLink href={hangarUrl()} label="Hangar" aria="Open {name(c.copy.from)} to {name(c.copy.to)} in the RSI hangar" /></td>
+          <td class="muted">{t('Standard today {amount}', { amount: usd(c.standardNow) })}</td>
+          <td><RsiLink href={hangarUrl()} label={t('Hangar')} aria={t('Open {from} to {to} in the RSI hangar', { from: name(c.copy.from), to: name(c.copy.to) })} /></td>
         </tr>
       {/each}
     </tbody>
   </table>
 
   <div class="kept">
-    <Fold bind:open={keptOpen} title={`Kept (${searching ? `${kept.length} of ${view.kept.length}` : view.kept.length})`}>
+    <Fold bind:open={keptOpen} title={t('Kept ({count})', { count: searching ? t('{shown} of {total}', { shown: kept.length, total: view.kept.length }) : view.kept.length })}>
       <table>
         <tbody>
           {#each kept as c (c.copy.copyId)}

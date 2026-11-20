@@ -1,25 +1,26 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { groupActive } from '../view/filters.mjs';
   import Term from '../ui/Term.svelte';
 
   // The filter column: plain checkboxes under a heading per group, "(reset)" for a group that is not at its start state.
   // groups/sel: see view/filters.mjs; counts: { groupId: { optionId: n } } (how many each option would show).
-  let { groups, sel, counts = {}, label = 'Filters', ontoggle, onreset, onrange } = $props();
+  let { groups, sel, counts = {}, label = undefined, ontoggle, onreset, onrange } = $props();
   const uid = $props.id();
 </script>
 
-<div class="col" role="group" aria-label={label}>
+<div class="col" role="group" aria-label={label ?? t('Filters')}>
   {#each groups as g (g.id)}
     <div class="grp" role="group" aria-labelledby="{uid}-{g.id}">
       <div class="head">
-        <span class="gl" id="{uid}-{g.id}" title={g.help}>{g.label}</span>{#if g.term}<Term term={g.term} />{/if}
-        {#if groupActive(groups, sel, g.id)}<button type="button" class="reset" onclick={() => onreset(g.id)} aria-label="Reset {g.label}">(reset)</button>{/if}
+        <span class="gl" id="{uid}-{g.id}" title={g.help ? t(g.help) : undefined}>{t(g.label)}</span>{#if g.term}<Term term={g.term} />{/if}
+        {#if groupActive(groups, sel, g.id)}<button type="button" class="reset" onclick={() => onreset(g.id)} aria-label={t('Reset {label}', { label: t(g.label) })}>{t('(reset)')}</button>{/if}
       </div>
       {#if g.kind === 'range'}
         <div class="range">
-          <input type="text" inputmode="decimal" placeholder="From $" aria-label="{g.label}: from, in dollars" value={sel[g.id].min} oninput={(e) => onrange(g.id, 'min', e.currentTarget.value)} />
+          <input type="text" inputmode="decimal" placeholder={t('From $')} aria-label={t('{label}: from, in dollars', { label: t(g.label) })} value={sel[g.id].min} oninput={(e) => onrange(g.id, 'min', e.currentTarget.value)} />
           <span aria-hidden="true">–</span>
-          <input type="text" inputmode="decimal" placeholder="To $" aria-label="{g.label}: up to, in dollars" value={sel[g.id].max} oninput={(e) => onrange(g.id, 'max', e.currentTarget.value)} />
+          <input type="text" inputmode="decimal" placeholder={t('Up to $')} aria-label={t('{label}: up to, in dollars', { label: t(g.label) })} value={sel[g.id].max} oninput={(e) => onrange(g.id, 'max', e.currentTarget.value)} />
         </div>
       {:else}
         {#each g.options as o (o.id)}
@@ -27,7 +28,7 @@
           {@const on = (sel[g.id] ?? []).includes(o.id)}
           <label class="opt" class:zero={n === 0 && !on}>
             <input type="checkbox" checked={on} onchange={() => ontoggle(g.id, o.id)} />
-            <span class="ol">{o.label}</span>
+            <span class="ol">{t(o.label)}</span>
             {#if n != null}<span class="n">{n}</span>{/if}
           </label>
         {/each}

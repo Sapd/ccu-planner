@@ -1,4 +1,6 @@
 <script>
+  import { t, N_ } from '$logic/i18n.mjs';
+  import { lang, setLanguage } from './i18n.svelte.js';
   import { ui, dismissNotice, pickSection, pickAdvanced, leaveSample, openGlossary, load } from './state.svelte.js';
   import { currencyProblem } from '$logic/format.mjs';
   import Glossary from './Glossary.svelte';
@@ -47,7 +49,7 @@
   async function openRelease() {
     updater.error = '';
     try { await backend.openExternal(RELEASES_URL); }
-    catch { updater.error = 'Could not open the releases page in your browser.'; }
+    catch { updater.error = t('Could not open the releases page in your browser.'); }
   }
   // First open (after the import's Continue or with existing data): show it unless already seen.
   onMount(() => {
@@ -87,7 +89,10 @@
   const feedRunning = $derived(ui.app ? runningFeedEvent(ui.app.saleEvents, localToday(today)) : null);
   let checkEl = $state(null);
   const openChecker = async () => { ui.store.checkOpen = !ui.store.checkOpen; if (ui.store.checkOpen) { await tick(); checkEl?.querySelector('textarea')?.focus(); } };
-  const STORE_TABS = [{ id: 'upgrades', label: 'Upgrades' }, { id: 'browse', label: 'Browse store' }];
+  const STORE_TABS = [{ id: 'upgrades', label: N_('Upgrades') }, { id: 'browse', label: N_('Browse store') }];
+  // The page title and purpose of a PAGE_INFO entry, in the current language (Page shows what it is given).
+  const pageInfo = (key) => ({ title: t(PAGE_INFO[key].title), purpose: t(PAGE_INFO[key].purpose) });
+  const LANGUAGES = [['en', 'English'], ['de', 'Deutsch']]; // each in its own language, never translated
   const browseOffers = () => document.getElementById('store-offers')?.scrollIntoView({ block: 'start' });
   let menuOpen = $state(false);
   let advEl = $state(null);
@@ -114,11 +119,11 @@
     <strong class="app">CCU Planner</strong>
     <SectionNav current={ui.advanced ? null : ui.section} onselect={pickSection} />
     <div class="adv" bind:this={advEl} {onfocusout}>
-      <button type="button" class="advbtn" bind:this={advBtn} class:active={!!ui.advanced} aria-expanded={menuOpen} onclick={() => { menuOpen = !menuOpen; }}>Advanced ▾</button>
+      <button type="button" class="advbtn" bind:this={advBtn} class:active={!!ui.advanced} aria-expanded={menuOpen} onclick={() => { menuOpen = !menuOpen; }}>{t('Advanced')} ▾</button>
       {#if menuOpen}
         <ul class="menu">
           {#each ADVANCED as [key, label] (key)}
-            <li><button type="button" class:active={ui.advanced === key} onclick={() => openAdvanced(key)}><span class="lbl">{label}</span><span class="hintline">{ADVANCED_HINT[key]}</span></button></li>
+            <li><button type="button" class:active={ui.advanced === key} onclick={() => openAdvanced(key)}><span class="lbl">{t(label)}</span><span class="hintline">{t(ADVANCED_HINT[key])}</span></button></li>
           {/each}
         </ul>
       {/if}
@@ -126,29 +131,33 @@
     <span class="grow"></span>
     {#if updater.status === 'ready'}
       <span class="upd" role="status">
-        <button type="button" class="primary" onclick={restartToUpdate}>Update {updater.version} ready · Restart</button>
+        <button type="button" class="primary" onclick={restartToUpdate}>{t('Update {version} ready · Restart', { version: updater.version })}</button>
         {#if updater.error}<span class="uperr" role="alert">{updater.error}</span>{/if}
-        {#if updater.notes}<button type="button" class="linkbtn" aria-expanded={notesOpen} onclick={() => { notesOpen = !notesOpen; }}>What's new</button>{/if}
+        {#if updater.notes}<button type="button" class="linkbtn" aria-expanded={notesOpen} onclick={() => { notesOpen = !notesOpen; }}>{t('What\'s new')}</button>{/if}
         {#if notesOpen && updater.notes}<div class="notes">{updater.notes}</div>{/if}
       </span>
     {:else if updater.status === 'available'}
       <span class="upd">
         <span role="status">{checkLine(updater.status, updater.current, updater.version, updater.error)}</span>
-        <button type="button" class="linkbtn" onclick={openRelease}>Open releases ↗</button>
+        <button type="button" class="linkbtn" onclick={openRelease}>{t('Open releases ↗')}</button>
         {#if updater.error}<span class="uperr" role="alert">{updater.error}</span>{/if}
       </span>
     {/if}
-    <small class="stamps" class:stale>Store: {stamp(meta.catalogAt)} · Hangar: {stamp(meta.hangarAt)}</small>
-    {#if !ui.sample}<button type="button" class="reload" disabled={reloading} aria-label="Reload the saved data" title="Reads the saved store and hangar data again. To get fresh prices, run Sync, then Store." onclick={reload}>{reloading ? '…' : '↻'}</button>{/if}
+    <small class="stamps" class:stale>{t('Store: {store} · Hangar: {hangar}', { store: stamp(meta.catalogAt), hangar: stamp(meta.hangarAt) })}</small>
+    {#if !ui.sample}<button type="button" class="reload" disabled={reloading} aria-label={t('Reload the saved data')} title={t('Reads the saved store and hangar data again. To get fresh prices, run Sync, then Store.')} onclick={reload}>{reloading ? '…' : '↻'}</button>{/if}
     <SyncMenu />
     <div class="adv" bind:this={helpEl} onfocusout={onhelpfocusout}>
-      <button type="button" class="helpbtn" bind:this={helpBtn} aria-expanded={helpOpen} onclick={() => { helpOpen = !helpOpen; menuOpen = false; }}>Help ▾</button>
+      <button type="button" class="helpbtn" bind:this={helpBtn} aria-expanded={helpOpen} onclick={() => { helpOpen = !helpOpen; menuOpen = false; }}>{t('Help')} ▾</button>
       {#if helpOpen}
         <ul class="menu right">
-          <li><button type="button" onclick={() => { helpOpen = false; explainerOpen = true; }}><span class="lbl">How CCUs work</span><span class="hintline">Three short steps: what a CCU is and why chaining and waiting pay</span></button></li>
-          <li><button type="button" onclick={(e) => { helpOpen = false; openGlossary('', helpBtn); }}><span class="lbl">Look up a term</span><span class="hintline">What the words in the planner mean</span></button></li>
+          <li><button type="button" onclick={() => { helpOpen = false; explainerOpen = true; }}><span class="lbl">{t('How CCUs work')}</span><span class="hintline">{t('Three short steps: what a CCU is and why chaining and waiting pay')}</span></button></li>
+          <li><button type="button" onclick={(e) => { helpOpen = false; openGlossary('', helpBtn); }}><span class="lbl">{t('Look up a term')}</span><span class="hintline">{t('What the words in the planner mean')}</span></button></li>
+          <li class="lang" role="group" aria-labelledby="lang-label">
+            <span class="lbl" id="lang-label">{t('Language')}</span>
+            <span class="langbtns">{#each LANGUAGES as [code, name] (code)}<button type="button" lang={code} class:active={lang.code === code} aria-pressed={lang.code === code} data-language={code} onclick={() => setLanguage(code)}>{name}</button>{/each}</span>
+          </li>
           {#if updater.desktop}
-            <li><button type="button" disabled={updater.status === 'checking' || updater.status === 'downloading'} onclick={() => checkForUpdate(true)}><span class="lbl">Check for updates</span><span class="hintline" role="status">{checkLine(updater.status, updater.current, updater.version, updater.error)}</span></button></li>
+            <li><button type="button" disabled={updater.status === 'checking' || updater.status === 'downloading'} onclick={() => checkForUpdate(true)}><span class="lbl">{t('Check for updates')}</span><span class="hintline" role="status">{checkLine(updater.status, updater.current, updater.version, updater.error)}</span></button></li>
             {#if updater.current || updater.portable}<li class="ver">CCU Planner {updater.current}{updater.portable ? ' · Portable' : ''}</li>{/if}
           {/if}
         </ul>
@@ -156,71 +165,71 @@
     </div>
   </header>
   {#if ui.notice}
-    <div class="notice" role="alert">{ui.notice} {#if ui.bought}<button disabled={ui.syncBusy} onclick={() => window.dispatchEvent(new CustomEvent('sync-hangar'))}>Bought it? Sync hangar</button>{/if} <button onclick={dismissNotice}>Dismiss</button></div>
+    <div class="notice" role="alert">{ui.notice} {#if ui.bought}<button disabled={ui.syncBusy} onclick={() => window.dispatchEvent(new CustomEvent('sync-hangar'))}>{t('Bought it? Sync hangar')}</button>{/if} <button onclick={dismissNotice}>{t('Dismiss')}</button></div>
   {/if}
   {#if health && health.key !== healthDismissed}
-    <div class="health" role="status" data-hangar-health>{health.text} <button type="button" onclick={() => openNeedsReview()}>Show them</button> <button type="button" onclick={dismissHealth}>Dismiss</button></div>
+    <div class="health" role="status" data-hangar-health>{health.text} <button type="button" onclick={() => openNeedsReview()}>{t('Show them')}</button> <button type="button" onclick={dismissHealth}>{t('Dismiss')}</button></div>
   {/if}
   {#if ui.sample}
-    <div class="sample" role="status"><b>Sample data</b> — made-up ships, not your account. Changes you make here are forgotten when you leave. <button type="button" onclick={leaveSample}>Leave sample data</button></div>
+    <div class="sample" role="status"><b>{t('Sample data')}</b> — {t('made-up ships, not your account. Changes you make here are forgotten when you leave.')} <button type="button" onclick={leaveSample}>{t('Leave sample data')}</button></div>
   {/if}
   <div class="body">
     {#if wrongCurrency}
-      <main class="main"><div class="currency" role="alert"><h1>Your store account is not supported yet</h1><p>{wrongCurrency}</p></div></main>
+      <main class="main"><div class="currency" role="alert"><h1>{t('Your store account is not supported yet')}</h1><p>{wrongCurrency}</p></div></main>
     {:else if ui.advanced === 'explorer'}
-      <main class="main"><Page {...PAGE_INFO.explorer}><PlanExplorer app={ui.app} /></Page></main>
+      <main class="main"><Page {...pageInfo('explorer')}><PlanExplorer app={ui.app} /></Page></main>
     {:else if ui.advanced === 'prices'}
-      <main class="main"><Page {...PAGE_INFO.prices}><PricesTab app={ui.app} /></Page></main>
+      <main class="main"><Page {...pageInfo('prices')}><PricesTab app={ui.app} /></Page></main>
     {:else if ui.advanced === 'graphs'}
-      <main class="main"><Page {...PAGE_INFO.graphs} wide><GraphTab app={ui.app} {chain} /></Page></main>
+      <main class="main"><Page {...pageInfo('graphs')} wide><GraphTab app={ui.app} {chain} /></Page></main>
     {:else if ui.section === 'today'}
-      <main class="main"><Page {...PAGE_INFO.today}><TodayPage app={ui.app} /></Page></main>
+      <main class="main"><Page {...pageInfo('today')}><TodayPage app={ui.app} /></Page></main>
     {:else if ui.section === 'goals'}
       <main class="main">
-        <Page {...PAGE_INFO.goals} wide>
+        <Page {...pageInfo('goals')} wide>
           {#snippet actions()}<GoalsActions app={ui.app} />{/snippet}
           <GoalsPage app={ui.app} />
         </Page>
       </main>
     {:else if ui.section === 'hangar'}
       <main class="main">
-        <Page {...PAGE_INFO.hangar} wide>
-          {#snippet actions()}<button type="button" class="primary" disabled={ui.syncBusy || ui.sample} title={ui.sample ? 'Sync is off while you look at sample data' : undefined} onclick={() => window.dispatchEvent(new CustomEvent('sync-hangar'))}>Sync hangar</button>{/snippet}
+        <Page {...pageInfo('hangar')} wide>
+          {#snippet actions()}<button type="button" class="primary" disabled={ui.syncBusy || ui.sample} title={ui.sample ? t('Sync is off while you look at sample data') : undefined} onclick={() => window.dispatchEvent(new CustomEvent('sync-hangar'))}>{t('Sync hangar')}</button>{/snippet}
           <HangarTab app={ui.app} />
         </Page>
       </main>
     {:else if ui.section === 'store'}
       <main class="main">
-        <Page {...PAGE_INFO.store}>
+        <Page {...pageInfo('store')}>
           {#snippet actions()}
             {#if ui.storeTab === 'upgrades'}
-              <button type="button" onclick={browseOffers}>Browse offers</button>
-              <button type="button" class="primary" aria-expanded={ui.store.checkOpen} aria-controls="store-check" onclick={openChecker}>Check a deal</button>
+              <button type="button" onclick={browseOffers}>{t('Browse offers')}</button>
+              <button type="button" class="primary" aria-expanded={ui.store.checkOpen} aria-controls="store-check" onclick={openChecker}>{t('Check a deal')}</button>
             {/if}
           {/snippet}
           <div class="store">
-            <div class="tabs" role="group" aria-label="Store view">
-              {#each STORE_TABS as t (t.id)}
-                <button type="button" class="tab" class:active={ui.storeTab === t.id} aria-pressed={ui.storeTab === t.id} data-store-tab={t.id} onclick={() => { ui.storeTab = t.id; }}>{t.label}</button>
+            <div class="tabs" role="group" aria-label={t('Store view')}>
+              {#each STORE_TABS as tab (tab.id)}
+                <button type="button" class="tab" class:active={ui.storeTab === tab.id} aria-pressed={ui.storeTab === tab.id} data-store-tab={tab.id} onclick={() => { ui.storeTab = tab.id; }}>{t(tab.label)}</button>
               {/each}
             </div>
             {#if ui.storeTab === 'browse'}
               {#key ui.sample}<BrowseStore app={ui.app} />{/key}
             {:else}
             {#if feedRunning}
-              <p class="feednote" role="status" data-sale-feed>{feedRunning.name} is on until {shortDay(feedRunning.to)}. The planner counts it as a sale event; it comes from the CCU Planner feed.</p>
+              <p class="feednote" role="status" data-sale-feed>{t('{name} is on until {date}. The planner counts it as a sale event; it comes from the CCU Planner feed.', { name: feedRunning.name, date: shortDay(feedRunning.to) })}</p>
             {/if}
             {#if ui.store.checkOpen}
               <div id="store-check" bind:this={checkEl}>
                 <GlassPanel>
-                  <h2 class="checkh">Check a deal</h2>
+                  <h2 class="checkh">{t('Check a deal')}</h2>
                   <CheckOffer app={ui.app} />
                 </GlassPanel>
               </div>
             {/if}
             <div id="store-offers"><WarbondsTab app={ui.app} /></div>
-            <Fold id="sale-events" title={`Sale events (${ui.app.saleEvents.events.length})`} bind:open={saleOpen}><SaleEvents app={ui.app} /></Fold>
-            <p class="more"><button type="button" class="linkbtn" onclick={() => { pickAdvanced('prices'); }}>Price assumptions → Advanced</button></p>
+            <Fold id="sale-events" title={t('Sale events ({n})', { n: ui.app.saleEvents.events.length })} bind:open={saleOpen}><SaleEvents app={ui.app} /></Fold>
+            <p class="more"><button type="button" class="linkbtn" onclick={() => { pickAdvanced('prices'); }}>{t('Price assumptions → Advanced')}</button></p>
             {/if}
           </div>
         </Page>
@@ -278,6 +287,10 @@
   .upd .primary { padding: 3px 10px; font-size: 13px; }
   .uperr { margin: 0 8px; font-size: 13px; color: var(--warn, #f0b36b); }
   .notes { position: absolute; top: 100%; right: 0; z-index: var(--z-popover); margin-top: 6px; width: 320px; max-height: 260px; overflow: auto; white-space: pre-wrap; padding: 10px 12px; font-size: 13px; background: #121a2b; border: 1px solid var(--glass-border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+  .lang { padding: 6px 10px 4px; }
+  .langbtns { display: flex; gap: 6px; margin-top: 4px; }
+  .menu .langbtns button { display: inline-block; width: auto; text-align: center; padding: 4px 12px; border: 1px solid var(--glass-border); border-radius: 8px; }
+  .menu .langbtns button.active { color: var(--accent); border-color: var(--accent); }
   .ver { padding: 6px 10px 2px; color: var(--muted); font-size: 12px; }
   .reload { padding: 2px 8px; font-size: 14px; line-height: 1; }
 </style>

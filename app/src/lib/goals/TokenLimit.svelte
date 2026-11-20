@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { tokenSettings } from '$logic/tokens.mjs';
   import { dispatch } from '../state.svelte.js';
 
@@ -13,7 +14,7 @@
     if (text == null) return;
     const dollars = Number(text);
     if (text.trim() === '' || !Number.isFinite(dollars) || dollars < 0) {
-      problem = 'Enter an amount of 0 or more.';
+      problem = t('Enter an amount of 0 or more.');
       return;
     }
     problem = '';
@@ -24,7 +25,7 @@
 </script>
 
 <div class="limit">
-  <label for="limit-{uid}">Starting ship price limit (store price, $)</label>
+  <label for="limit-{uid}">{t('Starting ship price limit (store price, $)')}</label>
   <input id="limit-{uid}" type="number" min="0" step="1" inputmode="decimal" value={text ?? String(limit / 100)}
     oninput={(e) => { text = e.currentTarget.value; }} onchange={commit} onkeydown={(e) => { if (e.key === 'Enter') commit(); }} aria-invalid={problem ? 'true' : undefined} />
   {#if problem}<p class="problem" role="alert">{problem}</p>{/if}

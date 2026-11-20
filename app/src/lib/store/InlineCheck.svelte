@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { onDestroy, untrack } from 'svelte';
   import { Job } from '../jobs.svelte.js';
   import JobStatus from '../ui/JobStatus.svelte';
@@ -13,12 +14,12 @@
     untrack(() => job.start(current, 'checkOffer', offer));
   });
   onDestroy(() => job.cancel());
-  const name = (id) => app.data.ships.get(id)?.name ?? 'unknown ship';
+  const name = (id) => app.data.ships.get(id)?.name ?? t('unknown ship');
   const r = $derived(job.status === 'done' ? job.value : null);
 </script>
 
 <div class="inline" data-inline-check>
-  <JobStatus {job} what="Checking" />
+  <JobStatus {job} what={t('Checking')} />
   {#if r}<OfferVerdict {r} {name} />{/if}
 </div>
 

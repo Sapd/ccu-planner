@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { untrack, tick } from 'svelte';
   import { OBJECTIVE_CHOICE } from '$logic/describe.mjs';
   import { usd } from '$logic/format.mjs';
@@ -21,7 +22,7 @@
     viaError = null;
     try {
       const released = await dispatch({ type: 'setVia', chainId: chain.id, ship });
-      if (released?.length) ui.notice = `Released the reserved chain of ${goalLabel(chain, ships)}: it did not pass through ${ships.get(ship)?.name ?? 'that ship'}.`;
+      if (released?.length) ui.notice = t('Released the reserved chain of {goal}: it did not pass through {ship}.', { goal: goalLabel(chain, ships), ship: ships.get(ship)?.name ?? t('that ship') });
     } catch (e) { viaError = e?.message ?? String(e); }
     // A refused choice (the app shows why) leaves the field on the saved ship.
     await tick();
@@ -31,28 +32,28 @@
 
 <div class="settings">
   <div class="row">
-    <label>What counts
+    <label>{t('What counts')}
       <select value={objective} onchange={(e) => set('setObjective', e.currentTarget.value)}>
-        {#each Object.entries(OBJECTIVE_CHOICE) as [v, l] (v)}<option value={v}>{l}</option>{/each}
+        {#each Object.entries(OBJECTIVE_CHOICE) as [v, l] (v)}<option value={v}>{t(l)}</option>{/each}
       </select>
     </label>
-    <p class="allin">All-in, including what you already paid: <b>{usd(allIn)}</b></p>
+    <p class="allin">{t('All-in, including what you already paid:')} <b>{usd(allIn)}</b></p>
   </div>
 
   <div class="via" data-via>
-    <ShipPicker {ships} bind:value={via} label="Route through this ship (optional)" id="via-{chain.id}" onpick={(sh) => setVia(sh.id)} />
-    {#if chain.via != null}<button type="button" onclick={() => { via = null; setVia(null); }}>Clear</button>{/if}
-    <p class="help">{VIA_HELP}</p>
+    <ShipPicker {ships} bind:value={via} label={t('Route through this ship (optional)')} id="via-{chain.id}" onpick={(sh) => setVia(sh.id)} />
+    {#if chain.via != null}<button type="button" onclick={() => { via = null; setVia(null); }}>{t('Clear')}</button>{/if}
+    <p class="help">{t(VIA_HELP)}</p>
     {#if viaError}<p class="err" role="alert">{viaError}</p>{/if}
   </div>
 
   <div class="remove">
     {#if confirmRemove}
-      <span>Remove {goalLabel(chain, ships)}?</span>
-      <button type="button" class="danger" onclick={() => dispatch({ type: 'remove', chainId: chain.id })}>Yes, remove</button>
-      <button type="button" onclick={() => { confirmRemove = false; }}>Cancel</button>
+      <span>{t('Remove {goal}?', { goal: goalLabel(chain, ships) })}</span>
+      <button type="button" class="danger" onclick={() => dispatch({ type: 'remove', chainId: chain.id })}>{t('Yes, remove')}</button>
+      <button type="button" onclick={() => { confirmRemove = false; }}>{t('Cancel')}</button>
     {:else}
-      <button type="button" class="danger" onclick={() => { confirmRemove = true; }}>Remove goal</button>
+      <button type="button" class="danger" onclick={() => { confirmRemove = true; }}>{t('Remove goal')}</button>
     {/if}
   </div>
 </div>

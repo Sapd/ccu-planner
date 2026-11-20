@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { planRoutes, summarize, incomingCount } from '$logic/planner.mjs';
   import { excludedCopies } from '$logic/goals.mjs';
   import { routeLine, noRouteMessage, OBJECTIVE_CHOICE } from '$logic/describe.mjs';
@@ -27,11 +28,11 @@
   const k = $derived(parseBounded(kText, 1, 5));
   const maxSteps = $derived(parseBounded(maxText, 1, 25));
   const problem = $derived(
-    from == null || to == null ? 'Pick both ships.'
-    : from === to ? 'From and to must differ.'
-    : credit == null ? 'RSI store credit must be an amount in dollars, zero or more.'
-    : k == null ? 'Alternatives must be 1 to 5.'
-    : maxSteps == null ? 'Longest route must be 1 to 25 upgrades.' : null,
+    from == null || to == null ? t('Pick both ships.')
+    : from === to ? t('From and to must differ.')
+    : credit == null ? t('RSI store credit must be an amount in dollars, zero or more.')
+    : k == null ? t('Alternatives must be 1 to 5.')
+    : maxSteps == null ? t('Longest route must be 1 to 25 upgrades.') : null,
   );
 
   function run(e) {
@@ -44,18 +45,18 @@
 
 <div class="explorer">
   <GlassPanel>
-  <h2>Find a route between two ships</h2>
-  <p class="intro">Pick the ship you start from and the ship you want. The planner shows the best ways to get there, without creating a goal.</p>
+  <h2>{t('Find a route between two ships')}</h2>
+  <p class="intro">{t('Pick the ship you start from and the ship you want. The planner shows the best ways to get there, without creating a goal.')}</p>
   <form onsubmit={run}>
-    <ShipPicker {ships} bind:value={from} label="From" id="px-from" />
-    <ShipPicker {ships} bind:value={to} label="To" id="px-to" />
-    <label>RSI store credit available ($) <input inputmode="decimal" bind:value={creditText} placeholder="0" /><span class="fieldnote">Applies to eligible Standard purchases.</span></label>
-    <label>Alternatives to show (1–5) <input inputmode="numeric" bind:value={kText} /></label>
-    <label>Longest route (upgrades) <input inputmode="numeric" bind:value={maxText} /></label>
-    <label>Cheapest means <select bind:value={objective}>{#each Object.entries(OBJECTIVE_CHOICE) as [v, text] (v)}<option value={v}>{text}</option>{/each}</select></label>
-    <label class="check"><input type="checkbox" bind:checked={noOwned} /> Don’t use CCUs I own</label>
-    <label class="check"><input type="checkbox" bind:checked={noWarbond} /> Don’t use Warbond upgrades</label>
-    <button type="submit" disabled={!!problem}>Plan</button>
+    <ShipPicker {ships} bind:value={from} label={t('From')} id="px-from" />
+    <ShipPicker {ships} bind:value={to} label={t('To')} id="px-to" />
+    <label>{t('RSI store credit available ($)')} <input inputmode="decimal" bind:value={creditText} placeholder="0" /><span class="fieldnote">{t('Applies to eligible Standard purchases.')}</span></label>
+    <label>{t('Alternatives to show (1–5)')} <input inputmode="numeric" bind:value={kText} /></label>
+    <label>{t('Longest route (upgrades)')} <input inputmode="numeric" bind:value={maxText} /></label>
+    <label>{t('Cheapest means')} <select bind:value={objective}>{#each Object.entries(OBJECTIVE_CHOICE) as [v, text] (v)}<option value={v}>{t(text)}</option>{/each}</select></label>
+    <label class="check"><input type="checkbox" bind:checked={noOwned} /> {t('Don’t use CCUs I own')}</label>
+    <label class="check"><input type="checkbox" bind:checked={noWarbond} /> {t('Don’t use Warbond upgrades')}</label>
+    <button type="submit" disabled={!!problem}>{t('Plan##verb')}</button>
   </form>
   {#if problem}<p class="hint">{problem}</p>{/if}
   </GlassPanel>
@@ -66,8 +67,8 @@
     {#each result.routes as r, i}
       {@const s = summarize(r, ships, result.from, result.to)}
       <GlassPanel class="route">
-        <h4>Route {i + 1}</h4>
-        <p class="line">{routeLine(r)}{#if s.savingsVsStandard != null} · saves {usd(s.savingsVsStandard)} vs direct Standard{/if}</p>
+        <h4>{t('Route {n}', { n: i + 1 })}</h4>
+        <p class="line">{routeLine(r)}{#if s.savingsVsStandard != null} · {t('saves {amount} vs direct Standard', { amount: usd(s.savingsVsStandard) })}{/if}</p>
         <Steps {app} route={r} />
       </GlassPanel>
     {/each}

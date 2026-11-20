@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { tick } from 'svelte';
   import { MODE_CHOICE, LOCK_CHOICE, PRIORITY_CHOICE, settingsSummary } from '$logic/describe.mjs';
   import { dispatch } from '../state.svelte.js';
@@ -17,28 +18,28 @@
   const set = (type, value) => dispatch({ type, chainId: chain.id, value });
 </script>
 
-<GlassPanel class="quick" aria-label="Settings for this goal" {onkeydown}>
+<GlassPanel class="quick" aria-label={t('Settings for this goal')} {onkeydown}>
   <div class="sumrow">
     <p class="summary" data-settings-summary>{settingsSummary(chain, startLine)}</p>
-    <button type="button" bind:this={editBtn} aria-expanded={open} aria-controls="quick-{uid}" onclick={() => { open = !open; }}>{open ? 'Close settings' : 'Edit settings'}</button>
+    <button type="button" bind:this={editBtn} aria-expanded={open} aria-controls="quick-{uid}" onclick={() => { open = !open; }}>{open ? t('Close settings') : t('Edit settings')}</button>
   </div>
   {#if open}
-  <p class="caption">A change updates the prices and the chain.</p>
+  <p class="caption">{t('A change updates the prices and the chain.')}</p>
   <div class="row" id="quick-{uid}">
     <StartControl bind:this={startCtl} {chain} {pool} {ships} />
-    <label>How to buy
+    <label>{t('How to buy')}
       <select value={chain.mode ?? 'watch'} onchange={(e) => set('setMode', e.currentTarget.value)}>
-        {#each Object.entries(MODE_CHOICE) as [v, l] (v)}<option value={v}>{l}</option>{/each}
+        {#each Object.entries(MODE_CHOICE) as [v, l] (v)}<option value={v}>{t(l)}</option>{/each}
       </select>
     </label>
-    <label>Priority
+    <label>{t('Priority')}
       <select value={chain.priority ?? 'normal'} onchange={(e) => set('setPriority', e.currentTarget.value)}>
-        {#each Object.entries(PRIORITY_CHOICE) as [v, l] (v)}<option value={v}>{l}</option>{/each}
+        {#each Object.entries(PRIORITY_CHOICE) as [v, l] (v)}<option value={v}>{t(l)}</option>{/each}
       </select>
     </label>
-    <label>Lock the price of the last step
+    <label>{t('Lock the price of the last step')}
       <select value={chain.lock ?? 'auto'} onchange={(e) => set('setLock', e.currentTarget.value)}>
-        {#each Object.entries(LOCK_CHOICE) as [v, l] (v)}<option value={v}>{l}</option>{/each}
+        {#each Object.entries(LOCK_CHOICE) as [v, l] (v)}<option value={v}>{t(l)}</option>{/each}
       </select>
     </label>
   </div>

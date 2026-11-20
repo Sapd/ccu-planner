@@ -82,7 +82,9 @@ everything in memory and leaves your own data alone; **Leave sample data** takes
   Subscriber, Concierge) with filters. Sync → Store catalog (or the tab's Refresh) fills it; signed in, it also
   gets the Subscriber store and Concierge items, which RSI shows only to a signed-in account.
 - **Advanced** has the Upgrade map, Compare routes and Price assumptions.
-- **Help** has "How CCUs work" and "Look up a term".
+- **Help** has "How CCUs work", "Look up a term" and the language switch. The app is available in
+  English and German (Deutsch); it starts in German when your system language is German, and remembers
+  the language you pick. Ship and manufacturer names stay as RSI writes them.
 - Use **Sync** in the top bar to refresh the hangar (fast) or the store (about 4 to 5 minutes). Prices
   change, so sync before you decide. After you buy something, use **Bought it? Sync hangar**.
 - The **?** in the top bar explains how CCUs work and opens the **Glossary** (CCU, Standard and Warbond,

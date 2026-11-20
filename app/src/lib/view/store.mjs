@@ -1,5 +1,7 @@
 // What the Store page says about an offer, taken from the same journeys Today shows (so the two pages agree). Pure.
 
+import { N_ } from '../../../../src/logic/i18n.mjs';
+
 /**
  * The planner's verdict for each ship that has a Warbond offer, and for each exact source -> target pair.
  * - 'plan': a goal's chain has a Warbond step into the ship that Today lists to buy (buy now, no rush or optional).
@@ -29,8 +31,8 @@ export function storeVerdicts(goals) {
   return { ships: shipsOut, pairs };
 }
 
-export const VERDICT_LABEL = { plan: 'In your plan', helps: 'Helps a goal' };
+export const VERDICT_LABEL = { plan: N_('In your plan'), helps: N_('Helps a goal') };
 export const VERDICT_HELP = {
-  plan: 'A goal buys this upgrade now, as Today lists it.',
-  helps: 'A goal still needs an upgrade into this ship, so an offer here may matter.',
+  plan: N_('A goal buys this upgrade now, as Today lists it.'),
+  helps: N_('A goal still needs an upgrade into this ship, so an offer here may matter.'),
 };

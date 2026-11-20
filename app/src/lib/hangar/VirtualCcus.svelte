@@ -1,4 +1,5 @@
 <script>
+  import { t, tn } from '$logic/i18n.mjs';
   import { usd } from '$logic/format.mjs';
   import { shortDay } from '$logic/availability.mjs';
   import { todayView } from '../view/today.mjs';
@@ -14,7 +15,7 @@
   let editing = $state(undefined); // undefined: closed, null: new, else the record
   let busy = $state(false);
   const remove = async (r) => {
-    if (!confirm(`Delete the virtual CCU ${r.fromName} → ${r.toName}? A chain you reserved with it keeps it.`)) return;
+    if (!confirm(t('Delete the virtual CCU {from} → {to}? A chain you reserved with it keeps it.', { from: r.fromName, to: r.toName }))) return;
     busy = true;
     try { await dispatch({ type: 'removeVirtualCcu', id: r.id }); } finally { busy = false; }
   };
@@ -22,27 +23,27 @@
 
 <section class="virtual" data-virtual-ccus aria-labelledby="virtual-h">
   <div class="head">
-    <h4 id="virtual-h">Virtual CCUs ({rows.length})</h4>
-    <button type="button" onclick={() => { editing = null; }} data-add-virtual>Add virtual CCU</button>
+    <h4 id="virtual-h">{t('Virtual CCUs ({count})', { count: rows.length })}</h4>
+    <button type="button" onclick={() => { editing = null; }} data-add-virtual>{t('Add virtual CCU')}</button>
   </div>
   {#if rows.length}
     <ul>
       {#each rows as r (r.id)}
         <li class:expired={r.expired} data-virtual={r.id}>
           <span class="pair"><b>{r.fromName} → {r.toName}</b>
-            <span class="muted">{usd(r.cents)}{r.savings != null ? ` · saves ${usd(r.savings)}` : ''} · {r.copies} {r.copies === 1 ? 'copy' : 'copies'}{r.expires ? ` · ${r.expired ? 'expired' : 'until'} ${shortDay(r.expires)}` : ''}</span>
+            <span class="muted">{usd(r.cents)}{r.savings != null ? ` · ${t('saves {amount}', { amount: usd(r.savings) })}` : ''} · {tn(r.copies, '{n} copy', '{n} copies')}{r.expires ? ` · ${r.expired ? t('expired {date}', { date: shortDay(r.expires) }) : t('until {date}', { date: shortDay(r.expires) })}` : ''}</span>
             {#if r.note}<span class="note">{r.note}</span>{/if}
-            {#if r.usedBy.length}<span class="used">Used by {#each r.usedBy as g, i (g.goalId)}{i ? ', ' : ''}<button type="button" class="link" onclick={() => openGoalFrom(g.goalId, 'Back to Hangar')}>{g.name}</button>{/each}</span>{:else if !r.expired}<span class="muted">No goal uses it now.</span>{/if}
+            {#if r.usedBy.length}<span class="used">{t('Used by')} {#each r.usedBy as g, i (g.goalId)}{i ? ', ' : ''}<button type="button" class="link" onclick={() => openGoalFrom(g.goalId, t('Back to Hangar'))}>{g.name}</button>{/each}</span>{:else if !r.expired}<span class="muted">{t('No goal uses it now.')}</span>{/if}
           </span>
           <span class="acts">
-            <button type="button" disabled={busy} onclick={() => { editing = r; }}>Edit</button>
-            <button type="button" disabled={busy} onclick={() => remove(r)}>Delete</button>
+            <button type="button" disabled={busy} onclick={() => { editing = r; }}>{t('Edit')}</button>
+            <button type="button" disabled={busy} onclick={() => remove(r)}>{t('Delete')}</button>
           </span>
         </li>
       {/each}
     </ul>
   {:else}
-    <p class="muted">An upgrade you can get outside the RSI store (from a friend, a trade or a coming sale) can be added here, and plans will use it at the price you give.</p>
+    <p class="muted">{t('An upgrade you can get outside the RSI store (from a friend, a trade or a coming sale) can be added here, and plans will use it at the price you give.')}</p>
   {/if}
 </section>
 

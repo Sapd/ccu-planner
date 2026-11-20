@@ -8,6 +8,7 @@
 // `app` is { plans, graph, data?, overrides?, saleEvents?, expected?, session? } like sessionOf() takes.
 // The planning of an edited state costs as much as a whole plan (seconds on a large account): the app runs it in a
 // worker (see jobs.mjs).
+import { t } from './i18n.mjs';
 import { applyAction } from './state.mjs';
 import { createSession, sessionFor } from './session.mjs';
 import { buildGraph, keepVirtual } from './planner.mjs';
@@ -46,10 +47,10 @@ function editedSession(app, { plans = app.plans, graph = app.graph, data = app.d
 export function assertBuyable(from, to, data) {
   const catalog = data?.ships;
   if (!catalog) return;
-  for (const id of [from, to]) if (!catalog.has(id)) throw new Error(`unknown ship ${id}`);
-  if (from === to) throw new Error(`${catalog.get(to).name} to itself is not an upgrade RSI sells`);
+  for (const id of [from, to]) if (!catalog.has(id)) throw new Error(t('unknown ship {id}', { id: String(id) }));
+  if (from === to) throw new Error(t('{name} to itself is not an upgrade RSI sells', { name: catalog.get(to).name }));
   const [a, b] = [catalog.get(from).msrp, catalog.get(to).msrp];
-  if (a != null && b != null && !(b > a)) throw new Error(`${catalog.get(to).name} does not cost more than ${catalog.get(from).name}, so RSI sells no upgrade from one to the other`);
+  if (a != null && b != null && !(b > a)) throw new Error(t('{to} does not cost more than {from}, so RSI sells no upgrade from one to the other', { to: catalog.get(to).name, from: catalog.get(from).name }));
 }
 
 /** { total, goals: { [id]: { name, cash } } } of a session's shared plan; cash null = no route. total adds every goal that has one. */
@@ -101,8 +102,8 @@ function applyChange(app, change) {
   }
   if ('price' in change) {
     const { shipId, msrp } = change.price;
-    if (!app.data?.ships?.has(shipId)) throw new Error(`unknown ship ${shipId}`);
-    if (!Number.isInteger(msrp) || msrp <= 0) throw new Error('price must be a whole number of cents above zero');
+    if (!app.data?.ships?.has(shipId)) throw new Error(t('unknown ship {id}', { id: String(shipId) }));
+    if (!Number.isInteger(msrp) || msrp <= 0) throw new Error(t('price must be a whole number of cents above zero'));
     // The same mechanism as the expected prices: Standard offers touching the ship are recomputed at the new msrp
     // difference; Warbond prices are fixed quotes and stay.
     const only = { rev: 0, ships: { [shipId]: { msrp } } };
@@ -112,7 +113,7 @@ function applyChange(app, change) {
     const graph = rebuild(app.graph, { owned, offers: expectedOffers(offers, app.data.ships, only), ships });
     return { session: editedSession(app, { graph, data: { ...app.data, ships, offers: expectedOffers(app.data.offers ?? offers, app.data.ships, only) } }) };
   }
-  throw new Error('unknown what-if change');
+  throw new Error(t('unknown what-if change'));
 }
 
 /**

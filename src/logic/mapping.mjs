@@ -14,6 +14,7 @@
 //   planSnapshots  plan-snapshots.json or null (the shared plan after each sync, written by scripts/sync.mjs)
 //   plans, overrides  carried for callers; not used here
 
+import { t } from './i18n.mjs';
 import { norm } from './ships.mjs';
 import { shipImageUrl, shipThumbs } from './images.mjs';
 import { pledgeView } from './hangar.mjs';
@@ -159,7 +160,10 @@ export function buildPlannerData(raw, aliases) {
     if (fromId == null || toId == null || conflict) {
       review.push({
         pledgeId: p.pledgeId, name: p.name,
-        reason: conflict ? 'the item IDs and the title name different ships' : `from matches ${from.length}, ship targets ${to.length}`,
+        // Review entries survive language switches with the mapped Hangar data.
+        get reason() {
+          return conflict ? t('the item IDs and the title name different ships') : t('from matches {from}, ship targets {to}', { from: from.length, to: to.length });
+        },
         match: u.match_items, target: u.target_items,
         // The side that did resolve, so a plan can say which goal an unreadable upgrade may belong to.
         fromShip: from.length === 1 ? from[0].shipId : null, toShip: to.length === 1 ? to[0].r.shipId : null,

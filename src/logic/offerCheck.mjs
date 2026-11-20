@@ -2,6 +2,7 @@
 //
 //   checkOffer(app, { from, to, kind, cash })   owned copies, goals that use the pair, the effect of buying one, a verdict
 //   parseOfferText(text, ships)                 offers pulled out of pasted text
+import { loc, t } from './i18n.mjs';
 import { sessionFor } from './session.mjs';
 import { whatIf, assertBuyable } from './whatif.mjs';
 import { goalNamer, norm } from './ships.mjs';
@@ -23,10 +24,10 @@ import { usd } from './format.mjs';
 export function checkOffer(app, { from, to, kind = 'warbond', cash, before = null }) {
   const session = sessionFor(app);
   assertBuyable(from, to, session.data);
-  if (!['warbond', 'standard'].includes(kind)) throw new Error('kind must be warbond or standard');
-  if (!Number.isInteger(cash) || cash < 0) throw new Error('the price must be a whole number of cents');
+  if (!['warbond', 'standard'].includes(kind)) throw new Error(t('kind must be warbond or standard'));
+  if (!Number.isInteger(cash) || cash < 0) throw new Error(t('the price must be a whole number of cents'));
   const namer = goalNamer(session.plans, session.data?.ships ?? null);
-  const shipName = (id) => session.data?.ships?.get(id)?.name ?? 'unknown ship';
+  const shipName = (id) => session.data?.ships?.get(id)?.name ?? t('unknown ship');
 
   const edges = session.graph.edges.get(from) ?? [];
   const ownedEdge = edges.find((e) => e.kind === 'owned' && e.to === to);
@@ -46,8 +47,12 @@ export function checkOffer(app, { from, to, kind = 'warbond', cash, before = nul
 
   const effect = whatIf(app, { buy: { from, to, kind, cash, copies: 1 } }, { before });
   const saving = Math.max(0, 0 - effect.net);
+  const verdict = offerVerdict(effect, saving, copies.length, onRoutes, from, to, cash, shipName);
+  return { offer: { from, to, kind, cash }, store, copies, onRoutes, effect, saving, verdict };
+}
+
+const offerVerdict = loc('offerCheck.verdict', (effect, saving, n, onRoutes, from, to, cash, shipName) => {
   const helped = effect.deltas.filter((d) => d.delta != null && d.delta < 0);
-  const n = copies.length;
 
   let verdict;
   if (saving > 0) {
@@ -60,8 +65,8 @@ export function checkOffer(app, { from, to, kind = 'warbond', cash, before = nul
   } else {
     verdict = 'Would not make any goal cheaper';
   }
-  return { offer: { from, to, kind, cash }, store, copies, onRoutes, effect, saving, verdict: `${verdict}.` };
-}
+  return `${verdict}.`;
+});
 
 // ---- Pasted text ----
 
@@ -75,9 +80,9 @@ const NOISE = new Set(['the', 'a', 'an', 'ship', 'upgrade', 'ccu', 'from', 'to',
 // ("Carrack Expedition" is not the Carrack), and when the longest name is ambiguous there is no fall back to a shorter one.
 function matchShip(index, text) {
   const q = norm(text);
-  if (!q) return { id: null, reason: 'no ship name' };
+  if (!q) return { id: null, reason: t('no ship name') };
   const exact = index.byName.get(q);
-  if (exact != null) return exact === 'ambiguous' ? { id: null, reason: `"${text.trim()}" matches several catalog ships` } : { id: exact };
+  if (exact != null) return exact === 'ambiguous' ? { id: null, reason: t("\"{name}\" matches several catalog ships", { name: text.trim() }) } : { id: exact };
   // "Aegis Avenger Titan": a known manufacturer name (or its first words) in front of an exact ship name
   for (const maker of index.makers) {
     if (!q.startsWith(`${maker} `)) continue;
@@ -92,11 +97,11 @@ function matchShip(index, text) {
     if (!best || name.length > best.name.length) { best = { name, id }; tie = false; }
     else if (name.length === best.name.length && name !== best.name) tie = true;
   }
-  if (!best) return { id: null, reason: `"${text.trim()}" is not a catalog ship` };
+  if (!best) return { id: null, reason: t("\"{name}\" is not a catalog ship", { name: text.trim() }) };
   const shown = index.display.get(best.name);
-  if (tie || best.id === 'ambiguous') return { id: null, reason: `"${text.trim()}" matches several catalog ships` };
+  if (tie || best.id === 'ambiguous') return { id: null, reason: t("\"{name}\" matches several catalog ships", { name: text.trim() }) };
   const left = q.replace(best.name, ' ').split(' ').filter((w) => w && !NOISE.has(w));
-  if (left.length) return { id: null, reason: `"${text.trim()}" is not a catalog ship (did you mean ${shown}?)`, suggestion: shown };
+  if (left.length) return { id: null, reason: t("\"{name}\" is not a catalog ship (did you mean {suggestion}?)", { name: text.trim(), suggestion: shown }), suggestion: shown };
   return { id: best.id };
 }
 
@@ -166,22 +171,24 @@ export function parseOfferText(text, ships) {
       price = MONEY.exec(arrow[2])?.[0] ?? leadPrice;
     }
     const looksLikeOffer = MONEY.test(line) || /→|->|=>|\bfrom\b/i.test(line);
-    if (fromText == null) { if (looksLikeOffer) unmatched.push({ line, reason: 'no "X to Y" or "from X" pair found' }); continue; }
+    if (fromText == null) { if (looksLikeOffer) unmatched.push({ line, reason: t('no "X to Y" or "from X" pair found') }); continue; }
     const a = matchShip(index, fromText);
     const b = matchShip(index, toText);
     if (a.id == null || b.id == null || a.id === b.id) {
-      unmatched.push({ line, reason: a.id != null && a.id === b.id ? 'both sides are the same ship' : (a.id == null ? a : b).reason });
+      unmatched.push({ line, reason: a.id != null && a.id === b.id ? t('both sides are the same ship') : (a.id == null ? a : b).reason });
       continue;
     }
     const from = a.id;
     const to = b.id;
     const m = price ? MONEY.exec(price) : MONEY.exec(plain);
-    if (!m) { unmatched.push({ line, reason: 'no price found' }); continue; }
+    if (!m) { unmatched.push({ line, reason: t('no price found') }); continue; }
     // Two different prices in one line ("$25 - A to B $30") are not guessed at.
     const seen = new Set([...(leadPrice ? [leadPrice] : []), ...(plain.match(PRICE) ?? [])].map((x) => cents(MONEY.exec(x)[1])));
-    if (seen.size > 1) { unmatched.push({ line, reason: `two different prices (${[...seen].map((c) => usd(c)).join(' and ')})` }); continue; }
+    if (seen.size > 1) { unmatched.push({ line, reason: differentPrices(seen) }); continue; }
     const k = kindOf(plain); // a bracket that holds prices was skipped; one that only names the kind counts
     offers.push({ from, to, cash: cents(m[1]), kind: k ?? 'warbond', kindAssumed: k == null, line });
   }
   return { offers, unmatched };
 }
+
+const differentPrices = loc('offerCheck.differentPrices', (seen) => `two different prices (${[...seen].map((c) => usd(c)).join(' and ')})`);

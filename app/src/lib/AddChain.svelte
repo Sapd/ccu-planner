@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import ShipPicker from './ShipPicker.svelte';
   import { MODE_CHOICE, PRIORITY_CHOICE, NO_STARTER_TEXT, NO_HANGAR_TEXT, NO_STARTER_NOTE, SAMPLE_EXAMPLE_LABEL } from '$logic/describe.mjs';
   import { tokenPool, tokenSettings } from '$logic/tokens.mjs';
@@ -43,7 +44,7 @@
   }
 
   const problem = $derived(
-    target == null ? 'Pick the ship you want.' : fixed && base == null ? 'Pick the starting ship, or switch back to Automatic.' : fixed && base === target ? 'Start and target must differ.' : null,
+    target == null ? t('Pick the ship you want.') : fixed && base == null ? t('Pick the starting ship, or switch back to Automatic.') : fixed && base === target ? t('Start and target must differ.') : null,
   );
 
   // The preview plans every goal again with this one added, in memory. Nothing is saved. A result is only shown for the
@@ -74,49 +75,49 @@
 </script>
 
 <form class="add" onsubmit={submit}>
-  <h3>New goal</h3>
+  <h3>{t('New goal')}</h3>
   {#if example}
-    <p><button type="button" class="example" data-sample-example onclick={useExample}>{SAMPLE_EXAMPLE_LABEL}</button></p>
+    <p><button type="button" class="example" data-sample-example onclick={useExample}>{t(SAMPLE_EXAMPLE_LABEL)}</button></p>
   {/if}
-  {#key resets}<ShipPicker {ships} bind:value={target} label="Ship you want" id="add-to" {suggest} onpick={() => { touched = true; }} />{/key}
+  {#key resets}<ShipPicker {ships} bind:value={target} label={t('Ship you want')} id="add-to" {suggest} onpick={() => { touched = true; }} />{/key}
   <fieldset class="starts">
-    <legend>Starts from</legend>
-    <label class="check"><input type="radio" name="add-start" value={false} bind:group={fixed} onchange={() => { touched = true; }} /> Automatic: the cheapest LTI ship you own</label>
-    <label class="check"><input type="radio" name="add-start" value={true} bind:group={fixed} onchange={() => { touched = true; }} /> A ship I choose</label>
+    <legend>{t('Starts from')}</legend>
+    <label class="check"><input type="radio" name="add-start" value={false} bind:group={fixed} onchange={() => { touched = true; }} /> {t('Automatic: the cheapest LTI ship you own')}</label>
+    <label class="check"><input type="radio" name="add-start" value={true} bind:group={fixed} onchange={() => { touched = true; }} /> {t('A ship I choose')}</label>
   </fieldset>
   {#if fixed}
-    {#key resets}<ShipPicker {ships} bind:value={base} label="Starting ship" id="add-from" />{/key}
+    {#key resets}<ShipPicker {ships} bind:value={base} label={t('Starting ship')} id="add-from" />{/key}
   {:else if starter === 'none'}
     <div class="nostarter" role="status" data-no-starter>
-      <p>{hangarSynced ? NO_STARTER_TEXT : NO_HANGAR_TEXT}</p>
+      <p>{t(hangarSynced ? NO_STARTER_TEXT : NO_HANGAR_TEXT)}</p>
       <p class="actions">
-        {#if !hangarSynced}<button type="button" disabled={ui.syncBusy} onclick={() => sync('hangar')}>{ui.syncBusy ? 'Syncing…' : 'Sync hangar'}</button>{/if}
-        <button type="button" onclick={chooseShip}>Choose a ship</button>
+        {#if !hangarSynced}<button type="button" disabled={ui.syncBusy} onclick={() => sync('hangar')}>{ui.syncBusy ? t('Syncing…') : t('Sync hangar')}</button>{/if}
+        <button type="button" onclick={chooseShip}>{t('Choose a ship')}</button>
       </p>
     </div>
   {/if}
   {#if endpoints}
-    <p class="endpoints" data-endpoints>{endpoints}{#if goalCash != null} · {goalCash === 0 ? 'no new cash needed' : `${usd(goalCash)} new cash`}{/if}</p>
+    <p class="endpoints" data-endpoints>{endpoints}{#if goalCash != null} · {goalCash === 0 ? t('no new cash needed') : t('{amount} new cash', { amount: usd(goalCash) })}{/if}</p>
   {/if}
-  <label>Name <input bind:value={name} placeholder="optional" /></label>
+  <label>{t('Name')} <input bind:value={name} placeholder={t('optional')} /></label>
   <div class="row">
-    <label>How to buy <select bind:value={mode}>{#each Object.entries(MODE_CHOICE) as [v, l] (v)}<option value={v}>{l}</option>{/each}</select><span class="fine">{mode === 'watch' ? 'Cheapest: waits for sales when that saves money.' : 'Fastest: buys what is available now.'}</span></label>
-    <label>Priority <select bind:value={priority}>{#each Object.entries(PRIORITY_CHOICE) as [v, l] (v)}<option value={v}>{l}</option>{/each}</select><span class="fine">Goals with higher priority get first pick of your CCUs and credit.</span></label>
+    <label>{t('How to buy')} <select bind:value={mode}>{#each Object.entries(MODE_CHOICE) as [v, l] (v)}<option value={v}>{t(l)}</option>{/each}</select><span class="fine">{mode === 'watch' ? t('Cheapest: waits for sales when that saves money.') : t('Fastest: buys what is available now.')}</span></label>
+    <label>{t('Priority')} <select bind:value={priority}>{#each Object.entries(PRIORITY_CHOICE) as [v, l] (v)}<option value={v}>{t(l)}</option>{/each}</select><span class="fine">{t('Goals with higher priority get first pick of your CCUs and credit.')}</span></label>
   </div>
   {#if problem && touched}<p class="hint">{problem}</p>{/if}
   <div class="row">
-    <button type="submit" disabled={!!problem || busy}>{starter === 'none' ? 'Add goal without a starter' : 'Add goal'}</button>
-    <button type="button" onclick={onclose}>Cancel</button>
+    <button type="submit" disabled={!!problem || busy}>{starter === 'none' ? t('Add goal without a starter') : t('Add goal')}</button>
+    <button type="button" onclick={onclose}>{t('Cancel')}</button>
   </div>
-  <JobStatus {job} what="Planning all goals again" />
-  {#if starter === 'none' && !problem}<p class="help" data-no-starter-note>{NO_STARTER_NOTE}</p>{/if}
+  <JobStatus {job} what={t('Planning all goals again')} />
+  {#if starter === 'none' && !problem}<p class="help" data-no-starter-note>{t(NO_STARTER_NOTE)}</p>{/if}
   {#if preview}
     <div class="preview" data-preview>
       <p>{addGoalText(preview)}</p>
       {#if preview.deltas.length}
-        <ul>{#each preview.deltas as d (d.id)}<li>{d.name}: {d.was == null ? 'no route' : usd(d.was)} → {d.now == null ? 'no route' : usd(d.now)}{d.delta != null ? ` (${signed(d.delta)})` : ''}</li>{/each}</ul>
+        <ul>{#each preview.deltas as d (d.id)}<li>{d.name}: {d.was == null ? t('no route') : usd(d.was)} → {d.now == null ? t('no route') : usd(d.now)}{d.delta != null ? ` (${signed(d.delta)})` : ''}</li>{/each}</ul>
       {/if}
-      <p class="help">Nothing is saved until you add the goal.</p>
+      <p class="help">{t('Nothing is saved until you add the goal.')}</p>
     </div>
   {/if}
 </form>

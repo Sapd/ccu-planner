@@ -1,6 +1,7 @@
 // The Hangar's Ships view: one card per ship you own, plus optional cards for your goal ships. Pure.
 import { goalRow } from './goalTable.mjs';
 import { matchesQuery, searchText } from '../../../../src/logic/search.mjs';
+import { t, tn, N_ } from '../../../../src/logic/i18n.mjs';
 
 const monthsOf = (title) => (!title ? 0 : /lifetime|\bLTI\b/i.test(title) ? Infinity : Number(/(\d+)\s*month/i.exec(title)?.[1] ?? 0));
 
@@ -14,7 +15,7 @@ export function insuranceLabel(title) {
   const kind = insuranceKind(title);
   if (kind === 'lti') return 'LTI';
   const months = /(\d+)\s*month/i.exec(title ?? '')?.[1];
-  return months ? `${months} months` : (title ?? null);
+  return months ? t('{n} months', { n: months }) : (title ?? null);
 }
 
 const PREFIX = /^(?:Standalone Ships?|Package|Upgrade|Warbond(?: Edition)?)\s*[-–:]\s*/i;
@@ -29,7 +30,7 @@ export function originLine(pledge, shipName) {
   if (pledge.upgraded) return `${name.replace(PREFIX, '')} → ${shipName}`;
   if (!STANDALONE.test(name)) return name || null;
   const rest = name.replace(STANDALONE, '');
-  return rest.trim().toLowerCase() === String(shipName).trim().toLowerCase() ? 'Standalone ship' : rest;
+  return rest.trim().toLowerCase() === String(shipName).trim().toLowerCase() ? t('Standalone ship') : rest;
 }
 
 /**
@@ -50,14 +51,14 @@ export function ownedCards(fleet, pledges, ships, poolIds = new Set()) {
     const withKind = ps.filter((p) => insuranceKind(p.insurance ?? null) === kind).length;
     const startingN = e.pledgeIds.filter((id) => poolIds.has(String(id))).length;
     const giftN = ps.filter((p) => p.giftable).length;
-    const some = (n, label) => (n === 0 ? null : many && n < ps.length ? `${label} on ${n} of ${ps.length}` : label);
+    const some = (n, label) => (n === 0 ? null : many && n < ps.length ? t('{label} on {n} of {total}', { label, n, total: ps.length }) : label);
     return {
       kind: 'owned', key: `o:${e.key}`, shipId: e.shipId, name: e.name, manufacturer: e.manufacturer, count: e.count ?? 1, pledges: ps.length,
-      pledgeId: e.pledgeIds[0], line: many && lines.length > 1 ? `${ps.length} pledges` : (lines[0] ?? null), upgraded: !!first?.upgraded,
+      pledgeId: e.pledgeIds[0], line: many && lines.length > 1 ? t('{n} pledges', { n: ps.length }) : (lines[0] ?? null), upgraded: !!first?.upgraded,
       insurance: e.insurance ? (some(withKind, insuranceLabel(e.insurance)) ?? insuranceLabel(e.insurance)) : null, insuranceKind: kind, lti: !!e.lti,
       stage: ship ? (ship.concept ? 'concept' : 'flight') : null,
-      starting: startingN > 0, startingText: some(startingN, 'Starting ship'),
-      giftable: giftN > 0, giftableText: some(giftN, 'Giftable'),
+      starting: startingN > 0, startingText: some(startingN, t('Starting ship')),
+      giftable: giftN > 0, giftableText: some(giftN, t('Giftable')),
     };
   });
 }
@@ -70,15 +71,16 @@ export function goalCards(goals, ships) {
   return goals.map((g) => {
     const r = goalRow(g);
     const open = Math.max(0, r.total - r.own);
-    const tag = g.status === 'no-token' ? 'Goal · needs a starting ship'
-      : g.status === 'no-route' ? 'Goal · no route'
-      : g.status === 'done' || (r.total > 0 && open === 0) ? 'Goal · chain ready'
-      : r.total > 0 ? `Goal · ${open} ${open === 1 ? 'upgrade' : 'upgrades'} to buy`
-      : 'Goal';
+    const ready = g.status !== 'no-token' && g.status !== 'no-route' && (g.status === 'done' || (r.total > 0 && open === 0));
+    const tag = g.status === 'no-token' ? t('Goal · needs a starting ship')
+      : g.status === 'no-route' ? t('Goal · no route')
+      : ready ? t('Goal · chain ready')
+      : r.total > 0 ? tn(open, 'Goal · {n} upgrade to buy', 'Goal · {n} upgrades to buy')
+      : t('Goal');
     const ship = ships.get(g.targetId);
     return {
       kind: 'goal', key: `g:${g.goalId}`, goalId: g.goalId, shipId: g.targetId ?? null, name: g.targetName ?? g.name, manufacturer: null, count: 1,
-      line: g.startLine ?? 'Your goal', tag, ready: tag === 'Goal · chain ready', stage: ship ? (ship.concept ? 'concept' : 'flight') : null,
+      line: g.startLine ?? t('Your goal'), tag, ready, stage: ship ? (ship.concept ? 'concept' : 'flight') : null,
       insurance: null, insuranceKind: null, starting: false, giftable: false,
     };
   });
@@ -90,22 +92,23 @@ export function fleetItems(owned, goals, query = '') {
 }
 
 /** The filter groups of the Ships view. "Show" is strict: what is unticked is hidden. */
+// Labels are marked with N_ and translated where the filter is drawn.
 export const FLEET_GROUPS = [
-  { id: 'show', label: 'Show', strict: true, defaults: ['owned', 'goal'], options: [
-    { id: 'owned', label: 'Owned ships', offLabel: 'Owned ships hidden', test: (c) => c.kind === 'owned' },
-    { id: 'goal', label: 'Goal ships', offLabel: 'Goal ships hidden', test: (c) => c.kind === 'goal' },
+  { id: 'show', label: N_('Show'), strict: true, defaults: ['owned', 'goal'], options: [
+    { id: 'owned', label: N_('Owned ships'), offLabel: N_('Owned ships hidden'), test: (c) => c.kind === 'owned' },
+    { id: 'goal', label: N_('Goal ships'), offLabel: N_('Goal ships hidden'), test: (c) => c.kind === 'goal' },
   ] },
-  { id: 'insurance', label: 'Insurance', options: [
-    { id: 'lti', label: 'LTI', test: (c) => c.insuranceKind === 'lti' },
-    { id: '120', label: '120 months', test: (c) => c.insuranceKind === '120' },
-    { id: 'less', label: 'Under 120 months', test: (c) => c.insuranceKind === 'less' },
+  { id: 'insurance', label: N_('Insurance'), options: [
+    { id: 'lti', label: N_('LTI'), test: (c) => c.insuranceKind === 'lti' },
+    { id: '120', label: N_('120 months'), test: (c) => c.insuranceKind === '120' },
+    { id: 'less', label: N_('Under 120 months'), test: (c) => c.insuranceKind === 'less' },
   ] },
-  { id: 'stage', label: 'Stage', options: [
-    { id: 'flight', label: 'Flight ready', test: (c) => c.stage === 'flight' },
-    { id: 'concept', label: 'Concept', test: (c) => c.stage === 'concept' },
+  { id: 'stage', label: N_('Stage'), options: [
+    { id: 'flight', label: N_('Flight ready'), test: (c) => c.stage === 'flight' },
+    { id: 'concept', label: N_('Concept'), test: (c) => c.stage === 'concept' },
   ] },
-  { id: 'start', label: 'Starting ship', term: 'lti', help: 'A starting ship is a cheap ship in your hangar with lifetime insurance. A goal can start from it, and the upgrades you buy then carry the insurance on to the goal ship.', options: [{ id: 'start', label: 'Starting ship only', test: (c) => c.starting }] },
-  { id: 'gift', label: 'Giftable', options: [{ id: 'gift', label: 'Giftable', test: (c) => c.giftable }] },
+  { id: 'start', label: N_('Starting ship'), term: 'lti', help: N_('A starting ship is a cheap ship in your hangar with lifetime insurance. A goal can start from it, and the upgrades you buy then carry the insurance on to the goal ship.'), options: [{ id: 'start', label: N_('Starting ship only'), test: (c) => c.starting }] },
+  { id: 'gift', label: N_('Giftable'), options: [{ id: 'gift', label: N_('Giftable'), test: (c) => c.giftable }] },
 ];
 
 /**
@@ -114,12 +117,12 @@ export const FLEET_GROUPS = [
  */
 export function fleetCountText(shown, total, pledges) {
   const n = (list, kind) => list.filter((c) => c.kind === kind).length;
-  const ships = (k) => `${k} ${k === 1 ? 'ship' : 'ships'}`;
-  if (shown.length !== total.length) return `Showing ${shown.length} of ${total.length} · ${n(shown, 'owned')} owned, ${n(shown, 'goal')} goal`;
+  const ships = (k) => tn(k, '{n} ship', '{n} ships');
+  if (shown.length !== total.length) return t('Showing {shown} of {total} · {owned} owned, {goal} goal', { shown: shown.length, total: total.length, owned: n(shown, 'owned'), goal: n(shown, 'goal') });
   const o = n(total, 'owned');
   const g = n(total, 'goal');
   const parts = [];
-  if (o) parts.push(`${o} owned ${o === 1 ? 'ship' : 'ships'}${pledges != null && pledges !== o ? ` (${pledges} ${pledges === 1 ? 'pledge' : 'pledges'})` : ''}`);
-  if (g) parts.push(`${g} goal ${g === 1 ? 'ship' : 'ships'}`);
-  return parts.length ? `Showing ${parts.join(' · ')}` : ships(0);
+  if (o) parts.push(`${tn(o, '{n} owned ship', '{n} owned ships')}${pledges != null && pledges !== o ? ` (${tn(pledges, '{n} pledge', '{n} pledges')})` : ''}`);
+  if (g) parts.push(tn(g, '{n} goal ship', '{n} goal ships'));
+  return parts.length ? t('Showing {parts}', { parts: parts.join(' · ') }) : ships(0);
 }

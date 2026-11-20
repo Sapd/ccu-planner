@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { sessionOf } from '$logic/session.mjs';
   import { changesSinceSync } from '$logic/changes.mjs';
   import { changesHeadline, goalChangeLine, changesGoalLines } from '$logic/describe.mjs';
@@ -7,7 +8,7 @@
   // "Since last sync": what the total and each goal's cost did since the data last changed, and why.
   let { app } = $props();
   const c = $derived(changesSinceSync(sessionOf(app), app.data.planSnapshots));
-  const name = (id) => app.data.ships.get(id)?.name ?? 'unknown ship';
+  const name = (id) => app.data.ships.get(id)?.name ?? t('unknown ship');
   const lines = $derived(c ? c.goals.map((g) => goalChangeLine(g, { name })) : []);
   const goalLines = $derived(c ? changesGoalLines(c) : []);
   const hasDetail = $derived(lines.length > 0 || goalLines.length > 0);
@@ -17,12 +18,12 @@
 </script>
 
 {#if c}
-  <GlassPanel id="since-sync" class="changes" aria-label="Since last sync">
+  <GlassPanel id="since-sync" class="changes" aria-label={t('Since last sync')}>
     <h2>
-      <span class="what">Since last sync</span>
+      <span class="what">{t('Since last sync')}</span>
       <span class="head" class:up={c.totalDelta > 0} class:down={c.totalDelta < 0}>{changesHeadline(c)}</span>
       {#if hasDetail}
-        <button type="button" class="more" aria-expanded={open} aria-controls="since-sync-detail" onclick={() => { toggled = !open; }}>{open ? 'Hide' : 'Details'} {open ? '▴' : '▾'}</button>
+        <button type="button" class="more" aria-expanded={open} aria-controls="since-sync-detail" onclick={() => { toggled = !open; }}>{open ? t('Hide') : t('Details')} {open ? '▴' : '▾'}</button>
       {/if}
     </h2>
     {#if open}

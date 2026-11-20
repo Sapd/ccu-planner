@@ -1,9 +1,10 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { ui, goBack } from '../state.svelte.js';
 </script>
 
 {#if ui.back}
-  <p class="back"><button type="button" class="backbtn" data-back onclick={goBack}><span aria-hidden="true">←</span> {ui.back.label}</button></p>
+  <p class="back"><button type="button" class="backbtn" data-back onclick={goBack}><span aria-hidden="true">←</span> {t(ui.back.label)}</button></p>
 {/if}
 
 <style>

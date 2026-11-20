@@ -2,6 +2,7 @@
 // Only what the planner has: ship prices from the catalog (today's list prices) and what you paid. A missing price stays missing.
 import { matchesQuery, searchText } from '../../../../src/logic/search.mjs';
 import { applyFilters } from './filters.mjs';
+import { N_ } from '../../../../src/logic/i18n.mjs';
 
 /**
  * Hangar rows with the numbers beside them: fromValue and toValue (today's ship prices), value (what the same upgrade costs today
@@ -61,28 +62,28 @@ export function groupCcuPairs(rows) {
  * The filter groups of the Upgrades view. "Not reserved" means no goal holds the copy; "Not in use" is stricter: no goal holds it and
  * no goal's current (proposed) chain uses it either (rows marked by hangarSummary.markInUse). "Needs review" lists unmatched pledges; it matches no copy. */
 export const CCU_GROUPS = [
-  { id: 'use', label: 'Use', options: [
-    { id: 'reserved', label: 'Reserved', test: (r) => !!r.reservedBy },
-    { id: 'free', label: 'Not reserved', test: (r) => !r.reservedBy },
-    { id: 'unused', label: 'Not in use', test: (r) => r.inUse === undefined ? !r.reservedBy : !r.inUse },
-    { id: 'review', label: 'Needs review', test: () => false },
+  { id: 'use', label: N_('Use'), options: [
+    { id: 'reserved', label: N_('Reserved'), test: (r) => !!r.reservedBy },
+    { id: 'free', label: N_('Not reserved'), test: (r) => !r.reservedBy },
+    { id: 'unused', label: N_('Not in use'), test: (r) => r.inUse === undefined ? !r.reservedBy : !r.inUse },
+    { id: 'review', label: N_('Needs review'), test: () => false },
   ] },
-  { id: 'saving', label: 'Saving', options: [
-    { id: 'saving', label: 'Saving', test: (r) => r.saving != null && r.saving > 0 },
-    { id: 'none', label: 'No saving', test: (r) => r.saving === 0 },
-    { id: 'negative', label: 'Negative value', test: (r) => r.saving != null && r.saving < 0 },
+  { id: 'saving', label: N_('Saving'), options: [
+    { id: 'saving', label: N_('Saving'), test: (r) => r.saving != null && r.saving > 0 },
+    { id: 'none', label: N_('No saving'), test: (r) => r.saving === 0 },
+    { id: 'negative', label: N_('Negative value'), test: (r) => r.saving != null && r.saving < 0 },
   ] },
-  { id: 'warbond', label: 'Warbond', options: [{ id: 'warbond', label: 'Warbond edition', test: (r) => r.warbond }] },
-  { id: 'gift', label: 'Giftable', options: [{ id: 'gift', label: 'Giftable', test: (r) => r.giftable }] },
-  { id: 'melt', label: 'Meltable', options: [
-    { id: 'melt', label: 'Meltable', test: (r) => r.meltable },
-    { id: 'nomelt', label: 'Not meltable', test: (r) => !r.meltable },
+  { id: 'warbond', label: N_('Warbond'), options: [{ id: 'warbond', label: N_('Warbond edition'), test: (r) => r.warbond }] },
+  { id: 'gift', label: N_('Giftable'), options: [{ id: 'gift', label: N_('Giftable'), test: (r) => r.giftable }] },
+  { id: 'melt', label: N_('Meltable'), options: [
+    { id: 'melt', label: N_('Meltable'), test: (r) => r.meltable },
+    { id: 'nomelt', label: N_('Not meltable'), test: (r) => !r.meltable },
   ] },
-  { id: 'stage', label: 'Stage of target', options: [
-    { id: 'flight', label: 'Flight ready', test: (r) => r.stage === 'flight' },
-    { id: 'concept', label: 'Concept', test: (r) => r.stage === 'concept' },
+  { id: 'stage', label: N_('Stage of target'), options: [
+    { id: 'flight', label: N_('Flight ready'), test: (r) => r.stage === 'flight' },
+    { id: 'concept', label: N_('Concept'), test: (r) => r.stage === 'concept' },
   ] },
-  { id: 'range', label: 'Upgrade value', kind: 'range', value: (r) => r.value },
+  { id: 'range', label: N_('Upgrade value'), kind: 'range', value: (r) => r.value },
 ];
 
 /**

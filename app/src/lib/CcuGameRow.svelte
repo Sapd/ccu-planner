@@ -1,6 +1,7 @@
 <script>
   // "Coming from CCU Game?" on the first steps. With the store's ship list the file goes through the same preview and confirm
   // as on Goals; without it the file is checked and kept, and imported after the sync (pending-import.svelte.js).
+  import { t } from '$logic/i18n.mjs';
   import ImportGoals from './goals/ImportGoals.svelte';
   import FilePick from './ui/FilePick.svelte';
   import { ui } from './state.svelte.js';
@@ -13,7 +14,7 @@
     error = null;
     try { await stagePending(file); } catch (e) { error = e?.message ?? String(e); }
   }
-  const lead = 'Coming from CCU Game?';
+  const lead = $derived(t('Coming from CCU Game?'));
 </script>
 
 <div class="ccu" data-ccugame>
@@ -21,14 +22,14 @@
     <div class="pick" role="status">
       <span class="lead">{lead}</span>
       <span class="ready">{pendingText(ui.pending.chains.length)}</span>
-      <button type="button" class="quiet" onclick={removePending}>Remove</button>
+      <button type="button" class="quiet" onclick={removePending}>{t('Remove')}</button>
     </div>
   {:else if app}
     <ImportGoals {app} embedded {lead} />
   {:else}
     <div class="pick">
       <span class="lead">{lead}</span>
-      <FilePick label="Import CCU Game file" inputLabel="Saved Chains file from CCU Game" onfile={choose} />
+      <FilePick label={t('Import CCU Game file')} inputLabel={t('Saved Chains file from CCU Game')} onfile={choose} />
     </div>
     {#if error}<p class="error" role="alert">{error}</p>{/if}
   {/if}

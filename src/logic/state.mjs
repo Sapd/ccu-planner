@@ -3,6 +3,7 @@
 // never touches a document's rev; the store bumps rev when it saves.
 // Three documents: plans, overrides (price + availability) and saleEvents.
 
+import { t } from './i18n.mjs';
 import { addSaleEvent, removeSaleEvent, emptySaleEvents, AVAILABILITY, isDay } from './availability.mjs';
 import { pairKey } from './urgency.mjs';
 import { tokenSettings } from './tokens.mjs';
@@ -41,8 +42,8 @@ import { addChain, acceptRoute, releaseChain, setMode, setObjective, setLock, PR
  *   acceptFleet { plans: [{ chainId, route }] }          accepts the route of every goal that has none yet (accepted goals stay untouched)
  */
 function checkStart(start) {
-  if (!['token', 'ship'].includes(start?.kind)) throw new Error('start must be a token or a ship');
-  if (start.kind === 'token' && start.pledgeId !== undefined && typeof start.pledgeId !== 'string') throw new Error('token pledgeId must be a string');
+  if (!['token', 'ship'].includes(start?.kind)) throw new Error(t('start must be a token or a ship'));
+  if (start.kind === 'token' && start.pledgeId !== undefined && typeof start.pledgeId !== 'string') throw new Error(t('token pledgeId must be a string'));
 }
 
 export function applyAction(doc, action, ctx = {}) {
@@ -51,20 +52,20 @@ export function applyAction(doc, action, ctx = {}) {
   const saleEvents = structuredClone(doc.saleEvents ?? emptySaleEvents());
   const out = { plans, overrides, saleEvents, changed: 'plans' };
   const chain = (id) => {
-    if (!Object.hasOwn(plans.chains, id)) throw new Error(`unknown chain ${id}`);
+    if (!Object.hasOwn(plans.chains, id)) throw new Error(t('unknown chain {id}', { id: String(id) }));
     return plans.chains[id];
   };
 
   switch (action.type) {
     case 'addChain': {
       if (action.start == null && action.base != null) action = { ...action, start: { kind: 'ship', ship: action.base } };
-      if (action.start == null || action.target == null) throw new Error('addChain needs a start and a target ship');
+      if (action.start == null || action.target == null) throw new Error(t('addChain needs a start and a target ship'));
       checkStart(action.start);
       action = { ...action, start: { ...action.start } };
       const fixed = action.start.kind === 'ship';
-      if (fixed && action.start.ship === action.target) throw new Error('start and target must differ');
+      if (fixed && action.start.ship === action.target) throw new Error(t('start and target must differ'));
       for (const sid of fixed ? [action.start.ship, action.target] : [action.target]) {
-        if (ctx.ships && !ctx.ships.has(sid)) throw new Error(`unknown ship ${sid}`);
+        if (ctx.ships && !ctx.ships.has(sid)) throw new Error(t('unknown ship {id}', { id: String(sid) }));
       }
       const name = action.name ?? ctx.ships?.get(action.target)?.name;
       out.result = addChain(plans, { name, start: action.start, target: action.target, priority: action.priority, mode: action.mode });
@@ -75,9 +76,9 @@ export function applyAction(doc, action, ctx = {}) {
       for (const r of action.rows ?? []) {
         if (r.status !== 'new') continue;
         checkStart(r.start);
-        if (r.start.kind === 'ship' && r.start.ship === r.to) throw new Error('start and target must differ');
+        if (r.start.kind === 'ship' && r.start.ship === r.to) throw new Error(t('start and target must differ'));
         for (const sid of r.start.kind === 'ship' ? [r.start.ship, r.to] : [r.to]) {
-          if (ctx.ships && !ctx.ships.has(sid)) throw new Error(`unknown ship ${sid}`);
+          if (ctx.ships && !ctx.ships.has(sid)) throw new Error(t('unknown ship {id}', { id: String(sid) }));
         }
         out.result.push(addChain(plans, { name: typeof r.name === 'string' && r.name ? r.name : ctx.ships?.get(r.to)?.name, start: { ...r.start }, target: r.to, mode: r.mode }).id);
       }
@@ -86,29 +87,29 @@ export function applyAction(doc, action, ctx = {}) {
     case 'setStart': {
       const c = chain(action.chainId);
       checkStart(action.start);
-      if (action.start.kind === 'ship' && action.start.ship === c.target) throw new Error('start and target must differ');
-      if (ctx.ships && action.start?.kind === 'ship' && !ctx.ships.has(action.start.ship)) throw new Error(`unknown ship ${action.start.ship}`);
+      if (action.start.kind === 'ship' && action.start.ship === c.target) throw new Error(t('start and target must differ'));
+      if (ctx.ships && action.start?.kind === 'ship' && !ctx.ships.has(action.start.ship)) throw new Error(t('unknown ship {id}', { id: String(action.start.ship) }));
       releaseChain(plans, action.chainId);
       c.start = { ...action.start };
       break;
     }
     case 'setTokenSettings': {
-      const t = action.tokens ?? {};
-      if (t.limitCents !== undefined && (!Number.isInteger(t.limitCents) || t.limitCents < 0)) throw new Error('token limit must be a whole number of cents');
+      const settings = action.tokens ?? {};
+      if (settings.limitCents !== undefined && (!Number.isInteger(settings.limitCents) || settings.limitCents < 0)) throw new Error(t('token limit must be a whole number of cents'));
       for (const k of ['use', 'never']) {
-        if (t[k] !== undefined && !(Array.isArray(t[k]) && t[k].every((x) => typeof x === 'string'))) throw new Error(`${k} must be an array of strings`);
+        if (settings[k] !== undefined && !(Array.isArray(settings[k]) && settings[k].every((x) => typeof x === 'string'))) throw new Error(t('{field} must be an array of strings', { field: k }));
       }
       const cur = tokenSettings(plans);
       plans.profile.tokens = {
-        limitCents: t.limitCents ?? cur.limitCents,
-        use: t.use ? [...t.use] : cur.use,
-        never: t.never ? [...t.never] : cur.never,
+        limitCents: settings.limitCents ?? cur.limitCents,
+        use: settings.use ? [...settings.use] : cur.use,
+        never: settings.never ? [...settings.never] : cur.never,
       };
       break;
     }
     case 'excludeCopy': {
-      if (typeof action.copyId !== 'string' || !action.copyId) throw new Error('copyId must be a non-empty string');
-      if (typeof action.excluded !== 'boolean') throw new Error('excluded must be true or false');
+      if (typeof action.copyId !== 'string' || !action.copyId) throw new Error(t('copyId must be a non-empty string'));
+      if (typeof action.excluded !== 'boolean') throw new Error(t('excluded must be true or false'));
       const cur = (plans.profile.excludedCopies ?? []).filter((id) => id !== action.copyId);
       plans.profile.excludedCopies = action.excluded ? [...cur, action.copyId] : cur;
       // A reservation that holds the copy can no longer keep its chain: release it, like a changed start does.
@@ -123,17 +124,17 @@ export function applyAction(doc, action, ctx = {}) {
     case 'setVirtualCcu': {
       const v = action.ccu ?? {};
       const known = (id) => !ctx.ships || ctx.ships.has(id);
-      if (!Number.isInteger(v.from) || !Number.isInteger(v.to) || !known(v.from) || !known(v.to)) throw new Error('a virtual CCU needs a known source and target ship');
-      if (v.from === v.to) throw new Error('source and target ship must differ');
-      if (!Number.isInteger(v.cents) || v.cents < 0) throw new Error('price must be a whole number of cents, 0 or more');
+      if (!Number.isInteger(v.from) || !Number.isInteger(v.to) || !known(v.from) || !known(v.to)) throw new Error(t('a virtual CCU needs a known source and target ship'));
+      if (v.from === v.to) throw new Error(t('source and target ship must differ'));
+      if (!Number.isInteger(v.cents) || v.cents < 0) throw new Error(t('price must be a whole number of cents, 0 or more'));
       const copies = v.copies ?? 1;
-      if (!Number.isInteger(copies) || copies < 1 || copies > 99) throw new Error('copies must be between 1 and 99');
-      if (v.expires != null && !isDay(v.expires)) throw new Error('expiration date must be YYYY-MM-DD');
+      if (!Number.isInteger(copies) || copies < 1 || copies > 99) throw new Error(t('copies must be between 1 and 99'));
+      if (v.expires != null && !isDay(v.expires)) throw new Error(t('expiration date must be YYYY-MM-DD'));
       const note = String(v.note ?? '').trim();
-      if (note.length > 100) throw new Error('note must be at most 100 characters');
+      if (note.length > 100) throw new Error(t('note must be at most 100 characters'));
       const list = plans.profile.virtualCcus ?? [];
       const prev = v.id != null ? list.find((x) => x.id === v.id) : null;
-      if (v.id != null && !prev) throw new Error(`unknown virtual CCU ${v.id}`);
+      if (v.id != null && !prev) throw new Error(t('unknown virtual CCU {id}', { id: v.id }));
       const id = prev?.id ?? `v${plans.profile.nextVirtualId ?? 1}`;
       if (!prev) plans.profile.nextVirtualId = (plans.profile.nextVirtualId ?? 1) + 1;
       const rec = { id, from: v.from, to: v.to, cents: v.cents, copies, expires: v.expires ?? null, note, createdAt: prev?.createdAt ?? new Date().toISOString() };
@@ -143,7 +144,7 @@ export function applyAction(doc, action, ctx = {}) {
     }
     case 'removeVirtualCcu': {
       const list = plans.profile.virtualCcus ?? [];
-      if (!list.some((x) => x.id === action.id)) throw new Error(`unknown virtual CCU ${action.id}`);
+      if (!list.some((x) => x.id === action.id)) throw new Error(t('unknown virtual CCU {id}', { id: String(action.id) }));
       plans.profile.virtualCcus = list.filter((x) => x.id !== action.id);
       break;
     }
@@ -151,9 +152,9 @@ export function applyAction(doc, action, ctx = {}) {
       const c = chain(action.chainId);
       const ship = action.ship ?? null;
       if (ship != null) {
-        if (!Number.isInteger(ship) || (ctx.ships && !ctx.ships.has(ship))) throw new Error(`unknown ship ${ship}`);
-        if (ship === c.target) throw new Error('the ship to route through must differ from the target');
-        if (c.start?.kind === 'ship' && ship === c.start.ship) throw new Error('the ship to route through must differ from the start');
+        if (!Number.isInteger(ship) || (ctx.ships && !ctx.ships.has(ship))) throw new Error(t('unknown ship {id}', { id: String(ship) }));
+        if (ship === c.target) throw new Error(t('the ship to route through must differ from the target'));
+        if (c.start?.kind === 'ship' && ship === c.start.ship) throw new Error(t('the ship to route through must differ from the start'));
       }
       if (ship == null) delete c.via; else c.via = ship;
       const passes = (a) => ship == null || a.token?.ship === ship || a.steps.some((st) => st.to === ship || st.from === ship);
@@ -162,7 +163,7 @@ export function applyAction(doc, action, ctx = {}) {
       break;
     }
     case 'markToken': {
-      if (![ 'use', 'never', null ].includes(action.mark)) throw new Error('mark must be use, never or null');
+      if (![ 'use', 'never', null ].includes(action.mark)) throw new Error(t('mark must be use, never or null'));
       const cur = tokenSettings(plans);
       const id = String(action.pledgeId);
       const t = { ...cur, use: cur.use.filter((x) => x !== id), never: cur.never.filter((x) => x !== id) };
@@ -196,15 +197,15 @@ export function applyAction(doc, action, ctx = {}) {
       break;
     case 'setPriority':
       chain(action.chainId);
-      if (!Object.hasOwn(PRIORITY, action.value)) throw new Error(`priority must be one of ${Object.keys(PRIORITY).join(', ')}`);
+      if (!Object.hasOwn(PRIORITY, action.value)) throw new Error(t('priority must be one of {values}', { values: Object.keys(PRIORITY).join(', ') }));
       plans.chains[action.chainId].priority = action.value;
       break;
     case 'setCredit':
-      if (!Number.isInteger(action.cents) || action.cents < 0) throw new Error('credit must be zero or more whole cents');
+      if (!Number.isInteger(action.cents) || action.cents < 0) throw new Error(t('credit must be zero or more whole cents'));
       plans.profile.credit = action.cents;
       break;
     case 'setPrice':
-      if (!Number.isInteger(action.cents) || action.cents <= 0) throw new Error('price must be a whole number of cents above zero');
+      if (!Number.isInteger(action.cents) || action.cents <= 0) throw new Error(t('price must be a whole number of cents above zero'));
       overrides.ships[action.shipId] = { ...overrides.ships[action.shipId], msrp: action.cents, note: action.note ?? null, setAt: new Date().toISOString() };
       out.result = overrides.ships[action.shipId];
       out.changed = 'overrides';
@@ -217,8 +218,8 @@ export function applyAction(doc, action, ctx = {}) {
       break;
     }
     case 'setAvailability': {
-      if (!AVAILABILITY.includes(action.value)) throw new Error(`availability must be one of ${AVAILABILITY.join(', ')}`);
-      if (ctx.ships && !ctx.ships.has(action.shipId)) throw new Error(`unknown ship ${action.shipId}`);
+      if (!AVAILABILITY.includes(action.value)) throw new Error(t('availability must be one of {values}', { values: AVAILABILITY.join(', ') }));
+      if (ctx.ships && !ctx.ships.has(action.shipId)) throw new Error(t('unknown ship {id}', { id: String(action.shipId) }));
       const { availabilityNote, ...rest } = overrides.ships[action.shipId] ?? {};
       overrides.ships[action.shipId] = { ...rest, availability: action.value, ...(action.note ? { availabilityNote: action.note } : {}) };
       out.result = overrides.ships[action.shipId];
@@ -233,8 +234,8 @@ export function applyAction(doc, action, ctx = {}) {
       break;
     }
     case 'setOfferEnd': {
-      if (action.soon !== true && !isDay(action.until)) throw new Error('an offer note needs a day (YYYY-MM-DD) or soon: true');
-      if (ctx.ships && (!ctx.ships.has(action.from) || !ctx.ships.has(action.to))) throw new Error(`unknown ship in ${action.from}-${action.to}`);
+      if (action.soon !== true && !isDay(action.until)) throw new Error(t('an offer note needs a day (YYYY-MM-DD) or soon: true'));
+      if (ctx.ships && (!ctx.ships.has(action.from) || !ctx.ships.has(action.to))) throw new Error(t('unknown ship in {from}-{to}', { from: String(action.from), to: String(action.to) }));
       const note = action.soon === true ? { soon: true } : { until: action.until };
       overrides.pairs = { ...(overrides.pairs ?? {}), [pairKey(action.from, action.to)]: { ...note, setAt: new Date().toISOString() } };
       out.result = overrides.pairs[pairKey(action.from, action.to)];
@@ -264,7 +265,7 @@ export function applyAction(doc, action, ctx = {}) {
       for (const p of action.plans) if (p.route && plans.chains[p.chainId] && !plans.chains[p.chainId].accepted) acceptRoute(plans, p.chainId, p.route, ctx.meta ?? {}, { graph: ctx.graph });
       break;
     default:
-      throw new Error(`unknown action ${action.type}`);
+      throw new Error(t('unknown action {type}', { type: String(action.type) }));
   }
   return out;
 }

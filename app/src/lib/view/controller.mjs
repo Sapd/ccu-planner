@@ -3,11 +3,13 @@
 import { applyAction } from '../../../../src/logic/state.mjs';
 import { deriveAppState, withDocs } from './derive.mjs';
 import { userSaleEvents } from '../../../../src/logic/feed.mjs';
+import { t, N_ } from '../../../../src/logic/i18n.mjs';
+import { backendError } from './backendErrors.mjs';
 
 // Action result document -> save_doc name (the file names live in the backends).
 const DOC_NAMES = { plans: 'plans', overrides: 'overrides', saleEvents: 'sale-events' };
 
-export const CONFLICT_NOTICE = 'Changed outside the app; reloaded. Do it again.';
+export const CONFLICT_NOTICE = N_('Changed outside the app; reloaded. Do it again.');
 
 /** `feed()` gives the feed's part of the sale events when state is derived: { events, at } (see withDocs); none by default. */
 export function createController(backend, aliases, { onChange = () => {}, feed = () => undefined } = {}) {
@@ -36,12 +38,12 @@ export function createController(backend, aliases, { onChange = () => {}, feed =
       if (e?.conflict) {
         try {
           await self.load();
-          self.notice = CONFLICT_NOTICE;
+          self.notice = t(CONFLICT_NOTICE);
         } catch (loadError) {
-          self.notice = `Changed outside the app; reload failed: ${loadError?.message ?? loadError}`;
+          self.notice = t('Changed outside the app; reload failed: {error}', { error: backendError(loadError) });
         }
       } else {
-        self.notice = e?.message ?? String(e);
+        self.notice = backendError(e);
       }
       onChange(self);
     }

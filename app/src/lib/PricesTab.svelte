@@ -1,4 +1,5 @@
 <script>
+  import { t, tn } from '$logic/i18n.mjs';
   import ShipThumb from './ShipThumb.svelte';
   import ShipPicker from './ShipPicker.svelte';
   import GlassPanel from './ui/GlassPanel.svelte';
@@ -37,7 +38,7 @@
   let busy = $state(false);
   let resets = $state(0);
   const cents = $derived(parsePriceUsd(priceText));
-  const problem = $derived(shipId == null ? 'Pick a ship.' : cents == null ? 'Enter a price in dollars above zero.' : null);
+  const problem = $derived(shipId == null ? t('Pick a ship.') : cents == null ? t('Enter a price in dollars above zero.') : null);
 
   async function add(e) {
     e.preventDefault();
@@ -50,64 +51,64 @@
 </script>
 
 <div class="prices">
-  <SearchBox bind:value={query} label="Search price assumptions" placeholder="Search ships" shown={rows.length + availShown.length + concepts.length} total={allRows.length + avail.length + allConcepts.length} />
+  <SearchBox bind:value={query} label={t('Search price assumptions')} placeholder={t('Search ships')} shown={rows.length + availShown.length + concepts.length} total={allRows.length + avail.length + allConcepts.length} />
 
-  <p class="saleslink">These are the planner's working assumptions; most people never need to change them. <button type="button" class="linkbtn" onclick={() => openSaleEvents()}>Manage sale dates in Store</button>.</p>
+  <p class="saleslink">{t("These are the planner's working assumptions; most people never need to change them.")} <button type="button" class="linkbtn" onclick={() => openSaleEvents()}>{t('Manage sale dates in Store')}</button>.</p>
 
   <GlassPanel>
-    <h2>Expected prices ({searching ? `${rows.length} of ${allRows.length}` : rows.length})</h2>
+    <h2>{t('Expected prices ({count})', { count: searching ? t('{shown} of {total}', { shown: rows.length, total: allRows.length }) : rows.length })}</h2>
     <p class="muted">{assumptionsCoverText(affected)}</p>
     {#each rows as r (r.shipId)}
       <div class="row" data-ship={r.shipId}>
         <span class="lbl"><ShipThumb ship={ships.get(r.shipId) ?? null} size="s" /><span>{priceLine(r.name, r.today, r.override, r.affected)}</span></span>
-        <button type="button" onclick={() => clear(r.shipId)} aria-label="Clear expected price for {r.name}">Clear</button>
+        <button type="button" onclick={() => clear(r.shipId)} aria-label={t('Clear expected price for {name}', { name: r.name })}>{t('Clear')}</button>
       </div>
     {:else}
-      <p class="muted">{searching && allRows.length ? noMatchesText(query) : 'No expected prices set.'}</p>
+      <p class="muted">{searching && allRows.length ? noMatchesText(query) : t('No expected prices set.')}</p>
     {/each}
 
     <form class="add" onsubmit={add}>
       {#key resets}
-        <ShipPicker {ships} bind:value={shipId} label="Ship" id="price-ship" />
+        <ShipPicker {ships} bind:value={shipId} label={t('Ship')} id="price-ship" />
       {/key}
-      <label>Expected price $ <input type="text" inputmode="decimal" bind:value={priceText} /></label>
-      <label>Note <input bind:value={note} placeholder="optional" /></label>
+      <label>{t('Expected price $')} <input type="text" inputmode="decimal" bind:value={priceText} /></label>
+      <label>{t('Note')} <input bind:value={note} placeholder={t('optional')} /></label>
       {#if problem && (shipId != null || priceText)}<p class="muted">{problem}</p>{/if}
-      <button type="submit" class="primary" disabled={!!problem || busy}>Set expected price</button>
+      <button type="submit" class="primary" disabled={!!problem || busy}>{t('Set expected price')}</button>
     </form>
   </GlassPanel>
 
   {#snippet availRow(r)}
     <div class="row" data-avail={r.shipId} data-status={r.status}>
       <span class="lbl"><ShipThumb ship={ships.get(r.shipId) ?? null} size="s" /><span>{r.name}: {availabilityText(r)}</span></span>
-      <select value={r.mark} onchange={(e) => markAvailability(r.shipId, e.currentTarget.value)} aria-label="Availability of {r.name}">
-        <option value="auto">auto</option>
-        <option value="regular">regular</option>
-        <option value="event-only">event-only</option>
+      <select value={r.mark} onchange={(e) => markAvailability(r.shipId, e.currentTarget.value)} aria-label={t('Availability of {name}', { name: r.name })}>
+        <option value="auto">{t('auto')}</option>
+        <option value="regular">{t('regular')}</option>
+        <option value="event-only">{t('event-only')}</option>
       </select>
     </div>
   {/snippet}
 
   <GlassPanel>
-    <h2>Ship availability ({searching ? `${availShown.length} of ${avail.length}` : avail.length})</h2>
-    <p class="muted">Whether a ship is on sale all year (regular) or only during sales events. The planner learns this from your syncs; set it by hand only if it is wrong.</p>
+    <h2>{t('Ship availability ({count})', { count: searching ? t('{shown} of {total}', { shown: availShown.length, total: avail.length }) : avail.length })}</h2>
+    <p class="muted">{t('Whether a ship is on sale all year (regular) or only during sales events. The planner learns this from your syncs; set it by hand only if it is wrong.')}</p>
     {#each split.known as r (r.shipId)}{@render availRow(r)}{:else}
-      <p class="muted">{searching && avail.length ? noMatchesText(query) : 'No ship has a verdict yet.'}</p>
+      <p class="muted">{searching && avail.length ? noMatchesText(query) : t('No ship has a verdict yet.')}</p>
     {/each}
     {#if split.unknown.length}
-      <Fold title="{split.unknown.length} ships not seen on sale often enough yet" bind:open={unknownOpen}>
-        <p class="muted">The planner treats these as unknown until a sync sees them on sale on several days. You can still mark one by hand.</p>
+      <Fold title={tn(split.unknown.length, '{n} ship not seen on sale often enough yet', '{n} ships not seen on sale often enough yet')} bind:open={unknownOpen}>
+        <p class="muted">{t('The planner treats these as unknown until a sync sees them on sale on several days. You can still mark one by hand.')}</p>
         {#each split.unknown as r (r.shipId)}{@render availRow(r)}{/each}
       </Fold>
     {/if}
   </GlassPanel>
 
   <GlassPanel>
-    <h2>Concept ships ({searching ? `${concepts.length} of ${allConcepts.length}` : concepts.length})</h2>
+    <h2>{t('Concept ships ({count})', { count: searching ? t('{shown} of {total}', { shown: concepts.length, total: allConcepts.length }) : concepts.length })}</h2>
     {#each concepts as s (s.id)}
-      <div class="row" data-ship={s.id}><span class="lbl"><ShipThumb ship={s} size="s" /><span>{s.name}</span></span><span class="muted">{usd(s.msrp)} · {s.onSale ? 'on sale' : 'not on sale'}</span></div>
+      <div class="row" data-ship={s.id}><span class="lbl"><ShipThumb ship={s} size="s" /><span>{s.name}</span></span><span class="muted">{usd(s.msrp)} · {s.onSale ? t('on sale') : t('not on sale')}</span></div>
     {:else}
-      <p class="muted">{searching && allConcepts.length ? noMatchesText(query) : 'No concept ships.'}</p>
+      <p class="muted">{searching && allConcepts.length ? noMatchesText(query) : t('No concept ships.')}</p>
     {/each}
   </GlassPanel>
 </div>

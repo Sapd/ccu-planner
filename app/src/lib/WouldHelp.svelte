@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { onDestroy, untrack } from 'svelte';
   import { groupWanted, parseSlackUsd } from '$logic/wantedView.mjs';
   import { shipName } from '$logic/ships.mjs';
@@ -35,7 +36,7 @@
   const groups = $derived(result ? groupWanted(result) : null);
   const maxStd = $derived(Math.max(1, ...(result?.wanted ?? []).map((x) => x.standard)));
   const target = $derived(ships.get(chain.target));
-  const label = $derived(result?.objective === 'allin' ? 'all-in' : 'new money');
+  const label = $derived(result?.objective === 'allin' ? t('all-in') : t('new money'));
 
   const ITEMS = 4, TIES = 8, NEEDS = 12;
   let expandedFor = $state(null); // chain id whose lists are expanded
@@ -43,13 +44,13 @@
   const pct = (cents) => `${Math.min(100, (100 * cents) / maxStd).toFixed(1)}%`;
 </script>
 
-{#snippet watch(x)}<RsiLink href={upgradeToolUrl({ from: x.from, to: x.to })} label="Watch on RSI" aria="Watch {name(x.from)} to {name(x.to)} on RSI" />{/snippet}
+{#snippet watch(x)}<RsiLink href={upgradeToolUrl({ from: x.from, to: x.to })} label={t('Watch on RSI')} aria={t('Watch {from} to {to} on RSI', { from: name(x.from), to: name(x.to) })} />{/snippet}
 
 {#snippet bar(x)}
   <div class="row" data-from={x.from} data-to={x.to}>
     <span class="label">{name(x.from)} → {name(x.to)}</span>
-    <span class="meta">below {usd(x.below)} (Std {usd(x.standard)}){x.onBestRoute ? ' *' : ''} {@render watch(x)}</span>
-    <div class="bar" title="Standard {usd(x.standard)}, a Warbond below {usd(x.below)} helps">
+    <span class="meta">{t('below {below} (Std {std})', { below: usd(x.below), std: usd(x.standard) })}{x.onBestRoute ? ' *' : ''} {@render watch(x)}</span>
+    <div class="bar" title={t('Standard {std}, a Warbond below {below} helps', { std: usd(x.standard), below: usd(x.below) })}>
       <i class="std" style:width={pct(x.standard)}></i>
       <i class="mark" style:left={pct(x.below)}></i>
     </div>
@@ -62,7 +63,7 @@
     {#each g.items.slice(0, ITEMS) as x (`${x.from}-${x.to}`)}{@render bar(x)}{/each}
     {#if g.items.length > ITEMS}
       <details>
-        <summary>+{g.items.length - ITEMS} more</summary>
+        <summary>{t('+{n} more', { n: g.items.length - ITEMS })}</summary>
         {#each g.items.slice(ITEMS) as x (`${x.from}-${x.to}`)}{@render bar(x)}{/each}
       </details>
     {/if}
@@ -70,48 +71,48 @@
 {/snippet}
 
 <div class="wh">
-  <JobStatus {job} what="Looking for offers that would help" />
+  <JobStatus {job} what={t('Looking for offers that would help')} />
   {#if result}
-    <p class="muted">Which Warbonds RSI offers next is unknown; this only says what a Warbond would have to cost to help. Today: {result.best ? `${usd(result.bestCost)} ${label}` : 'no route'}.</p>
+    <p class="muted">{t('Which Warbonds RSI offers next is unknown; this only says what a Warbond would have to cost to help. Today: {today}.', { today: result.best ? `${usd(result.bestCost)} ${label}` : t('no route') })}</p>
 
-    {#if result.truncated}<p class="muted" data-truncated>Checked the {result.checked} most promising of {result.candidates} pairs.</p>{/if}
+    {#if result.truncated}<p class="muted" data-truncated>{t('Checked the {checked} most promising of {candidates} pairs.', { checked: result.checked, candidates: result.candidates })}</p>{/if}
     {#if !result.wanted.length}
-      <p class="muted">No pair where a new Warbond would help.</p>
+      <p class="muted">{t('No pair where a new Warbond would help.')}</p>
     {:else if groups.createsRoute.length}
-      <h4>Would create a route</h4>
-      <p class="muted">RSI sells no upgrade into {target?.name ?? name(chain.target)} today{target?.concept ? ' (concept ship: its price rises before release, so any upgrade into it locks today\'s price, Standard included)' : ''}.</p>
+      <h4>{t('Would create a route')}</h4>
+      <p class="muted">{target?.concept ? t("RSI sells no upgrade into {ship} today (concept ship: its price rises before release, so any upgrade into it locks today's price, Standard included).", { ship: target?.name ?? name(chain.target) }) : t('RSI sells no upgrade into {ship} today.', { ship: target?.name ?? name(chain.target) })}</p>
       {#each groups.createsRoute.slice(0, showAll ? undefined : NEEDS) as x (`${x.from}-${x.to}`)}
         <div class="row" data-from={x.from} data-to={x.to}>
           <span class="label">{name(x.from)} → {name(x.to)}</span>
-          <span class="meta">up to {usd(x.below)} {@render watch(x)}</span>
+          <span class="meta">{t('up to {below}', { below: usd(x.below) })} {@render watch(x)}</span>
           <div class="bar"><i class="std" style:width={pct(x.standard)}></i><i class="mark" style:left={pct(x.below)}></i></div>
         </div>
       {/each}
-      {#if groups.createsRoute.length > NEEDS && !showAll}<button onclick={() => { expandedFor = chain.id; }}>Show all {groups.createsRoute.length}</button>{/if}
+      {#if groups.createsRoute.length > NEEDS && !showAll}<button onclick={() => { expandedFor = chain.id; }}>{t('Show all {n}', { n: groups.createsRoute.length })}</button>{/if}
     {:else}
-      <h4>Any discount helps</h4>
-      {#each groups.ties.slice(0, showAll ? undefined : TIES) as g (g.to)}{@render group(g, '')}{:else}<p class="muted">(none)</p>{/each}
+      <h4>{t('Any discount helps')}</h4>
+      {#each groups.ties.slice(0, showAll ? undefined : TIES) as g (g.to)}{@render group(g, '')}{:else}<p class="muted">{t('(none)')}</p>{/each}
       {#if groups.needs.length}
-        <h4>Would help if discounted enough</h4>
-        {#each groups.needs.slice(0, showAll ? undefined : NEEDS) as g (g.to)}{@render group(g, `needs ${g.sharePct}% off`)}{/each}
+        <h4>{t('Would help if discounted enough')}</h4>
+        {#each groups.needs.slice(0, showAll ? undefined : NEEDS) as g (g.to)}{@render group(g, t('needs {pct}% off', { pct: g.sharePct }))}{/each}
       {/if}
       {#if !showAll && (groups.ties.length > TIES || groups.needs.length > NEEDS)}
-        <button onclick={() => { expandedFor = chain.id; }}>Show all</button>
+        <button onclick={() => { expandedFor = chain.id; }}>{t('Show all')}</button>
       {/if}
-      {#if result.wanted.some((x) => x.onBestRoute)}<p class="muted">* Standard bridge on today's route</p>{/if}
+      {#if result.wanted.some((x) => x.onBestRoute)}<p class="muted">{t("* Standard bridge on today's route")}</p>{/if}
     {/if}
 
-    <h4>On sale near this route</h4>
-    <label class="slack">At most $
-      <input type="text" inputmode="decimal" bind:value={slackText} onchange={commit} /> more
+    <h4>{t('On sale near this route')}</h4>
+    <label class="slack">{t('At most $')}
+      <input type="text" inputmode="decimal" bind:value={slackText} onchange={commit} /> {t('more')}
     </label>
     {#each result.holding as h (`${h.from}-${h.to}`)}
       <div class="row" data-from={h.from} data-to={h.to}>
         <span class="label">{name(h.from)} → {name(h.to)}</span>
-        <span class="meta">Warbond {usd(h.cash)} (Standard {usd(h.standard)}) · route {usd(h.extra)} more today {@render watch(h)}</span>
+        <span class="meta">{t('Warbond {cash} (Standard {std}) · route {extra} more today', { cash: usd(h.cash), std: usd(h.standard), extra: usd(h.extra) })} {@render watch(h)}</span>
       </div>
     {:else}
-      <p class="muted">Nothing on sale within {usd(slack)} of the best route.</p>
+      <p class="muted">{t('Nothing on sale within {amount} of the best route.', { amount: usd(slack) })}</p>
     {/each}
   {/if}
 </div>

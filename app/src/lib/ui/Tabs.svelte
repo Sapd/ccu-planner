@@ -1,15 +1,16 @@
 <script>
   import { tick } from 'svelte';
+  import { t } from '$logic/i18n.mjs';
 
   // A tab list with one panel. tabs: [{ key, label }]; value (bindable) is the chosen key; the panel is the children snippet
   // (it receives the key), built only for the chosen tab. Arrow keys, Home and End move between tabs (roving tabindex).
-  let { tabs, value = $bindable(), label = 'Sections', children } = $props();
+  let { tabs, value = $bindable(), label = null, children } = $props();
   const uid = $props.id();
-  const current = $derived(tabs.some((t) => t.key === value) ? value : (tabs[0]?.key ?? null));
+  const current = $derived(tabs.some((tab) => tab.key === value) ? value : (tabs[0]?.key ?? null));
   let list = $state(null);
   async function move(i) {
-    const t = tabs[(i + tabs.length) % tabs.length];
-    value = t.key;
+    const next = tabs[(i + tabs.length) % tabs.length];
+    value = next.key;
     await tick();
     list?.querySelector('[role="tab"][aria-selected="true"]')?.focus();
   }
@@ -23,9 +24,9 @@
 
 {#if tabs.length}
   <section class="tabs">
-    <div class="list" role="tablist" aria-label={label} bind:this={list}>
-      {#each tabs as t, i (t.key)}
-        <button type="button" role="tab" id="{uid}-t-{t.key}" aria-selected={t.key === current} aria-controls="{uid}-p" tabindex={t.key === current ? 0 : -1} class:on={t.key === current} onclick={() => { value = t.key; }} onkeydown={(e) => onkeydown(e, i)}>{t.label}</button>
+    <div class="list" role="tablist" aria-label={label ?? t('Sections')} bind:this={list}>
+      {#each tabs as tab, i (tab.key)}
+        <button type="button" role="tab" id="{uid}-t-{tab.key}" aria-selected={tab.key === current} aria-controls="{uid}-p" tabindex={tab.key === current ? 0 : -1} class:on={tab.key === current} onclick={() => { value = tab.key; }} onkeydown={(e) => onkeydown(e, i)}>{tab.label}</button>
       {/each}
     </div>
     <div class="panel" id="{uid}-p" role="tabpanel" aria-labelledby="{uid}-t-{current}" tabindex="-1">

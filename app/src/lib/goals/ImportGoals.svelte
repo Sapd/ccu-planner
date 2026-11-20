@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { parseSavedChains, importRows, restatus } from '$logic/ccugame.mjs';
   import { IMPORT_HELP, IMPORT_GROUPS, IMPORT_NEEDS_SHIP_HELP, importConfirmLabel } from '$logic/describe.mjs';
   import aliases from '../../../../src/logic/aliases.json';
@@ -52,19 +53,19 @@
     busy = false;
     if (added) { if (embedded) reset(); onclose(); }
   }
-  const shipName = (id) => app.data.ships.get(id)?.name ?? 'unknown ship';
+  const shipName = (id) => app.data.ships.get(id)?.name ?? t('unknown ship');
 </script>
 
 <section class="import" class:embedded>
   {#if embedded}
     <div class="pick">
       {#if lead}<span class="lead">{lead}</span>{/if}
-      <FilePick label="Import CCU Game file" inputLabel="Saved Chains file from CCU Game" onfile={choose} />
+      <FilePick label={t('Import CCU Game file')} inputLabel={t('Saved Chains file from CCU Game')} onfile={choose} />
     </div>
   {:else}
-    <h3>Import from CCU Game</h3>
-    <p class="help">{IMPORT_HELP}</p>
-    <input type="file" accept=".json" aria-label="Saved file from CCU Game" onchange={(e) => { const f = e.currentTarget.files?.[0]; if (f) choose(f); }} />
+    <h3>{t('Import from CCU Game')}</h3>
+    <p class="help">{t(IMPORT_HELP)}</p>
+    <input type="file" accept=".json" aria-label={t('Saved file from CCU Game')} onchange={(e) => { const f = e.currentTarget.files?.[0]; if (f) choose(f); }} />
   {/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 
@@ -72,16 +73,16 @@
     {#each groups as g (g.status)}
       {#if g.items.length}
         <div class="group">
-          <h4>{g.title} <span class="n">{g.items.length}</span></h4>
+          <h4>{t(g.title)} <span class="n">{g.items.length}</span></h4>
           <ul>
             {#each g.items as { r, i } (i)}
               <li class:dim={g.status === 'exists'}>
-                <span class="line"><b>{r.toName}</b> <span class="from">from {r.fromName}</span></span>
+                <span class="line"><b>{r.toName}</b> <span class="from">{t('from {name}', { name: r.fromName })}</span></span>
                 {#if g.status === 'needs-ship'}
                   <span class="fix">
-                    <span class="help">{IMPORT_NEEDS_SHIP_HELP}</span>
-                    {#if r.to == null}<ShipPicker ships={app.data.ships} id="imp-to-{i}" label="Ship you want ({r.toName})" onpick={(s) => fix(i, 'to', s)} />{/if}
-                    {#if r.start == null || r.from === r.to}<ShipPicker ships={app.data.ships} id="imp-from-{i}" label="Start from ({r.fromName})" onpick={(s) => fix(i, 'from', s)} />{/if}
+                    <span class="help">{t(IMPORT_NEEDS_SHIP_HELP)}</span>
+                    {#if r.to == null}<ShipPicker ships={app.data.ships} id="imp-to-{i}" label={t('Ship you want ({name})', { name: r.toName })} onpick={(s) => fix(i, 'to', s)} />{/if}
+                    {#if r.start == null || r.from === r.to}<ShipPicker ships={app.data.ships} id="imp-from-{i}" label={t('Start from ({name})', { name: r.fromName })} onpick={(s) => fix(i, 'from', s)} />{/if}
                   </span>
                 {/if}
               </li>
@@ -94,35 +95,35 @@
 
   <div class="row">
     {#if rows}<button type="button" class="primary" disabled={!count || busy} onclick={confirm}>{importConfirmLabel(count)}</button>{/if}
-    {#if fileText && !embedded}<button type="button" disabled={compare.status === 'running'} onclick={runCompare}>Compare</button>{/if}
-    {#if !embedded || rows || error}<button type="button" onclick={embedded ? reset : onclose}>Cancel</button>{/if}
+    {#if fileText && !embedded}<button type="button" disabled={compare.status === 'running'} onclick={runCompare}>{t('Compare')}</button>{/if}
+    {#if !embedded || rows || error}<button type="button" onclick={embedded ? reset : onclose}>{t('Cancel')}</button>{/if}
   </div>
-  <JobStatus job={compare} what="Comparing with your goals" />
+  <JobStatus job={compare} what={t('Comparing with your goals')} />
   {#if cmp}
     <div class="compare" data-compare class:stale={outdated}>
-      <h4>CCU Game against the planner</h4>
-      {#if outdated}<p class="note" data-outdated>Outdated: your goals or data changed since this comparison. Press Compare again.</p>{/if}
+      <h4>{t('CCU Game against the planner')}</h4>
+      {#if outdated}<p class="note" data-outdated>{t('Outdated: your goals or data changed since this comparison. Press Compare again.')}</p>{/if}
       <table>
-        <thead><tr><th scope="col">Chain</th><th scope="col">CCU Game</th><th scope="col">Its start ship</th><th scope="col">Planner</th><th scope="col">Difference</th></tr></thead>
+        <thead><tr><th scope="col">{t('Chain')}</th><th scope="col">CCU Game</th><th scope="col">{t('Its start ship')}</th><th scope="col">{t('Planner')}</th><th scope="col">{t('Difference')}</th></tr></thead>
         <tbody>
           {#each cmp.rows as r, i (i)}
             <tr>
-              <td><b>{r.target}</b> <span class="from">from {r.ccugameStart}</span>
+              <td><b>{r.target}</b> <span class="from">{t('from {name}', { name: r.ccugameStart })}</span>
                 {#each r.notes as n, k (k)}<div class="note">{n}</div>{/each}</td>
               <td class="num">{usd(r.ccugameCashNoStart)}</td>
               <td class="num">{r.startCost ? usd(r.startCost) : '–'}</td>
-              <td class="num">{r.goalId ? usd(r.ourCash) : '–'}{#if r.ourAlone != null && r.ourAlone !== r.ourCash}<div class="note">If planned alone · {usd(r.ourAlone)}</div>{/if}</td>
+              <td class="num">{r.goalId ? usd(r.ourCash) : '–'}{#if r.ourAlone != null && r.ourAlone !== r.ourCash}<div class="note">{t('If planned alone')} · {usd(r.ourAlone)}</div>{/if}</td>
               <td class="num">{r.diff == null ? '–' : signed(r.diff)}</td>
             </tr>
           {/each}
         </tbody>
         {#if cmp.totals.matched}
-          <tfoot><tr><th scope="row">Total of the {cmp.totals.matched} matched goals</th><td class="num">{usd(cmp.totals.ccugame)}</td><td class="num">{cmp.totals.startCosts ? usd(cmp.totals.startCosts) : '–'}</td><td class="num">{usd(cmp.totals.ours)}</td><td class="num">{signed(cmp.totals.diff)}</td></tr></tfoot>
+          <tfoot><tr><th scope="row">{t('Total of the {n} matched goals', { n: cmp.totals.matched })}</th><td class="num">{usd(cmp.totals.ccugame)}</td><td class="num">{cmp.totals.startCosts ? usd(cmp.totals.startCosts) : '–'}</td><td class="num">{usd(cmp.totals.ours)}</td><td class="num">{signed(cmp.totals.diff)}</td></tr></tfoot>
         {/if}
       </table>
       {#if cmp.onlyOurs.length}<ul class="only">{#each cmp.onlyOurs as o (o.goalId)}<li>{o.note}</li>{/each}</ul>{/if}
       {#each cmp.notes as n, k (k)}<p class="help">{n}</p>{/each}
-      <p class="help">CCU Game's cost here leaves out the store ship it starts from (shown apart), since you start from your own ship. A negative difference means the planner is cheaper. Figures are the new money each side expects to spend.</p>
+      <p class="help">{t("CCU Game's cost here leaves out the store ship it starts from (shown apart), since you start from your own ship. A negative difference means the planner is cheaper. Figures are the new money each side expects to spend.")}</p>
     </div>
   {/if}
 </section>

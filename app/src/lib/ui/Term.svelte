@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { glossaryEntry } from '$logic/glossary.mjs';
   import { openGlossary } from '../state.svelte.js';
 
@@ -10,9 +11,9 @@
 
 {#if entry}
   {#if label}
-    <button type="button" class="termlabel" aria-label="{label}: what is {entry.term}?" title="What is {entry.term}?" onclick={(e) => openGlossary(term, e.currentTarget)}>{label}<span class="q" aria-hidden="true">?</span></button>
+    <button type="button" class="termlabel" aria-label={t('{label}: what is {term}?', { label, term: entry.term })} title={t('What is {term}?', { term: entry.term })} onclick={(e) => openGlossary(term, e.currentTarget)}>{label}<span class="q" aria-hidden="true">?</span></button>
   {:else}
-    <button type="button" class="term" aria-label="What is {entry.term}?" title="What is {entry.term}?" onclick={(e) => openGlossary(term, e.currentTarget)}>?</button>
+    <button type="button" class="term" aria-label={t('What is {term}?', { term: entry.term })} title={t('What is {term}?', { term: entry.term })} onclick={(e) => openGlossary(term, e.currentTarget)}>?</button>
   {/if}
 {/if}
 

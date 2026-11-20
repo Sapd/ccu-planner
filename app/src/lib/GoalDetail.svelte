@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { evaluateAccepted, diffRoutes } from '$logic/chains.mjs';
   import { sessionOf } from '$logic/session.mjs';
   import { localToday } from '$logic/availability.mjs';
@@ -79,12 +80,12 @@
   // The figures that are not the one big number, one line each, inside the fold.
   const figureLines = $derived.by(() => {
     if (!f) return [];
-    const lines = [`${LIST_VALUE_LABEL} ${f.fullPrice == null ? 'unknown' : usd(f.fullPrice)} (comparison, not money saved)`];
+    const lines = [`${t(LIST_VALUE_LABEL)} ${f.fullPrice == null ? t('unknown') : usd(f.fullPrice)} ${t('(comparison, not money saved)')}`];
     // Only when sharing makes this goal dearer than it would be alone.
     const alone = goalCostLines(f.today, goal?.aloneCash ?? null)?.alone;
     if (alone) lines.push(alone);
     if (watch && anyWait) {
-      if (f.salesSeen) lines.push(`${SALES_CASH_LABEL}: ${usd(f.ifSales)}${f.today > f.ifSales ? ` (${cashCutText(usd(f.today - f.ifSales))})` : ''}`);
+      if (f.salesSeen) lines.push(`${t(SALES_CASH_LABEL)}: ${usd(f.ifSales)}${f.today > f.ifSales ? ` (${cashCutText(usd(f.today - f.ifSales))})` : ''}`);
       else if (f.estimate) lines.push(estimateText(f.estimate.typical));
     }
     return lines;
@@ -101,11 +102,11 @@
   const ownedCount = $derived([...app.graph.edges.values()].reduce((n, edges) => n + edges.filter((e) => e.kind === 'owned' && e.to === chain.target).reduce((m, e) => m + e.copies.length, 0), 0));
   const detailTabs = $derived([
     { key: 'routes', label: otherWaysTitle(prop.routes.length) },
-    ...(ownedCount ? [{ key: 'owned', label: `Owned CCUs into it (${ownedCount})` }] : []),
-    { key: 'without', label: 'If I remove this goal' },
-    { key: 'cheaper', label: 'What would make it cheaper' },
-    { key: 'chart', label: 'Price chart' },
-    { key: 'settings', label: 'What counts · route · remove' },
+    ...(ownedCount ? [{ key: 'owned', label: t('Owned CCUs into it ({n})', { n: ownedCount }) }] : []),
+    { key: 'without', label: t('If I remove this goal') },
+    { key: 'cheaper', label: t('What would make it cheaper') },
+    { key: 'chart', label: t('Price chart') },
+    { key: 'settings', label: t('What counts · route · remove') },
   ]);
 
   // What sharing costs this goal, and the buy steps that only exist because another goal holds what its alone route uses.
@@ -141,7 +142,7 @@
   let moreOpen = $state(false);
   // "Choose a starting ship" lives in the settings inside the fold: open the fold first.
   async function chooseStart() { moreOpen = true; await tick(); quick?.chooseFixedStart(); }
-  const viewCopy = (copyId) => openHangarCopy(copyId, `Back to ${goalTitle}`);
+  const viewCopy = (copyId) => openHangarCopy(copyId, t('Back to {goal}', { goal: goalTitle }));
   // A link from Today lands on one step: expand the run that holds it, then focus the row.
   $effect(() => {
     const target = ui.focusStep;
@@ -175,23 +176,23 @@
   <ShipHero ship={ships.get(chain.target) ?? null} height={68}>
       <h2>{goal?.targetName ?? name(chain.target)}</h2>
       {#if goal?.startLine}<p class="start">{goal.startLine}</p>{/if}
-      {#if chain.via != null}<p class="start" data-via-line>Routed through {name(chain.via)} (change it under Settings)</p>{/if}
+      {#if chain.via != null}<p class="start" data-via-line>{t('Routed through {ship} (change it under Settings)', { ship: name(chain.via) })}</p>{/if}
       {#if stuck}<p class="route">{goal ? goalStatusText(goal) : ''}</p>{/if}
   </ShipHero>
 
   {#if noToken}
     <GlassPanel class="notoken">
-      <h3 class="notitle">{NO_TOKEN_TITLE}</h3>
+      <h3 class="notitle">{t(NO_TOKEN_TITLE)}</h3>
       <p class="warnline">{noTokenHelp(chain.start, { ltiCount: (app.data.lti ?? []).length, poolCount: pool.length, limitCents: tokenSettings(app.plans).limitCents })}</p>
-      <button type="button" class="primary" onclick={chooseStart}>Choose a starting ship</button>
+      <button type="button" class="primary" onclick={chooseStart}>{t('Choose a starting ship')}</button>
       <details class="otherways">
-        <summary>Other ways</summary>
-        <p class="note">{NO_TOKEN_OTHER}</p>
+        <summary>{t('Other ways')}</summary>
+        <p class="note">{t(NO_TOKEN_OTHER)}</p>
         <div class="ways">
           <TokenLimit plans={app.plans} />
-          <div><button type="button" onclick={() => goSection('hangar')}>Open the Hangar</button></div>
+          <div><button type="button" onclick={() => goSection('hangar')}>{t('Open the Hangar')}</button></div>
         </div>
-        <p class="note">{TOKEN_HELP}</p>
+        <p class="note">{t(TOKEN_HELP)}</p>
       </details>
     </GlassPanel>
   {:else if noRoute}
@@ -202,7 +203,7 @@
 
   {#if !stuck && jv && selected}
     <ChainStrip steps={jv.steps} {ships} />
-    <p class="maplink"><button type="button" class="linkbtn" data-chain-map onclick={() => openChainMap(chain.id, `Back to ${goalTitle}`)}>View this chain on the map</button></p>
+    <p class="maplink"><button type="button" class="linkbtn" data-chain-map onclick={() => openChainMap(chain.id, t('Back to {goal}', { goal: goalTitle }))}>{t('View this chain on the map')}</button></p>
 
     <GlassPanel class="choice">
       {#if differs}
@@ -210,23 +211,23 @@
           <span class="btext">{showProposed ? comparingBanner(best.cash) : banner.text}</span>
           <span class="bbtns">
             {#if showProposed}
-              <button type="button" onclick={() => { comparing = false; }}>Back to reserved</button>
+              <button type="button" onclick={() => { comparing = false; }}>{t('Back to reserved')}</button>
             {:else}
-              <button type="button" onclick={() => { comparing = true; }}>Compare</button>
+              <button type="button" onclick={() => { comparing = true; }}>{t('Compare')}</button>
             {/if}
-            {#if statusLine.better}<button type="button" class="primary" disabled={acceptedBusy || acceptBusy} onclick={acceptPlan}>Switch</button>{/if}
+            {#if statusLine.better}<button type="button" class="primary" disabled={acceptedBusy || acceptBusy} onclick={acceptPlan}>{t('Switch')}</button>{/if}
           </span>
         </div>
         {#if showProposed}
           <div class="compare" id="compare-{chain.id}" data-compare>
             {#if changeText.length}<ul data-changes>{#each changeText as line, n (n)}<li>{line}</li>{/each}</ul>{/if}
-            <p class="note" data-effect>{RESERVED_STAYS}</p>
+            <p class="note" data-effect>{t(RESERVED_STAYS)}</p>
           </div>
         {/if}
       {/if}
       <div class="moneyrow">
-        <p class="money"><b class="bigfig" data-left>{f ? usd(f.today) : ''}</b> <span>new cash still needed</span> <span class="sep" aria-hidden="true">·</span> <span data-progress>{progressText(prog)}</span>{#if chain.accepted} <StateChip state="reserved" />{/if}</p>
-        {#if !chain.accepted && best}<button type="button" class="primary" disabled={acceptBusy} title={ACCEPT_THIS_HELP} onclick={acceptPlan}>Reserve this chain</button>{/if}
+        <p class="money"><b class="bigfig" data-left>{f ? usd(f.today) : ''}</b> <span>{t('new cash still needed')}</span> <span class="sep" aria-hidden="true">·</span> <span data-progress>{progressText(prog)}</span>{#if chain.accepted} <StateChip state="reserved" />{/if}</p>
+        {#if !chain.accepted && best}<button type="button" class="primary" disabled={acceptBusy} title={t(ACCEPT_THIS_HELP)} onclick={acceptPlan}>{t('Reserve this chain')}</button>{/if}
       </div>
       {#if prog.own < prog.total}<div class="progress"><JourneyBar bar={jv.bar} /></div>{/if}
       {#if nextLine}<p class="next" data-next>{nextLine}</p>{/if}
@@ -236,8 +237,8 @@
       {/if}
     </GlassPanel>
 
-    <section class="chain" aria-label="The chain, step by step">
-      {#if jv.steps.some((x) => x.state === 'own')}<p class="note chainnote" data-chain-note>{CHAIN_ORDER_NOTE}</p>{/if}
+    <section class="chain" aria-label={t('The chain, step by step')}>
+      {#if jv.steps.some((x) => x.state === 'own')}<p class="note chainnote" data-chain-note>{t(CHAIN_ORDER_NOTE)}</p>{/if}
       <ol class="journey" role="list">
         {#each jv.groups as g (g.kind === 'step' ? `s${g.index}` : `r${g.from}`)}
           {#if g.kind === 'step'}
@@ -264,59 +265,59 @@
   {/if}
 
   {#snippet heldList()}
-    {#if !heldLines.length}<p class="note">{NOTHING_HELD}</p>
+    {#if !heldLines.length}<p class="note">{t(NOTHING_HELD)}</p>
     {:else if heldLines.length > HELD_FOLD_AFTER}
-      <details class="heldfold" data-held-fold><summary>Holds {heldSummary}</summary><ul class="held">{#each heldLines as line, n (n)}<li>{line}</li>{/each}</ul></details>
+      <details class="heldfold" data-held-fold><summary>{t('Holds {summary}', { summary: heldSummary })}</summary><ul class="held">{#each heldLines as line, n (n)}<li>{line}</li>{/each}</ul></details>
     {:else}<ul class="held">{#each heldLines as line, n (n)}<li>{line}</li>{/each}</ul>{/if}
   {/snippet}
 
   <!-- Everything secondary lives in this one fold: how the total adds up, the reservation, the settings and the other views. -->
-  <Fold title="More: how the total adds up · reservation · settings" bind:open={moreOpen}>
+  <Fold title={t('More: how the total adds up · reservation · settings')} bind:open={moreOpen}>
     {#if !stuck && jv && selected}
-      <section class="sec" data-breakdown aria-label="How the total adds up">
-        <h3>How the total adds up</h3>
+      <section class="sec" data-breakdown aria-label={t('How the total adds up')}>
+        <h3>{t('How the total adds up')}</h3>
         {#if breakdown}{#each breakdownLines(breakdown) as line, n (n)}<p>{line}</p>{/each}{/if}
         {#each figureLines as line, n (n)}<p data-comparison={n === 0 ? '' : undefined}>{line}</p>{/each}
-        <p><b>{NEW_CASH_LABEL}:</b> {FIGURE_HELP.today}</p>
-        <p><b>{LIST_VALUE_LABEL}:</b> {FIGURE_HELP.fullPrice}</p>
+        <p><b>{t(NEW_CASH_LABEL)}:</b> {t(FIGURE_HELP.today)}</p>
+        <p><b>{t(LIST_VALUE_LABEL)}:</b> {t(FIGURE_HELP.fullPrice)}</p>
         {#if watch && anyWait && f}
-          {#if f.salesSeen}<p><b>{SALES_CASH_LABEL}:</b> {FIGURE_HELP.ifSales}</p>
-          {:else if f.estimate}<div data-estimate><p><b>How the estimate works</b></p>{#each estimateHowText(f.estimate.typical, f.estimate.low, f.estimate.high, f.estimate.n) as line, n (n)}<p>{line}</p>{/each}</div>
-          {:else}<p>{NO_SALES_SEEN}</p>{/if}
+          {#if f.salesSeen}<p><b>{t(SALES_CASH_LABEL)}:</b> {t(FIGURE_HELP.ifSales)}</p>
+          {:else if f.estimate}<div data-estimate><p><b>{t('How the estimate works')}</b></p>{#each estimateHowText(f.estimate.typical, f.estimate.low, f.estimate.high, f.estimate.n) as line, n (n)}<p>{line}</p>{/each}</div>
+          {:else}<p>{t(NO_SALES_SEEN)}</p>{/if}
         {/if}
       </section>
 
-      <section class="sec reserve" aria-label="Reservation" data-reservation>
+      <section class="sec reserve" aria-label={t('Reservation')} data-reservation>
         {#if chain.accepted}
           <h3>{reservedHeading(goalTitle, heldLines.length > 0)}</h3>
           {@render heldList()}
           {#if ev?.status === 'ok'}<p class="st ok" data-reservation-status>{statusLine.text}</p>{/if}
-          <p class="releaserow"><button type="button" disabled={acceptedBusy} onclick={release}>Release reservation</button>
-            <span class="note">{heldLines.length ? `Releases the ${heldLines.length === 1 ? 'item' : `${heldLines.length} items`} listed above.` : 'Nothing of yours is held, so nothing else is released.'}</span></p>
+          <p class="releaserow"><button type="button" disabled={acceptedBusy} onclick={release}>{t('Release reservation')}</button>
+            <span class="note">{heldLines.length ? (heldLines.length === 1 ? t('Releases the item listed above.') : t('Releases the {n} items listed above.', { n: heldLines.length })) : t('Nothing of yours is held, so nothing else is released.')}</span></p>
         {:else if best}
           <h3>{reserveHeading(goalTitle, heldLines.length > 0)}</h3>
           {@render heldList()}
-          <p class="releaserow"><span class="note">{ACCEPT_THIS_HELP}</span></p>
+          <p class="releaserow"><span class="note">{t(ACCEPT_THIS_HELP)}</span></p>
         {/if}
       </section>
     {/if}
 
-    <section class="sec" aria-label="Settings">
-      <h3>Settings</h3>
+    <section class="sec" aria-label={t('Settings')}>
+      <h3>{t('Settings')}</h3>
       <QuickSettings bind:this={quick} {chain} {pool} {ships} startLine={goal?.startLine ?? null} />
     </section>
 
     {#if shareLine}
       <div class="share" data-share>
         <p>{shareLine}</p>
-        {#if shareParts.length}<details><summary>See which</summary><ul>{#each shareParts as part, n (n)}<li>{part}</li>{/each}</ul></details>{/if}
+        {#if shareParts.length}<details><summary>{t('See which')}</summary><ul>{#each shareParts as part, n (n)}<li>{part}</li>{/each}</ul></details>{/if}
       </div>
     {/if}
 
-    <Tabs tabs={detailTabs} bind:value={ui.goalTab} label="More about this goal">
+    <Tabs tabs={detailTabs} bind:value={ui.goalTab} label={t('More about this goal')}>
       {#snippet children(key)}
         {#if key === 'routes'}
-          {#if differs}<p class="note">{BEST_DIFFERS_LABEL}</p>{/if}
+          {#if differs}<p class="note">{t(BEST_DIFFERS_LABEL)}</p>{/if}
           <Proposals {chain} {ships} routes={prop.routes} />
         {:else if key === 'owned'}
           <OwnedInto {app} {chain} />
@@ -325,7 +326,7 @@
         {:else if key === 'cheaper'}
           <WouldHelp {app} {chain} />
         {:else if key === 'chart'}
-          <p class="note">For the {selected && selected === chain.accepted ? 'reserved' : 'proposed'} chain shown above.</p>
+          <p class="note">{selected && selected === chain.accepted ? t('For the reserved chain shown above.') : t('For the proposed chain shown above.')}</p>
           <Staircase route={selected} {ships} />
         {:else if key === 'settings'}
           <GoalSettings {chain} {allIn} {ships} />

@@ -15,6 +15,7 @@ import { warbondUsage } from './warbonds.mjs';
 import { availCtx, localToday } from './availability.mjs';
 import { aloneRoute, sharedEffect, planningLevels } from './sharedEffect.mjs';
 import { withVirtualCcus } from './planner.mjs';
+import { getLocale } from './i18n.mjs';
 
 /** The graph goals are planned on: the store-and-hangar graph plus your virtual CCUs that have not expired on `today`. */
 export const planningGraph = (graph, plans, today = localToday()) => withVirtualCcus(graph, plans?.profile?.virtualCcus, today);
@@ -46,8 +47,10 @@ export function createSession({ plans, graph, data = null, overrides = null, sal
     get shared() { return (shared ??= planGoals(plans, graph, { maxSteps })); },
     /** Cached result of compute() in `namespace` under `key`, at most `max` entries per namespace. */
     memo(namespace, key, compute, max = Math.max(MEMO_MAX, 3 * Object.keys(plans.chains ?? {}).length)) {
-      let m = memos.get(namespace);
-      if (!m) memos.set(namespace, (m = new Map()));
+      // Views cache texts too: each language keeps its own results.
+      const ns = `${getLocale()}:${namespace}`;
+      let m = memos.get(ns);
+      if (!m) memos.set(ns, (m = new Map()));
       return memoized(m, key, compute, max);
     },
     /** A working object that lives as long as the session. `reset` replaces it. */

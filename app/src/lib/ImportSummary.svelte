@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   // What the automatic CCU Game import did after the first sync: what was added and what was left out, with the reason.
   import { ui } from './state.svelte.js';
   import { IMPORT_GROUPS } from '$logic/describe.mjs';
@@ -10,14 +11,14 @@
 </script>
 
 {#if r}
-  <GlassPanel class="summary" role="status" aria-label="CCU Game import">
-    <h2>CCU Game import</h2>
+  <GlassPanel class="summary" role="status" aria-label={t('CCU Game import')}>
+    <h2>{t('CCU Game import')}</h2>
     <p class="added">{addedText(r.added)}</p>
     {#each groups as g (g.title)}
-      <h3>Left out · {g.title} <span class="n">{g.items.length}</span></h3>
-      <ul>{#each g.items as x, i (i)}<li><b>{x.toName}</b> <span class="muted">from {x.fromName}</span> <span class="muted">· {x.reason}</span></li>{/each}</ul>
+      <h3>{t('Left out')} · {t(g.title)} <span class="n">{g.items.length}</span></h3>
+      <ul>{#each g.items as x, i (i)}<li><b>{x.toName}</b> <span class="muted">{t('from {name}', { name: x.fromName })}</span> <span class="muted">· {x.reason}</span></li>{/each}</ul>
     {/each}
-    <p><button type="button" onclick={() => { ui.importResult = null; }}>Dismiss</button></p>
+    <p><button type="button" onclick={() => { ui.importResult = null; }}>{t('Dismiss')}</button></p>
   </GlassPanel>
 {/if}
 

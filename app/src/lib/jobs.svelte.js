@@ -1,4 +1,5 @@
 import { createJobClient, JobCancelled } from './view/jobs.mjs';
+import { backendError } from './view/backendErrors.mjs';
 import { sessionOf } from '../../../src/logic/session.mjs';
 import { summarize } from '../../../src/logic/whatif.mjs';
 
@@ -39,7 +40,7 @@ export class Job {
     }, (e) => {
       if (this.#run !== run) return;
       if (e instanceof JobCancelled) this.status = 'cancelled';
-      else { this.status = 'error'; this.error = e?.message ?? String(e); }
+      else { this.status = 'error'; this.error = backendError(e); }
     });
     return run.promise;
   }

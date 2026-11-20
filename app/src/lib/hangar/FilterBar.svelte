@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { filtersButtonText } from '../view/filters.mjs';
 
   // Above the results: the Filters button (narrow layout), the result count, one removable chip per active filter and "Reset all".
@@ -10,9 +11,9 @@
   <button type="button" class="fbtn" aria-expanded={panelOpen} aria-controls={panelId} onclick={() => { panelOpen = !panelOpen; }}>{filtersButtonText(active.length)}</button>
   <span class="count" role="status" aria-live="polite">{countText}</span>
   {#each active as a (a.id)}
-    <button type="button" class="chip" onclick={() => onremove(a)} aria-label="Remove filter: {a.label}">{a.label} <span aria-hidden="true">×</span></button>
+    <button type="button" class="chip" onclick={() => onremove(a)} aria-label={t('Remove filter: {label}', { label: a.label })}>{a.label} <span aria-hidden="true">×</span></button>
   {/each}
-  {#if active.length}<button type="button" class="resetall" onclick={onreset}>Reset all</button>{/if}
+  {#if active.length}<button type="button" class="resetall" onclick={onreset}>{t('Reset all')}</button>{/if}
 </div>
 
 <style>

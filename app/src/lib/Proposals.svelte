@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { diffRoutes } from '$logic/chains.mjs';
   import { describeDiff, routeLine, ACCEPT_HELP } from '$logic/describe.mjs';
   import { dispatch } from './state.svelte.js';
@@ -20,21 +21,21 @@
 </script>
 
 {#if routes.length}
-  <p class="help">{ACCEPT_HELP}</p>
+  <p class="help">{t(ACCEPT_HELP)}</p>
   <div class="list">
     {#each routes as r, i (i)}
       <div class="prop">
         <div>
-          <strong>Proposal {i + 1}</strong> · {describeDiff(diffRoutes(chain.accepted, r))}
+          <strong>{t('Proposal {n}', { n: i + 1 })}</strong> · {describeDiff(diffRoutes(chain.accepted, r))}
           <div class="line">{routeLine(r)}</div>
-          <div class="thumbs">{#each changed(r) as s, j (j)}<ShipThumb ship={ships?.get(s.to) ?? null} size="xs" label={ships?.get(s.to)?.name ?? 'unknown ship'} />{/each}</div>
+          <div class="thumbs">{#each changed(r) as s, j (j)}<ShipThumb ship={ships?.get(s.to) ?? null} size="xs" label={ships?.get(s.to)?.name ?? t('unknown ship')} />{/each}</div>
         </div>
-        <button disabled={busy} onclick={() => accept(r)}>Reserve</button>
+        <button disabled={busy} onclick={() => accept(r)}>{t('Reserve')}</button>
       </div>
     {/each}
   </div>
 {:else}
-  <p class="none">{describeDiff(diffRoutes(chain.accepted, null)) === 'New plan' ? 'No route with the CCUs and offers left.' : describeDiff(diffRoutes(chain.accepted, null))}</p>
+  <p class="none">{diffRoutes(chain.accepted, null).kind === 'new' ? t('No route with the CCUs and offers left.') : describeDiff(diffRoutes(chain.accepted, null))}</p>
 {/if}
 
 <style>

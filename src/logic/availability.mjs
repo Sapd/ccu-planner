@@ -9,6 +9,7 @@
 // Dates are local calendar days 'YYYY-MM-DD'; ranges are inclusive. Callers pass
 // `today` in so results are deterministic.
 
+import { loc, t } from './i18n.mjs';
 export const REGULAR_MIN_DAYS = 2; // distinct on-sale days outside every event ...
 export const REGULAR_MIN_GAP = 7; // ... whose earliest and latest are this many days apart
 export const MAX_HISTORY_DAYS = 365;
@@ -31,7 +32,9 @@ export function isDay(s) {
 const dayNumber = (s) => Date.parse(`${s}T00:00:00Z`) / 86400000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** '2026-11-27' -> 'Nov 27'. */
-export const shortDay = (s) => (isDay(s) ? `${MONTHS[+s.slice(5, 7) - 1]} ${+s.slice(8, 10)}` : String(s));
+export const shortDay = loc('shortDay', (s) => (isDay(s) ? `${MONTHS[+s.slice(5, 7) - 1]} ${+s.slice(8, 10)}` : String(s)));
+/** A full day for lists ('2026-11-27' in English, '27.11.2026' in German). */
+export const dayText = loc('dayText', (s) => String(s));
 
 const eventList = (saleEvents) => (Array.isArray(saleEvents?.events) ? saleEvents.events : []);
 const covers = (e, day) => e.from <= day && day <= e.to;
@@ -99,9 +102,9 @@ export function appendSaleHistory(history, shipIds, today) {
 
 export function addSaleEvent(doc, { name, from, to }) {
   const n = String(name ?? '').trim();
-  if (!n) throw new Error('a sale event needs a name');
-  if (!isDay(from) || !isDay(to)) throw new Error('sale event dates must be YYYY-MM-DD');
-  if (from > to) throw new Error('a sale event cannot end before it starts');
+  if (!n) throw new Error(t('a sale event needs a name'));
+  if (!isDay(from) || !isDay(to)) throw new Error(t('sale event dates must be YYYY-MM-DD'));
+  if (from > to) throw new Error(t('a sale event cannot end before it starts'));
   const events = eventList(doc);
   const nextId = events.reduce((m, e) => Math.max(m, Number(String(e.id).replace(/^\D+/, '')) || 0), 0) + 1;
   const event = { id: `e${nextId}`, name: n, from, to };
@@ -110,7 +113,7 @@ export function addSaleEvent(doc, { name, from, to }) {
 
 export function removeSaleEvent(doc, id) {
   const events = eventList(doc);
-  if (!events.some((e) => e.id === id)) throw new Error(`unknown sale event ${id}`);
+  if (!events.some((e) => e.id === id)) throw new Error(t('unknown sale event {id}', { id: String(id) }));
   return { ...doc, events: events.filter((e) => e.id !== id) };
 }
 

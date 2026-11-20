@@ -2,6 +2,7 @@
 // Written by src/catalog-sync.mjs as <data dir>/store-catalog.json, read by the Browse store tab.
 // Prices are USD list prices in cents (nativePrice, never the session currency).
 
+import { N_ } from './i18n.mjs';
 export const RSI_ORIGIN = 'https://robertsspaceindustries.com';
 
 /**
@@ -10,26 +11,26 @@ export const RSI_ORIGIN = 'https://robertsspaceindustries.com';
  * There is no public Concierge store and no ship weapons category on RSI: Concierge items are flagged isVip, weapons are Add-ons and Gear.
  */
 export const CATALOG_CATEGORIES = [
-  { key: 'ships', label: 'Ships and vehicles', products: [72] },
-  { key: 'packs', label: 'Packs', products: [270] },
-  { key: 'packages', label: 'Game packages', products: [9, 45, 46] },
-  { key: 'paints', label: 'Paints', products: [268], facet: { id: 'paints', subs: [
-    { key: 'limited-time', label: 'Limited time', tag: 'filters-paint-limited-time' },
-    { key: 'premium', label: 'Premium', tag: 'filters-paint-premium' },
-    { key: 'standard', label: 'Standard', tag: 'filters-paint-standard' },
+  { key: 'ships', label: N_('Ships and vehicles'), products: [72] },
+  { key: 'packs', label: N_('Packs'), products: [270] },
+  { key: 'packages', label: N_('Game packages'), products: [9, 45, 46] },
+  { key: 'paints', label: N_('Paints'), products: [268], facet: { id: 'paints', subs: [
+    { key: 'limited-time', label: N_('Limited time'), tag: 'filters-paint-limited-time' },
+    { key: 'premium', label: N_('Premium'), tag: 'filters-paint-premium' },
+    { key: 'standard', label: N_('Standard'), tag: 'filters-paint-standard' },
   ] } },
-  { key: 'gear', label: 'Gear', products: [289], facet: { id: 'extras-gear', subs: [
-    { key: 'armor', label: 'Armor', tag: 'filters-gear-armor' },
-    { key: 'clothing', label: 'Clothing', tag: 'filters-gear-clothing' },
-    { key: 'equipment', label: 'Equipment', tag: 'filters-gear-equipment' },
+  { key: 'gear', label: N_('Gear'), products: [289], facet: { id: 'extras-gear', subs: [
+    { key: 'armor', label: N_('Armor'), tag: 'filters-gear-armor' },
+    { key: 'clothing', label: N_('Clothing'), tag: 'filters-gear-clothing' },
+    { key: 'equipment', label: N_('Equipment'), tag: 'filters-gear-equipment' },
   ] } },
-  { key: 'addons', label: 'Add-ons', products: [3] },
-  { key: 'goodies', label: 'Digital goodies', products: [222] },
-  { key: 'uec', label: 'UEC', products: [41] },
-  { key: 'tickets', label: 'Event tickets', products: [67] },
-  { key: 'giftcards', label: 'Gift cards', products: [60] },
+  { key: 'addons', label: N_('Add-ons'), products: [3] },
+  { key: 'goodies', label: N_('Digital goodies'), products: [222] },
+  { key: 'uec', label: N_('UEC'), products: [41] },
+  { key: 'tickets', label: N_('Event tickets'), products: [67] },
+  { key: 'giftcards', label: N_('Gift cards'), products: [60] },
   // Subscriber-only purchases: the item's own kind comes from its store path (see categoryFromUrl).
-  { key: 'subscriber', label: 'Subscriber store', products: [65], subscriber: true },
+  { key: 'subscriber', label: N_('Subscriber store'), products: [65], subscriber: true },
 ];
 
 /** Display label of a category key ("Other" for a kind outside the list). */

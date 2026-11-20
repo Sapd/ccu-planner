@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { upgradeToolUrl, hangarUrl } from '$logic/links.mjs';
   import { waitReasonText, wouldHelpLine, onSaleText, urgencyReasonText, FILLER_LABEL, stepKindLabel, virtualStepText, VIRTUAL_CHIP } from '$logic/describe.mjs';
   import { usd } from '$logic/format.mjs';
@@ -15,16 +16,16 @@
   // others: the other copies of this owned upgrade with the goals that use them ({ copyId, goals: [{ goalId, name }] }).
   let { item, ships, below = null, copy = null, others = [], needed = null, onExpand, app = null, number = null, phrase = '', onViewCopy = null } = $props();
   const s = $derived(item.step);
-  const name = (id) => ships.get(id)?.name ?? 'unknown ship';
+  const name = (id) => ships.get(id)?.name ?? t('unknown ship');
   let open = $state(false);
   const uid = $props.id();
 
   // Built in script: Svelte trims the spaces at the edges of {#if} blocks, which glued the " · " parts together.
   const ownTail = $derived([
-    copy ? `paid ${usd(copy.paid?.cents)}` : null,
-    copy ? (copy.giftable ? 'giftable' : 'not giftable') : null,
-    s.otherCopies ? `+${s.otherCopies} more copies` : null,
-  ].filter(Boolean).map((t) => ` · ${t}`).join(''));
+    copy ? t('paid {price}', { price: usd(copy.paid?.cents) }) : null,
+    copy ? (copy.giftable ? t('giftable') : t('not giftable')) : null,
+    s.otherCopies ? t('+{n} more copies', { n: s.otherCopies }) : null,
+  ].filter(Boolean).map((part) => ` · ${part}`).join(''));
   const seenLine = $derived(item.seen ? waitReasonText('seen', { event: item.seen.event, seen: item.seen, cash: s.cash }) : null);
   const toggle = () => { open = !open; if (open && item.state === 'wait') onExpand?.(item); };
 </script>
@@ -33,18 +34,18 @@
   <div class="line">
     <button type="button" class="rowbtn" aria-expanded={open} aria-controls="det-{uid}" onclick={toggle}>
       {#if phrase}<span class="sr">{phrase}</span>{/if}
-      {#if number}<span class="no" title="Step {number}" aria-hidden={phrase ? 'true' : undefined}>{number}</span>{/if}
+      {#if number}<span class="no" title={t('Step {n}', { n: number })} aria-hidden={phrase ? 'true' : undefined}>{number}</span>{/if}
       <!-- One picture per step: the ship you get. Both names stay as text, beside it at any width. -->
       <span class="pair" aria-hidden={phrase ? 'true' : undefined}>
         <ShipThumb ship={ships.get(s.to) ?? null} size="s" />
         <span class="names"><span class="nm">{name(s.from)}</span> <span aria-hidden="true">→</span> <span class="nm">{name(s.to)}</span></span>
       </span>
-      <span class="chipcell"><span aria-hidden={phrase ? 'true' : undefined}><StateChip state={item.state === 'now' && item.urgency === 'norush' ? 'norush' : item.state} lock={item.lock} text={item.state === 'wait' && item.filler ? FILLER_LABEL : item.state === 'now' && s.virtual && !item.lock ? VIRTUAL_CHIP : null} /></span>{#if item.alert}<span class="warnmark" role="img" aria-label="Alert: {item.alert}" title={item.alert}>!</span>{/if}</span>
+      <span class="chipcell"><span aria-hidden={phrase ? 'true' : undefined}><StateChip state={item.state === 'now' && item.urgency === 'norush' ? 'norush' : item.state} lock={item.lock} text={item.state === 'wait' && item.filler ? FILLER_LABEL : item.state === 'now' && s.virtual && !item.lock ? VIRTUAL_CHIP : null} /></span>{#if item.alert}<span class="warnmark" role="img" aria-label={t('Alert: {alert}', { alert: item.alert })} title={item.alert}>!</span>{/if}</span>
       <span class="cost" aria-hidden={phrase ? 'true' : undefined}>{#if item.state !== 'own'}<b class="price">{usd(s.cash)}</b><span class="kind">{stepKindLabel(s)}</span>{/if}</span>
       <span class="chev" aria-hidden="true">{open ? '▾' : '›'}</span>
     </button>
     {#if item.state === 'now' && !s.virtual}
-      <span class="act"><RsiLink href={upgradeToolUrl({ from: s.from, to: s.to })} label="Buy on RSI" aria="Buy {name(s.from)} to {name(s.to)} on RSI" /></span>
+      <span class="act"><RsiLink href={upgradeToolUrl({ from: s.from, to: s.to })} label={t('Buy on RSI')} aria={t('Buy {from} to {to} on RSI', { from: name(s.from), to: name(s.to) })} /></span>
     {/if}
   </div>
   {#if open}
@@ -52,27 +53,27 @@
       {#if item.alert}<p class="alert">{item.alert}</p>{/if}
       {#if item.lock && item.reason}<p class="why">{item.reason}</p>{/if}
       {#if item.trade}<p class="why" data-trade>{item.trade}</p>{/if}
-      {#if item.state === 'now' && item.urgency === 'today' && item.urgencyReasons?.length}<p class="why">Buy now: {item.urgencyReasons.map(urgencyReasonText).join(', ')}.</p>{/if}
+      {#if item.state === 'now' && item.urgency === 'today' && item.urgencyReasons?.length}<p class="why">{t('Buy now: {reasons}.', { reasons: item.urgencyReasons.map(urgencyReasonText).join(', ') })}</p>{/if}
       {#if item.state === 'now' && item.urgency === 'norush' && (item.since || item.until)}<p class="why">{onSaleText(item)}</p>{/if}
       {#if item.cover}<p class="why">{item.cover}</p>{/if}
       {#if needed}<p class="why needed">{needed}</p>{/if}
       {#if item.state === 'own'}
-        <p class="why">Owned CCU{ownTail}</p>
+        <p class="why">{t('Owned CCU')}{ownTail}</p>
         {#if others.length}
           <ul class="copies" data-other-copies>
             {#each others as o, i (o.copyId)}
-              <li>Copy {i + 2}: {o.goals.length ? `used by ${o.goals.map((g) => g.name).join(', ')}` : 'not used by any goal'}{#if onViewCopy} <button type="button" class="more" onclick={() => onViewCopy(o.copyId)}>View in Hangar</button>{/if}</li>
+              <li>{o.goals.length ? t('Copy {n}: used by {goals}', { n: i + 2, goals: o.goals.map((g) => g.name).join(', ') }) : t('Copy {n}: not used by any goal', { n: i + 2 })}{#if onViewCopy} <button type="button" class="more" onclick={() => onViewCopy(o.copyId)}>{t('View in Hangar')}</button>{/if}</li>
             {/each}
           </ul>
         {/if}
         <p class="links">
-          {#if copy && onViewCopy}<button type="button" class="more" data-view-copy onclick={() => onViewCopy(copy.copyId)}>View this copy in Hangar</button>{/if}
-          <RsiLink href={hangarUrl()} label="Open on RSI" aria="Open {name(s.from)} to {name(s.to)} in the RSI hangar" />
+          {#if copy && onViewCopy}<button type="button" class="more" data-view-copy onclick={() => onViewCopy(copy.copyId)}>{t('View this copy in Hangar')}</button>{/if}
+          <RsiLink href={hangarUrl()} label={t('Open on RSI')} aria={t('Open {from} to {to} in the RSI hangar', { from: name(s.from), to: name(s.to) })} />
         </p>
       {:else if item.state === 'wait'}
         <div class="expand">
           <p>{item.reason}</p>
-          {#if item.slot?.count}<p class="slot" data-slot>Ships in this range: {item.slot.examples.map((x) => x.name).join(', ')}{item.slot.count > item.slot.examples.length ? ` and ${item.slot.count - item.slot.examples.length} more` : ''}.</p>{/if}
+          {#if item.slot?.count}<p class="slot" data-slot>{item.slot.count > item.slot.examples.length ? t('Ships in this range: {names} and {n} more.', { names: item.slot.examples.map((x) => x.name).join(', '), n: item.slot.count - item.slot.examples.length }) : t('Ships in this range: {names}.', { names: item.slot.examples.map((x) => x.name).join(', ') })}</p>{/if}
           {#if seenLine && seenLine !== item.reason}<p>{seenLine}</p>{/if}
           {#if below != null}<p>{wouldHelpLine(usd(below))}</p>{/if}
         </div>

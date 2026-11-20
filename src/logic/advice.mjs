@@ -3,6 +3,7 @@
 // "buy before the price changes" alert (with the cost of waiting and its text), and which steps an
 // alert would be pointless for. Today, the goal journey, the decision graph, the melt plan and the CLI
 // all take this object and only format it, so they cannot disagree. Pure.
+import { t } from './i18n.mjs';
 import { splitRoute, lockDecision } from './lock.mjs';
 import { expectedChanges } from './priceChange.mjs';
 import { shipAvailability } from './availability.mjs';
@@ -48,7 +49,7 @@ export function routeAdvice(session, chain, route, { ships = null, overrides = n
   const groups = finish
     ? { buyNow: route.steps.filter((s) => s.kind !== 'owned'), lockNow: [], later: [], owned: split.owned }
     : { buyNow: split.buyNow, lockNow: split.lockNow, later: split.later, owned: split.owned };
-  const name = (id) => ships?.get(id)?.name ?? 'unknown ship';
+  const name = (id) => ships?.get(id)?.name ?? t('unknown ship');
   const lockCode = dec.lock ? dec.reason : null;
   const waitCtx = session && chain?.id != null ? { session, chainId: chain.id } : null;
   let changes = null;

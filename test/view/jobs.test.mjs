@@ -221,3 +221,19 @@ test('two data sets with equal stamps and revisions (real vs sample) never share
   client.clear();
   assert.equal(client.run(real, 'wanted', { chainId: 'c1' }).cached, false);
 });
+
+test('the language of a job reaches the host and the job runs in it; a language switch is a new question', async () => {
+  const { getLocale, setLocale } = await import('../../src/logic/i18n.mjs');
+  const { spawn, spawned } = fakeWorkers({ run: () => getLocale() });
+  const client = createJobClient({ spawn });
+  const app = demo();
+  try {
+    assert.equal(await client.run(app, 'wanted', { chainId: 'c1' }).promise, 'en');
+    setLocale('de');
+    const job = client.run(app, 'wanted', { chainId: 'c1' });
+    assert.equal(job.cached, false);
+    assert.equal(await job.promise, 'de');
+    assert.deepEqual(spawned[0].sent.filter((m) => m.type === 'run').map((m) => m.locale), ['en', 'de']);
+  } finally { setLocale('en'); }
+  assert.equal(getLocale(), 'en');
+});

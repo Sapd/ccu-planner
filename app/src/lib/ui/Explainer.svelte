@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { tick, untrack } from 'svelte';
   import { EXPLAINER_STEPS, EXPLAINER_TITLES, markExplainerSeen } from '../view/firstRun.mjs';
   import { openGlossary } from '../state.svelte.js';
@@ -32,25 +33,25 @@
 </script>
 
 {#if inline}
-  <div class="inline" role="note" aria-label="How CCUs work">
-    <h2>How CCUs work</h2>
-    <ol>{#each EXPLAINER_STEPS as s (s)}<li>{s}</li>{/each}</ol>
-    <button type="button" class="gloss" onclick={(e) => openGlossary('', e.currentTarget)}>Glossary: what the words mean</button>
+  <div class="inline" role="note" aria-label={t('How CCUs work')}>
+    <h2>{t('How CCUs work')}</h2>
+    <ol>{#each EXPLAINER_STEPS as s (s)}<li>{t(s)}</li>{/each}</ol>
+    <button type="button" class="gloss" onclick={(e) => openGlossary('', e.currentTarget)}>{t('Glossary: what the words mean')}</button>
   </div>
 {:else}
   <div class="backdrop" role="presentation" {onkeydown}>
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ex-title" tabindex="-1" bind:this={dialog}>
-      <p class="count">How CCUs work · step {step + 1} of {EXPLAINER_STEPS.length}</p>
-      <h2 id="ex-title">{EXPLAINER_TITLES[step]}</h2>
-      <p class="text" aria-live="polite">{EXPLAINER_STEPS[step]}</p>
+      <p class="count">{t('How CCUs work · step {n} of {total}', { n: step + 1, total: EXPLAINER_STEPS.length })}</p>
+      <h2 id="ex-title">{t(EXPLAINER_TITLES[step])}</h2>
+      <p class="text" aria-live="polite">{t(EXPLAINER_STEPS[step])}</p>
       <div class="dots" aria-hidden="true">{#each EXPLAINER_STEPS as _, i (i)}<span class:on={i === step}></span>{/each}</div>
-      <p class="glossrow"><button type="button" class="gloss" onclick={() => { close(); openGlossary('', returnTo); }}>Glossary: what the words mean</button></p>
+      <p class="glossrow"><button type="button" class="gloss" onclick={() => { close(); openGlossary('', returnTo); }}>{t('Glossary: what the words mean')}</button></p>
       <div class="btns">
-        <button type="button" disabled={step === 0} onclick={() => go(step - 1)}>Back</button>
+        <button type="button" disabled={step === 0} onclick={() => go(step - 1)}>{t('Back')}</button>
         {#if step < last}
-          <button type="button" class="primary" onclick={() => go(step + 1)}>Next</button>
+          <button type="button" class="primary" onclick={() => go(step + 1)}>{t('Next')}</button>
         {:else}
-          <button type="button" class="primary" onclick={close}>Done</button>
+          <button type="button" class="primary" onclick={close}>{t('Done')}</button>
         {/if}
       </div>
     </div>

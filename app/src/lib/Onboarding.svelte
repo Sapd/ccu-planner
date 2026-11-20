@@ -1,4 +1,5 @@
 <script>
+  import { t, N_ } from '$logic/i18n.mjs';
   import { onboardingSteps, syncProgressView, ONBOARDING_TITLE } from './view/onboarding.mjs';
   import { ui, enterSample, goSection } from './state.svelte.js';
   import { login, syncFirstRun } from './sync-actions.svelte.js';
@@ -16,7 +17,7 @@
     sync: () => syncFirstRun(app),
     goal: () => { ui.addingGoal = true; goSection('goals'); },
   };
-  const label = { signin: 'Connect my RSI account', sync: 'Sync store and hangar', goal: 'Pick your first goal' };
+  const label = { signin: N_('Connect my RSI account'), sync: N_('Sync store and hangar'), goal: N_('Pick your first goal') };
   // A goal needs the store's ships: that step opens once the store has been synced.
   const ready = (step) => step.key !== 'goal' || !!app;
   // The button of a step: the next one, and the goal step as soon as it can be opened.
@@ -25,8 +26,8 @@
 
 <!-- Sync and sign-in are off while sample data is shown, so the steps that need them are not offered. -->
 {#if !ui.sample}
-<section class="steps" class:welcome aria-label={ONBOARDING_TITLE}>
-  {#if !welcome}<h2>{ONBOARDING_TITLE}</h2>{/if}
+<section class="steps" class:welcome aria-label={t(ONBOARDING_TITLE)}>
+  {#if !welcome}<h2>{t(ONBOARDING_TITLE)}</h2>{/if}
   <ol>
     {#each steps as step, i (step.key)}
       <li class:done={step.done} class:next={step.next} data-step={step.key} aria-current={step.next ? 'step' : undefined}>
@@ -36,20 +37,20 @@
           {#if step.text}<p class="text">{step.text}</p>{/if}
           {#if step.key === 'goal' && progress}
             <div class="progress" role="status" data-sync-progress>
-              <p class="text">Wait: {progress.text}</p>
+              <p class="text">{t('Wait: {text}', { text: progress.text })}</p>
               {#if progress.max}<progress value={progress.value} max={progress.max}></progress>{:else}<progress></progress>{/if}
             </div>
           {/if}
         </div>
         {#if hasButton(step) && !(step.key === 'goal' && progress)}
-          <button type="button" class:primary={step.next} disabled={busy || !ready(step)} onclick={act[step.key]}>{busy && step.key !== 'goal' ? 'Working…' : label[step.key]}</button>
+          <button type="button" class:primary={step.next} disabled={busy || !ready(step)} onclick={act[step.key]}>{busy && step.key !== 'goal' ? t('Working…') : t(label[step.key])}</button>
         {/if}
       </li>
     {/each}
   </ol>
   <div class="more">
     <CcuGameRow {app} />
-    <p class="sample"><button type="button" class="link" disabled={busy} onclick={enterSample}>Not ready? Explore a sample chain</button></p>
+    <p class="sample"><button type="button" class="link" disabled={busy} onclick={enterSample}>{t('Not ready? Explore a sample chain')}</button></p>
   </div>
 </section>
 {/if}

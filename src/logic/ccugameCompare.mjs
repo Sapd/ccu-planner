@@ -1,5 +1,6 @@
 // Compares a CCU Game "Saved Chains" export with your goals: what CCU Game says each chain costs against what the planner
 // says for the matching goal, and the goals and chains only one side has. Pure: reads the app's shared plan, saves nothing.
+import { loc, t } from './i18n.mjs';
 import { parseSavedChains, NOT_SAVED_CHAINS } from './ccugame.mjs';
 import { aliasShipId, findShipExact } from './hangar.mjs';
 import { sessionFor } from './session.mjs';
@@ -51,7 +52,7 @@ export function compareCcuGame(app, savedChainsJson, { aliases = null } = {}) {
   const session = sessionFor(app);
   const { plans, data } = session;
   const ships = data?.ships ?? new Map();
-  const shipName = (id) => ships.get(id)?.name ?? 'unknown ship';
+  const shipName = (id) => ships.get(id)?.name ?? t('unknown ship');
   const figures = parseChainFigures(savedChainsJson);
   const goals = Object.values(plans.chains);
   const used = new Set();
@@ -62,16 +63,15 @@ export function compareCcuGame(app, savedChainsJson, { aliases = null } = {}) {
     const notes = [];
     const noStart = f.ccugameCash == null ? null : f.ccugameCash - f.startCost;
     const row = { name: f.name, target: f.toName, targetId: toId, ccugameStart: f.fromName, ccugameCash: f.ccugameCash, startCost: f.startCost, ccugameCashNoStart: noStart, goalId: null, goalName: null, ourStart: null, ourCash: null, ourAlone: null, diff: null, notes };
-    if (toId == null) notes.push(`${f.toName} is not in the ship catalog`);
+    if (toId == null) notes.push(t('{name} is not in the ship catalog', { name: f.toName }));
     const candidates = goals.filter((g) => g.target === toId && !used.has(g.id));
     const goal = candidates.find((g) => g.start?.kind === 'ship' && g.start.ship === fromId) ?? candidates.find((g) => g.start?.kind === 'token') ?? candidates[0] ?? null;
     // Only a chain that starts from something other than a hangar ship buys its start from the store.
     if (f.startOrigin && f.startOrigin !== 'hangar') {
-      const cost = f.startCost ? ` (its figure includes ${usd(f.startCost)} for the ship, left out of the difference)` : '';
-      notes.push(`CCU Game starts from a store ${f.fromName} without LTI${cost}`);
+      notes.push(storeStartNote(f));
     }
     if (!goal) {
-      if (toId != null) notes.push(`Not in your goals: ${f.toName}`);
+      if (toId != null) notes.push(t('Not in your goals: {name}', { name: f.toName }));
       rows.push(row);
       continue;
     }
@@ -85,16 +85,16 @@ export function compareCcuGame(app, savedChainsJson, { aliases = null } = {}) {
     const startId = entry?.route?.start?.ship ?? (goal.start?.kind === 'ship' ? goal.start.ship : null);
     row.ourStart = startId != null ? shipName(startId) : null;
     if (row.ourCash != null && noStart != null) row.diff = row.ourCash - noStart;
-    if (row.ourCash == null) notes.push('The planner has no route for this goal today');
-    if (row.ourStart && fromId != null && startId !== fromId) notes.push(`Ours starts from ${row.ourStart}, CCU Game from ${f.fromName}`);
+    if (row.ourCash == null) notes.push(t('The planner has no route for this goal today'));
+    if (row.ourStart && fromId != null && startId !== fromId) notes.push(t('Ours starts from {ours}, CCU Game from {theirs}', { ours: row.ourStart, theirs: f.fromName }));
     if (row.ourAlone != null && row.ourCash != null && row.ourAlone !== row.ourCash) {
-      notes.push(`CCU Game plans each chain separately; ours share your CCUs (on its own this goal costs ${usd(row.ourAlone)} here, ${usd(row.ourCash)} shared)`);
+      notes.push(t('CCU Game plans each chain separately; ours share your CCUs (on its own this goal costs {alone} here, {shared} shared)', { alone: usd(row.ourAlone), shared: usd(row.ourCash) }));
     }
     rows.push(row);
   }
   const onlyOurs = goals.filter((g) => !used.has(g.id)).map((g) => {
     const name = goalLabel(g, ships);
-    return { goalId: g.id, name, note: `Not in CCU Game: ${name}` };
+    return { goalId: g.id, name, note: t('Not in CCU Game: {name}', { name }) };
   });
   const both = rows.filter((r) => r.goalId && r.diff != null);
   const totals = {
@@ -105,8 +105,13 @@ export function compareCcuGame(app, savedChainsJson, { aliases = null } = {}) {
     diff: both.reduce((n, r) => n + r.diff, 0),
   };
   const notes = [];
-  if (rows.filter((r) => r.goalId).length > 1) notes.push('CCU Game plans each chain separately; the planner shares your CCUs between goals, so its total can be lower.');
+  if (rows.filter((r) => r.goalId).length > 1) notes.push(t('CCU Game plans each chain separately; the planner shares your CCUs between goals, so its total can be lower.'));
   return { rows, onlyOurs, totals, notes };
 }
 
 export { NOT_SAVED_CHAINS };
+
+const storeStartNote = loc('ccugameCompare.storeStartNote', (f) => {
+  const cost = f.startCost ? ` (its figure includes ${usd(f.startCost)} for the ship, left out of the difference)` : '';
+  return `CCU Game starts from a store ${f.fromName} without LTI${cost}`;
+});

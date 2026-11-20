@@ -2,6 +2,7 @@
 import { startShip, reservations, goalStarts } from '../../../../src/logic/chains.mjs';
 import { sessionOf } from '../../../../src/logic/session.mjs';
 import { dijkstra, edgeCost } from '../../../../src/logic/wanted.mjs';
+import { t } from '../../../../src/logic/i18n.mjs';
 
 const rank = { owned: 0, warbond: 1, standard: 2 };
 const same = (a, b) => a.from === b.from && a.to === b.to && a.kind === b.kind
@@ -21,7 +22,7 @@ export function takenFor(session, chainId) {
   const held = reservations(session.plans, chainId);
   if (!session.plans.chains[chainId]) return held;
   const out = new Map();
-  for (const id of session.shared.get(chainId).exclude) out.set(id, held.get(id) ?? 'another goal');
+  for (const id of session.shared.get(chainId).exclude) out.set(id, held.get(id) ?? t('another goal'));
   return out;
 }
 

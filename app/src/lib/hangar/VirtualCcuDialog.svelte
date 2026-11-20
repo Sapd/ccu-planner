@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { untrack } from 'svelte';
   import ShipPicker from '../ShipPicker.svelte';
   import { usd } from '$logic/format.mjs';
@@ -36,7 +37,7 @@
     try {
       // The app resolves a refused save with nothing (it shows the reason at the top): keep the dialog and what you typed.
       const saved = await onsave(virtualAction(form));
-      if (saved) dialog.close(); else error = 'Not saved. The message at the top of the window says why.';
+      if (saved) dialog.close(); else error = t('Not saved. The message at the top of the window says why.');
     } catch (err) { error = err?.message ?? String(err); } finally { busy = false; }
   };
 </script>
@@ -44,29 +45,29 @@
 <dialog bind:this={dialog} aria-labelledby="virtual-title" {onclose} data-virtual-dialog>
   <form onsubmit={save}>
     <header>
-      <h3 id="virtual-title">{ccu ? 'Edit virtual CCU' : 'New virtual CCU'}</h3>
-      <button type="button" class="x" aria-label="Close" onclick={() => dialog.close()}>×</button>
+      <h3 id="virtual-title">{ccu ? t('Edit virtual CCU') : t('New virtual CCU')}</h3>
+      <button type="button" class="x" aria-label={t('Close')} onclick={() => dialog.close()}>×</button>
     </header>
-    <p class="muted">An upgrade you expect to get outside the RSI store: from a friend, a trade or a coming sale. Plans use it like a Warbond: its price counts as new cash, and each copy serves one goal.</p>
-    <ShipPicker {ships} bind:value={form.from} label="Source ship" id="virtual-from" />
-    <ShipPicker {ships} bind:value={form.to} label="Target ship" id="virtual-to" />
-    {#if delta != null}<p class="muted small">Catalog difference: {usd(delta)}</p>{/if}
+    <p class="muted">{t('An upgrade you expect to get outside the RSI store: from a friend, a trade or a coming sale. Plans use it like a Warbond: its price counts as new cash, and each copy serves one goal.')}</p>
+    <ShipPicker {ships} bind:value={form.from} label={t('Source ship')} id="virtual-from" />
+    <ShipPicker {ships} bind:value={form.to} label={t('Target ship')} id="virtual-to" />
+    {#if delta != null}<p class="muted small">{t('Catalog difference: {amount}', { amount: usd(delta) })}</p>{/if}
     <div class="two">
-      <label>Price ($)<input inputmode="decimal" bind:value={form.price} oninput={() => { form = syncPrice(form, ships, 'price'); }} aria-describedby="virtual-price-help" data-virtual-price /><span id="virtual-price-help" class="help">What the CCU costs</span></label>
-      <label>Savings ($)<input inputmode="decimal" bind:value={form.savings} disabled={delta == null} oninput={() => { form = syncPrice(form, ships, 'savings'); }} aria-describedby="virtual-savings-help" /><span id="virtual-savings-help" class="help">Follows from the price, or enter it instead</span></label>
+      <label>{t('Price ($)')}<input inputmode="decimal" bind:value={form.price} oninput={() => { form = syncPrice(form, ships, 'price'); }} aria-describedby="virtual-price-help" data-virtual-price /><span id="virtual-price-help" class="help">{t('What the CCU costs')}</span></label>
+      <label>{t('Savings ($)')}<input inputmode="decimal" bind:value={form.savings} disabled={delta == null} oninput={() => { form = syncPrice(form, ships, 'savings'); }} aria-describedby="virtual-savings-help" /><span id="virtual-savings-help" class="help">{t('Follows from the price, or enter it instead')}</span></label>
     </div>
     <div class="two">
-      <label>Copies<input type="number" min="1" max="99" bind:value={form.copies} /></label>
-      <label>Expires (optional)
-        <span class="row"><input type="date" bind:value={form.expires} aria-describedby="virtual-exp-help" /><button type="button" onclick={() => { form.expires = dayAfter(localToday(), 30); }}>In 30 days</button></span>
+      <label>{t('Copies')}<input type="number" min="1" max="99" bind:value={form.copies} /></label>
+      <label>{t('Expires (optional)')}
+        <span class="row"><input type="date" bind:value={form.expires} aria-describedby="virtual-exp-help" /><button type="button" onclick={() => { form.expires = dayAfter(localToday(), 30); }}>{t('In 30 days')}</button></span>
       </label>
     </div>
-    <p id="virtual-exp-help" class="help">After this day plans stop using it. A chain you reserved with it keeps it.</p>
-    <label>Note (optional) <span class="help">{form.note.length}/{NOTE_MAX}</span><input maxlength={NOTE_MAX} bind:value={form.note} /></label>
+    <p id="virtual-exp-help" class="help">{t('After this day plans stop using it. A chain you reserved with it keeps it.')}</p>
+    <label>{t('Note (optional)')} <span class="help">{form.note.length}/{NOTE_MAX}</span><input maxlength={NOTE_MAX} bind:value={form.note} /></label>
     {#if (tried && problem) || error}<p class="error" role="alert">{(tried && problem) || error}</p>{/if}
     <footer>
-      <button type="button" onclick={() => dialog.close()}>Cancel</button>
-      <button type="submit" class="primary" disabled={busy}>Save</button>
+      <button type="button" onclick={() => dialog.close()}>{t('Cancel')}</button>
+      <button type="submit" class="primary" disabled={busy}>{t('Save')}</button>
     </footer>
   </form>
 </dialog>

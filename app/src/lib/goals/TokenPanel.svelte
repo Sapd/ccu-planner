@@ -1,4 +1,5 @@
 <script>
+  import { t, tn } from '$logic/i18n.mjs';
   import { tokenPool, tokenSettings } from '$logic/tokens.mjs';
   import { tokenSummaryText, tokenOptionLabels, TOKEN_HELP } from '$logic/describe.mjs';
   import GlassPanel from '../ui/GlassPanel.svelte';
@@ -11,26 +12,26 @@
   const lti = $derived(app.data.lti ?? []);
   const rowLabels = $derived(tokenOptionLabels(lti));
   const pool = $derived(tokenPool(lti, settings));
-  const inPool = $derived(new Set(pool.map((t) => t.pledgeId)));
+  const inPool = $derived(new Set(pool.map((tk) => tk.pledgeId)));
 </script>
 
 <GlassPanel class="tokens">
-  <h4>Starting ships</h4>
-  <p class="muted">{TOKEN_HELP}</p>
+  <h4>{t('Starting ships')}</h4>
+  <p class="muted">{t(TOKEN_HELP)}</p>
   <TokenLimit plans={app.plans} />
-  <p class="muted">{pool.length} {pool.length === 1 ? 'starting ship' : 'starting ships'} available{pool.length ? `: ${tokenSummaryText(pool)}` : ''}</p>
+  <p class="muted">{tn(pool.length, '{n} starting ship available', '{n} starting ships available')}{pool.length ? `: ${tokenSummaryText(pool)}` : ''}</p>
   {#if lti.length}
     <ul class="list">
-      {#each lti as t (t.pledgeId)}
-        <li data-token={t.pledgeId}>
-          <span class="nm">{rowLabels.get(t.pledgeId)}
-            {#if inPool.has(t.pledgeId)}<span class="badge">Starting ship</span>{/if}</span>
-          <TokenMark pledgeId={t.pledgeId} {settings} />
+      {#each lti as tk (tk.pledgeId)}
+        <li data-token={tk.pledgeId}>
+          <span class="nm">{rowLabels.get(tk.pledgeId)}
+            {#if inPool.has(tk.pledgeId)}<span class="badge">{t('Starting ship')}</span>{/if}</span>
+          <TokenMark pledgeId={tk.pledgeId} {settings} />
         </li>
       {/each}
     </ul>
   {:else}
-    <p class="muted">No ship pledge with Lifetime Insurance in the hangar.</p>
+    <p class="muted">{t('No ship pledge with Lifetime Insurance in the hangar.')}</p>
   {/if}
 </GlassPanel>
 

@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { onMount } from 'svelte';
   import { ui, loadCatalog } from '../state.svelte.js';
   import { sync } from '../sync-actions.svelte.js';
@@ -47,13 +48,14 @@
   const searching = $derived(query.trim() !== '');
   // The count of the open store is on its chip: the bar repeats it only once a search or a filter narrows the list.
   const countText = $derived(active.length || searching ? resultsText(shown.length, inStore.length, 'items') : '');
-  const storeLabel = $derived(STORES.find((s) => s.id === store)?.label ?? '');
+  const storeLabel = $derived(t(STORES.find((s) => s.id === store)?.label ?? ''));
   const stale = $derived(stampIsStale(doc?.fetchedAt));
   const signedIn = $derived(doc?.signedIn === true);
   // A public catalog never has Subscriber or Concierge items: their chips show no number (a 0 would read as "RSI has none").
   const chipCount = (s) => (counts[s.id] || signedIn || s.id === 'pledge' ? counts[s.id] : null);
-  const emptyText = $derived(emptyStoreReason(store, signedIn)
-    ?? (!inStore.length ? `RSI lists nothing in the ${storeLabel} for this account right now.` : searching && !active.length ? noMatchesText(query) : 'No items match these filters.'));
+  const reason = $derived(emptyStoreReason(store, signedIn));
+  const emptyText = $derived(reason ? t(reason)
+    : (!inStore.length ? t('RSI lists nothing in the {store} for this account right now.', { store: storeLabel }) : searching && !active.length ? noMatchesText(query) : t('No items match these filters.')));
   const pick = (id) => { store = id; panelOpen = false; };
 </script>
 
@@ -61,34 +63,34 @@
   {#if !ui.catalog.loaded}
     <!-- the catalog file is being read -->
   {:else if !doc}
-    <GlassPanel aria-label="No store catalog">
+    <GlassPanel aria-label={t('No store catalog')}>
       {#if ui.sample}
-        <p class="muted">The sample has no store catalog.</p>
+        <p class="muted">{t('The sample has no store catalog.')}</p>
       {:else}
-        <p class="muted">Download RSI's whole store to browse it here, about 5 minutes. {backend.catalogNeedsSignIn() ? 'Sign in to RSI first (Sync menu).' : 'Sign in first to include the Subscriber store and Concierge items.'}</p>
-        {#if canRefresh}<p><button type="button" class="primary" disabled={ui.syncBusy} onclick={refresh}>{refreshing ? 'Refreshing…' : 'Refresh store catalog'}</button></p>{/if}
+        <p class="muted">{t("Download RSI's whole store to browse it here, about 5 minutes.")} {backend.catalogNeedsSignIn() ? t('Sign in to RSI first (Sync menu).') : t('Sign in first to include the Subscriber store and Concierge items.')}</p>
+        {#if canRefresh}<p><button type="button" class="primary" disabled={ui.syncBusy} onclick={refresh}>{refreshing ? t('Refreshing…') : t('Refresh store catalog')}</button></p>{/if}
       {/if}
       {#if ui.catalog.error}<p class="err" role="alert">{ui.catalog.error}</p>{/if}
     </GlassPanel>
   {:else}
     <p class="age" class:stale><span>{catalogAge(doc.fetchedAt, signedIn, new Date(), ui.catalog.source)}</span>
-      {#if canRefresh} · <button type="button" class="link" disabled={ui.syncBusy} onclick={refresh}>{refreshing ? 'Refreshing…' : ui.catalog.source === 'feed' ? 'Refresh from RSI' : 'Refresh'}</button>{/if}</p>
+      {#if canRefresh} · <button type="button" class="link" disabled={ui.syncBusy} onclick={refresh}>{refreshing ? t('Refreshing…') : ui.catalog.source === 'feed' ? t('Refresh from RSI') : t('Refresh')}</button>{/if}</p>
 
-    <div class="views" role="group" aria-label="Store">
+    <div class="views" role="group" aria-label={t('Store')}>
       {#each STORES as s (s.id)}
-        <button type="button" class="chip-btn" class:active={store === s.id} aria-pressed={store === s.id} data-store={s.id} onclick={() => pick(s.id)}>{s.label}{#if chipCount(s) != null} <span class="n">{chipCount(s)}</span>{/if}</button>
+        <button type="button" class="chip-btn" class:active={store === s.id} aria-pressed={store === s.id} data-store={s.id} onclick={() => pick(s.id)}>{t(s.label)}{#if chipCount(s) != null} <span class="n">{chipCount(s)}</span>{/if}</button>
       {/each}
     </div>
 
-    <SearchBox bind:value={query} label="Search the store" placeholder="Search ships, gear, paints" />
+    <SearchBox bind:value={query} label={t('Search the store')} placeholder={t('Search ships, gear, paints')} />
 
     <div class="body">
       <div class="barwrap">
         <FilterBar {active} {countText} bind:panelOpen panelId="browse-filters" onremove={(a) => { sel = removeFilter(groups, sel, a); }} onreset={() => { sel = resetAll(groups); }} />
-        <label class="sort">Sort <select bind:value={sort} aria-label="Sort the store">{#each SORTS as o (o.id)}<option value={o.id}>{o.label}</option>{/each}</select></label>
+        <label class="sort">{t('Sort')} <select bind:value={sort} aria-label={t('Sort the store')}>{#each SORTS as o (o.id)}<option value={o.id}>{t(o.label)}</option>{/each}</select></label>
       </div>
-      <aside id="browse-filters" class="side" class:open={panelOpen} aria-label="Filters">
-        <FilterColumn {groups} {sel} counts={optCounts} label="Filter the store"
+      <aside id="browse-filters" class="side" class:open={panelOpen} aria-label={t('Filters')}>
+        <FilterColumn {groups} {sel} counts={optCounts} label={t('Filter the store')}
           ontoggle={(g, o) => { sel = toggleOption(sel, g, o); }} onreset={(g) => { sel = resetGroup(groups, sel, g); }} onrange={(g, k, v) => { sel = setRange(sel, g, k, v); }} />
       </aside>
       <div class="results">

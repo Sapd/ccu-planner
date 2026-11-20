@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { onDestroy } from 'svelte';
   import { Job } from '../jobs.svelte.js';
   import { parseOfferText } from '$logic/offerCheck.mjs';
@@ -12,7 +13,7 @@
   // Each offer is a what-if on the worker: nothing is saved or bought.
   let { app } = $props();
   const ships = $derived(app.data.ships);
-  const name = (id) => ships.get(id)?.name ?? 'unknown ship';
+  const name = (id) => ships.get(id)?.name ?? t('unknown ship');
 
   let from = $state(null);
   let to = $state(null);
@@ -25,7 +26,7 @@
   let seq = 0;
 
   const cents = $derived(parseSlackUsd(priceText.replace(/^\s*\$/, '')));
-  const problem = $derived(from == null || to == null ? 'Pick both ships.' : from === to ? 'The two ships must differ.' : cents == null ? 'Type the price in dollars.' : null);
+  const problem = $derived(from == null || to == null ? t('Pick both ships.') : from === to ? t('The two ships must differ.') : cents == null ? t('Type the price in dollars.') : null);
 
   // offer: { from, to, kind, cash }; assumed: the text did not say the kind (a daily deal is taken as a Warbond)
   function add(offer, assumed = false) {
@@ -46,7 +47,7 @@
   function readText() {
     const r = parseOfferText(pasted, ships);
     unmatched = r.unmatched;
-    note = r.offers.length ? null : 'No offers found in that text.';
+    note = r.offers.length ? null : t('No offers found in that text.');
     for (const o of [...r.offers].reverse()) add({ from: o.from, to: o.to, kind: o.kind, cash: o.cash }, o.kindAssumed);
   }
   // A card answers for the data it was asked on; after a sync or an edit it can be asked again.
@@ -62,25 +63,25 @@
 </script>
 
 <div class="check">
-  <p class="help">Paste a deal (for example from the CCU Game daily post) to see whether it is worth it for your goals. Nothing is bought or saved.</p>
-  <label class="paste">Paste the deal text
+  <p class="help">{t('Paste a deal (for example from the CCU Game daily post) to see whether it is worth it for your goals. Nothing is bought or saved.')}</p>
+  <label class="paste">{t('Paste the deal text')}
     <textarea rows="4" bind:value={pasted} placeholder="Guardian ($250 MSRP, $235 WB): $5 from the Scorpius Antares"></textarea>
   </label>
-  <p><button type="button" class="primary" disabled={!pasted.trim()} onclick={readText}>Check it</button></p>
+  <p><button type="button" class="primary" disabled={!pasted.trim()} onclick={readText}>{t('Check it')}</button></p>
   {#if note}<p class="hint">{note}</p>{/if}
   {#if unmatched.length}
-    <p class="hint">Could not read:</p>
+    <p class="hint">{t('Could not read:')}</p>
     <ul class="unmatched">{#each unmatched as u, i (i)}<li>{u.line} <span class="why">({u.reason})</span></li>{/each}</ul>
   {/if}
 
   <details>
-    <summary>Or pick the two ships yourself</summary>
+    <summary>{t('Or pick the two ships yourself')}</summary>
     <form onsubmit={checkPicked}>
-      <ShipPicker {ships} bind:value={from} label="Upgrade from" id="offer-from" />
-      <ShipPicker {ships} bind:value={to} label="Upgrade to" id="offer-to" />
-      <label>Price $ <input inputmode="decimal" bind:value={priceText} placeholder="5" size="6" /></label>
-      <label>Kind <select bind:value={kind}><option value="warbond">Warbond</option><option value="standard">Standard</option></select></label>
-      <button type="submit" disabled={!!problem}>Check</button>
+      <ShipPicker {ships} bind:value={from} label={t('Upgrade from')} id="offer-from" />
+      <ShipPicker {ships} bind:value={to} label={t('Upgrade to')} id="offer-to" />
+      <label>{t('Price $')} <input inputmode="decimal" bind:value={priceText} placeholder="5" size="6" /></label>
+      <label>{t('Kind')} <select bind:value={kind}><option value="warbond">{t('Warbond')}</option><option value="standard">{t('Standard')}</option></select></label>
+      <button type="submit" disabled={!!problem}>{t('Check')}</button>
     </form>
     {#if problem && (from != null || to != null || priceText)}<p class="hint">{problem}</p>{/if}
   </details>
@@ -91,17 +92,17 @@
     <article class="card" class:stale data-offer="{card.offer.from}-{card.offer.to}">
       <header>
         <b>{name(card.offer.from)} → {name(card.offer.to)}</b>
-        <span class="kind">{card.offer.kind === 'warbond' ? 'Warbond' : 'Standard'}</span>
+        <span class="kind">{card.offer.kind === 'warbond' ? t('Warbond') : t('Standard')}</span>
         <span class="price">{usd(card.offer.cash)}</span>
-        <button type="button" class="x" aria-label="Remove this check" onclick={() => remove(card)}>×</button>
+        <button type="button" class="x" aria-label={t('Remove this check')} onclick={() => remove(card)}>×</button>
       </header>
       {#if card.assumed}
-        <p class="assumed" data-assumed>Kind not stated; assumed {card.offer.kind === 'warbond' ? 'Warbond' : 'Standard'}.
-          <button type="button" onclick={() => setKind(card, card.offer.kind === 'warbond' ? 'standard' : 'warbond')}>Use {card.offer.kind === 'warbond' ? 'Standard' : 'Warbond'} instead</button></p>
+        <p class="assumed" data-assumed>{t('Kind not stated; assumed {kind}.', { kind: card.offer.kind === 'warbond' ? t('Warbond') : t('Standard') })}
+          <button type="button" onclick={() => setKind(card, card.offer.kind === 'warbond' ? 'standard' : 'warbond')}>{t('Use {kind} instead', { kind: card.offer.kind === 'warbond' ? t('Standard') : t('Warbond') })}</button></p>
       {/if}
-      <JobStatus job={card.job} what="Checking" />
+      <JobStatus job={card.job} what={t('Checking')} />
       {#if stale && card.job.status !== 'running'}
-        <p class="outdated" data-outdated>Outdated: your data or goals changed since this check. <button type="button" onclick={() => recheck(card)}>Check again</button></p>
+        <p class="outdated" data-outdated>{t('Outdated: your data or goals changed since this check.')} <button type="button" onclick={() => recheck(card)}>{t('Check again')}</button></p>
       {/if}
       {#if r}
         <div class="result"><OfferVerdict {r} {name} /></div>

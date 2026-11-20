@@ -1,10 +1,12 @@
 <script>
-  import { STATE_LABEL, LOCK_LABEL, FILLER_LABEL, chipHelp } from '$logic/describe.mjs';
+  import { t } from '$logic/i18n.mjs';
+  import { STATE_LABEL, LOCK_LABEL, FILLER_LABEL, VIRTUAL_CHIP, chipHelp } from '$logic/describe.mjs';
 
   // state: 'own' | 'now' | 'wait' | 'norush' | 'optional' | 'reserved'; lock: a step that locks its price now (shown for 'now').
   // count: shows "2 Wait" instead of "Wait" (counts as chips). One short label per state, never a sentence. text: a label of its own ("1 of 5 reserved").
   let { state, lock = false, count = null, text = null } = $props();
-  const label = $derived(text ?? (lock && state === 'now' ? LOCK_LABEL : (STATE_LABEL[state] ?? '')));
+  // The constants are English texts to translate; any other `text` is already built in the current language.
+  const label = $derived(text != null ? (text === FILLER_LABEL || text === VIRTUAL_CHIP ? t(text) : text) : lock && state === 'now' ? t(LOCK_LABEL) : STATE_LABEL[state] ? t(STATE_LABEL[state]) : '');
   // What the chip means, as its tooltip (a filler is a waiting step shown with its own label).
   const help = $derived(chipHelp(state, { lock, filler: text === FILLER_LABEL }));
 </script>

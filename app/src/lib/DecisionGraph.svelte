@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { decisionMemo } from '$logic/decision.mjs';
   import { shipName } from '$logic/ships.mjs';
   import { usd } from '$logic/format.mjs';
@@ -25,8 +26,8 @@
     const alts = g.nodes.filter((n) => !n.onBest).sort((a, b) => a.layer - b.layer || a.id - b.id);
     for (const n of g.nodes.filter((x) => x.onBest)) { lanes.set(n.id, 0); placed.push({ layer: n.layer, lane: 0 }); }
     for (const n of alts) {
-      for (let t = 1; ; t++) {
-        const lane = t % 2 ? Math.ceil(t / 2) : -t / 2;
+      for (let k = 1; ; k++) {
+        const lane = k % 2 ? Math.ceil(k / 2) : -k / 2;
         if (placed.some((p) => p.lane === lane && Math.abs(p.layer - n.layer) < 0.85)) continue;
         lanes.set(n.id, lane); placed.push({ layer: n.layer, lane }); break;
       }
@@ -59,14 +60,14 @@
   const ordered = $derived([...g.edges].sort((a, b) => Number(a.best) - Number(b.best)));
 </script>
 
-<section class="verdict" aria-label="Verdict">
+<section class="verdict" aria-label={t('Verdict')}>
   <p class="text">{g.verdict.text}</p>
-  {#if g.verdict.versus}<p>Why this route: {g.verdict.versus}.</p>{/if}
+  {#if g.verdict.versus}<p>{t('Why this route: {text}.', { text: g.verdict.versus })}</p>{/if}
   {#each wanted as w}<p class="help">{w}</p>{/each}
 </section>
 
 {#if g.nodes.length}
-  <p class="hint">Left to right: the best route as the spine, alternatives branch off it and rejoin, labelled by how much more they cost. Click a step for its options.</p>
+  <p class="hint">{t('Left to right: the best route as the spine, alternatives branch off it and rejoin, labelled by how much more they cost. Click a step for its options.')}</p>
   <div class="scroll">
     <div class="canvas" style:width="{layout.width}px" style:height="{layout.height}px">
       <svg width={layout.width} height={layout.height} aria-hidden="true">
@@ -75,7 +76,7 @@
           {#if e.best}
             {@const si = stepIndexOf(e)}
             <path class="hit" d={curve(e)} onclick={() => choose(si)} role="presentation" />
-            <text class="label" x={mid(e).x} y={mid(e).y} text-anchor="middle">{e.kind === 'owned' ? 'owned' : usd(e.cash)}</text>
+            <text class="label" x={mid(e).x} y={mid(e).y} text-anchor="middle">{e.kind === 'owned' ? t('owned') : usd(e.cash)}</text>
           {:else}
             <text class="label dim" x={mid(e).x} y={mid(e).y} text-anchor="middle">+{usd(e.delta)}</text>
           {/if}
@@ -84,13 +85,13 @@
       {#each g.nodes as n (n.id)}
         <div class="card" class:alt={!n.onBest} style:left="{layout.pos.get(n.id).x}px" style:top="{layout.pos.get(n.id).y}px" style:width="{W}px" style:height="{H}px" data-ship={n.id}>
           <ShipThumb ship={ships.get(n.id) ?? null} size="s" />
-          <span class="info"><b>{n.name}</b><span>{usd(n.msrp)}{n.concept ? ' · concept' : ''}</span></span>
+          <span class="info"><b>{n.name}</b><span>{usd(n.msrp)}{n.concept ? ` · ${t('concept')}` : ''}</span></span>
         </div>
       {/each}
     </div>
   </div>
 
-  <div class="steps" role="group" aria-label="Route steps">
+  <div class="steps" role="group" aria-label={t('Route steps')}>
     {#each g.steps as s, i (i)}
       <button class="stepbtn {s.chosen.kind}" class:active={index === i} aria-pressed={index === i} onclick={() => choose(i)}>{name(s.from)} → {name(s.to)}</button>
     {/each}
@@ -101,12 +102,12 @@
       <p class="decision">{step.decision}</p>
       {#if step.tie}<p class="tie" data-tie>{step.tie}</p>{/if}
       <table>
-        <thead><tr><th>Option</th><th>Price</th><th>Why</th></tr></thead>
+        <thead><tr><th>{t('Option')}</th><th>{t('Price')}</th><th>{t('Why')}</th></tr></thead>
         <tbody>
           {#each step.options as o}
             <tr class:chosen={o.chosen} class:off={!o.available}>
-              <td class={o.kind}>{o.kind === 'owned' ? `Owned CCU${o.paid != null ? ` (paid ${usd(o.paid)})` : ''}` : o.kind === 'warbond' ? 'Warbond' : o.kind === 'standard' ? 'Standard' : 'Expected price'}</td>
-              <td>{o.kind === 'owned' ? 'free' : usd(o.cash)}</td>
+              <td class={o.kind}>{o.kind === 'owned' ? (o.paid != null ? t('Owned CCU (paid {amount})', { amount: usd(o.paid) }) : t('Owned CCU')) : o.kind === 'warbond' ? t('Warbond') : o.kind === 'standard' ? t('Standard') : t('Expected price')}</td>
+              <td>{o.kind === 'owned' ? t('free') : usd(o.cash)}</td>
               <td>{o.why}</td>
             </tr>
           {/each}

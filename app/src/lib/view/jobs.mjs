@@ -3,13 +3,14 @@
 //
 // Messages (structured-clone safe):
 //   main -> worker   { type: 'data', dataId, data }                          the planner data (jobData), sent once per data object
-//                    { type: 'run', id, dataId, docs: { plans, overrides, saleEvents }, op, args }
+//                    { type: 'run', id, dataId, locale, docs: { plans, overrides, saleEvents }, op, args }   (locale: the language of the job's texts; the worker has its own module copy of it)
 //   worker -> main   { type: 'progress', id, done, total } · { type: 'result', id, value } · { type: 'error', id, message }
 // The client sends one job at a time. Cancelling the running job terminates the worker (the search is a tight loop that
 // cannot listen for a message) and starts a fresh one for the next job; cancelling a queued job just drops it.
 import { runJob, jobKey, jobData } from '../../../../src/logic/jobs.mjs';
 import { buildGraph } from '../../../../src/logic/planner.mjs';
 import { withDocs } from './derive.mjs';
+import { getLocale, withLocale } from '../../../../src/logic/i18n.mjs';
 
 export class JobCancelled extends Error {
   constructor() { super('cancelled'); this.name = 'JobCancelled'; }
@@ -44,7 +45,7 @@ export function createJobHost({ post, makeApp = workerApp, run = runJob, aliases
         if (data == null || msg.dataId !== dataId) throw new Error('the worker has no data for this job');
         const key = `${dataId}|${revsOf(docs)}`;
         if (cached.key !== key) cached = { key, app: makeApp(data, docs) };
-        const value = run(cached.app, op, args, { aliases, onProgress: (p) => post({ type: 'progress', id, done: p.done, total: p.total }) });
+        const value = withLocale(msg.locale, () => run(cached.app, op, args, { aliases, onProgress: (p) => post({ type: 'progress', id, done: p.done, total: p.total }) }));
         post({ type: 'result', id, value });
       } catch (e) {
         post({ type: 'error', id, message: e?.message ?? String(e) });
@@ -128,7 +129,7 @@ export function createJobClient({ spawn, cacheMax = 64 }) {
         worker.postMessage({ type: 'data', dataId, data: jobData(job.app.data) });
       }
       const { plans, overrides, saleEvents } = job.app;
-      worker.postMessage({ type: 'run', id: job.id, dataId, docs: { plans, overrides, saleEvents }, op: job.op, args: job.args });
+      worker.postMessage({ type: 'run', id: job.id, dataId, locale: job.locale, docs: { plans, overrides, saleEvents }, op: job.op, args: job.args });
     } catch (e) {
       drop();
       finish(job, e);
@@ -137,7 +138,8 @@ export function createJobClient({ spawn, cacheMax = 64 }) {
 
   return {
     run(app, op, args = {}, { onProgress = null } = {}) {
-      const key = `${generationOf(app.data)}:${jobKey(app, op, args)}`;
+      const locale = getLocale();
+      const key = `${locale}:${generationOf(app.data)}:${jobKey(app, op, args)}`; // the texts of an answer are in one language
       if (cache.has(key)) {
         const value = cache.get(key);
         cache.delete(key);
@@ -146,7 +148,7 @@ export function createJobClient({ spawn, cacheMax = 64 }) {
       }
       let job = live.get(key);
       if (!job) {
-        job = { id: nextId++, key, app, op, args, waiters: [], last: null, passed: 0 };
+        job = { id: nextId++, key, locale, app, op, args, waiters: [], last: null, passed: 0 };
         live.set(key, job);
         queue.push(job);
       } else { const at = queue.indexOf(job); if (at >= 0) { queue.splice(at, 1); queue.push(job); } } // asked again: it is the newest question now

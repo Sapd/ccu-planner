@@ -1,6 +1,7 @@
 // Virtual CCUs (plans.profile.virtualCcus): the list on the Hangar's Upgrades view and the add/edit form. Pure.
 import { virtualExpired } from '../../../../src/logic/planner.mjs';
 import { localToday } from '../../../../src/logic/availability.mjs';
+import { t } from '../../../../src/logic/i18n.mjs';
 
 /** Characters a note may have. */
 export const NOTE_MAX = 100;
@@ -48,8 +49,8 @@ export function virtualRows(plans, ships, routes = new Map(), today = localToday
     const delta = msrpDelta(ships, v.from, v.to);
     return {
       ...v,
-      fromName: ships?.get(v.from)?.name ?? 'unknown ship',
-      toName: ships?.get(v.to)?.name ?? 'unknown ship',
+      fromName: ships?.get(v.from)?.name ?? t('unknown ship'),
+      toName: ships?.get(v.to)?.name ?? t('unknown ship'),
       savings: delta == null ? null : delta - v.cents,
       expired: virtualExpired(v, today),
       usedBy: usedBy.get(v.id) ?? [],
@@ -81,11 +82,11 @@ export function syncPrice(form, ships, edited) {
 
 /** What is wrong with the form, or null. */
 export function formProblem(form) {
-  if (form.from == null || form.to == null) return 'Pick the source and the target ship.';
-  if (form.from === form.to) return 'Source and target must be different ships.';
-  if (dollarsToCents(form.price) == null) return 'Enter what the CCU costs, in dollars.';
-  if (!Number.isInteger(Number(form.copies)) || Number(form.copies) < 1 || Number(form.copies) > 99) return 'Copies must be between 1 and 99.';
-  if (String(form.note ?? '').trim().length > NOTE_MAX) return `The note can have at most ${NOTE_MAX} characters.`;
+  if (form.from == null || form.to == null) return t('Pick the source and the target ship.');
+  if (form.from === form.to) return t('Source and target must be different ships.');
+  if (dollarsToCents(form.price) == null) return t('Enter what the CCU costs, in dollars.');
+  if (!Number.isInteger(Number(form.copies)) || Number(form.copies) < 1 || Number(form.copies) > 99) return t('Copies must be between 1 and 99.');
+  if (String(form.note ?? '').trim().length > NOTE_MAX) return t('The note can have at most {max} characters.', { max: NOTE_MAX });
   return null;
 }
 

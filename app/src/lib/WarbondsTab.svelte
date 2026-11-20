@@ -1,4 +1,5 @@
 <script>
+  import { t, tn, N_ } from '$logic/i18n.mjs';
   import { sessionOf } from '$logic/session.mjs';
   import { warbondTargets, warbondSources, recentWarbondEvents, hangarShipIds, upgradeIntoIds, scopeOffers, filterWarbondTargets } from '$logic/warbonds.mjs';
   import { shipName, goalLabel } from '$logic/ships.mjs';
@@ -20,10 +21,10 @@
   const ships = $derived(app.data.ships);
   const offers = $derived(app.data.offers);
   const name = (id) => shipName(ships, id);
-  const goalName = (id) => (app.plans.chains[id] ? goalLabel(app.plans.chains[id], ships) : 'a goal');
+  const goalName = (id) => (app.plans.chains[id] ? goalLabel(app.plans.chains[id], ships) : t('a goal'));
   const ship = (id) => ships.get(id) ?? null;
 
-  const WINDOWS = [[24, '24 h'], [168, '7 d'], [720, '30 d']];
+  const WINDOWS = [[24, N_('24 h')], [168, N_('7 d')], [720, N_('30 d')]];
   // Search, filters and opened cards are kept for the session (ui.store): the page is rebuilt on every visit.
   let hours = $state(ui.store.hours);
   let query = $state(ui.store.query);
@@ -31,7 +32,7 @@
   // Which Warbond source ships to list: all, the ships in the hangar, or the ships you own an upgrade into.
   let scope = $state(ui.store.scope);
   $effect(() => { ui.store.hours = hours; ui.store.query = query; ui.store.onlyMine = onlyMine; ui.store.scope = scope; });
-  const SCOPES = [['all', 'All source ships'], ['hangar', 'Ships in my hangar'], ['upgrade', 'Ships I have an upgrade into']];
+  const SCOPES = [['all', N_('All source ships')], ['hangar', N_('Ships in my hangar')], ['upgrade', N_('Ships I have an upgrade into')]];
 
   // The planner's verdict per offer comes from the journeys Today shows, so the two pages agree.
   const verdicts = $derived(storeVerdicts(todayView(app).goals));
@@ -45,20 +46,20 @@
   const recent = $derived(recentWarbondEvents(app.data.history ?? [], offers, hours));
   // The "new" count in the summary follows the scope like the other two numbers; the fold below lists every source ship.
   const newInScope = $derived(scope === 'all' ? recent.appeared.length : recentWarbondEvents(app.data.history ?? [], scoped, hours).appeared.length);
-  const sourcesOf = $derived(new Map(all.map((t) => [t.to, warbondSources(scoped, ships, t.to, { ...own, usage })])));
+  const sourcesOf = $derived(new Map(all.map((tg) => [tg.to, warbondSources(scoped, ships, tg.to, { ...own, usage })])));
   const shown = $derived(
     filterWarbondTargets(all, ships, scoped, query)
-      .filter((t) => !onlyMine || verdictOf(t.to)),
+      .filter((tg) => !onlyMine || verdictOf(tg.to)),
   );
-  const cards = $derived(keyed(shown, (t) => t.to));
+  const cards = $derived(keyed(shown, (tg) => tg.to));
   const searching = $derived(query.trim() !== '');
   // True only when the search text itself (not the checkboxes) leaves nothing.
   const queryEmptied = $derived(searching && filterWarbondTargets(all, ships, scoped, query).length === 0);
   const appeared = $derived(keyed(recent.appeared, (e) => `${e.skuId}:${e.fromId}:${e.at}`));
   const gone = $derived(keyed(recent.disappeared, (e) => `${e.skuId}:${e.fromId}:${e.at}`));
-  const windowLabel = $derived(WINDOWS.find(([h]) => h === hours)?.[1] ?? `${hours} h`);
+  const windowLabel = $derived(t(WINDOWS.find(([h]) => h === hours)?.[1] ?? `${hours} h`));
   // What matters to your goals comes first; the rest starts as a short list.
-  const isMine = (t) => !!verdictOf(t.to);
+  const isMine = (tg) => !!verdictOf(tg.to);
   const mineCards = $derived(cards.filter((c) => isMine(c.item)));
   const otherCards = $derived(cards.filter((c) => !isMine(c.item)));
   const OTHER_SHOWN = 20;
@@ -68,13 +69,13 @@
   const LIST_MAX = 40;
   const day = (iso) => whenText(iso) ?? '';
   // What your own data says about a source ship: kept apart, because an upgrade into a ship is not the ship.
-  const OWN_CELL = { ship: '✓ ship in hangar', upgrade: '↗ upgrade into it' };
+  const OWN_CELL = { ship: N_('✓ ship in hangar'), upgrade: N_('↗ upgrade into it') };
   // The best source's ownership is a small chip after the line, not a parenthesis in it.
-  const ownText = (o) => ({ ship: 'ship owned', upgrade: 'owned upgrade' }[o] ?? null);
-  const bestLine = (t, best, verdict) => [
-    `${t.sources} source ${t.sources === 1 ? 'ship' : 'ships'}`,
-    `best: ${name(t.cheapest.from)}`,
-    verdict ? `for ${goalsText(verdict)}` : null,
+  const ownText = (o) => ({ ship: N_('ship owned'), upgrade: N_('owned upgrade') }[o] ?? null);
+  const bestLine = (tg, best, verdict) => [
+    tn(tg.sources, '{n} source ship', '{n} source ships'),
+    t('best: {name}', { name: name(tg.cheapest.from) }),
+    verdict ? t('for {name}', { name: goalsText(verdict) }) : null,
   ].filter(Boolean).join(' · ');
   const goalsText = (v) => v?.goals.map((g) => g.name).join(', ') ?? '';
   // Every source of a card saves the same when the Standard price is the same step: say it once in the header.
@@ -93,66 +94,66 @@
   </div>
 {/snippet}
 
-{#snippet offerCard(t)}
-    {@const sources = sourcesOf.get(t.to) ?? []}
-    {@const isOpen = !!ui.store.open[t.to]}
-    {@const verdict = verdictOf(t.to)}
+{#snippet offerCard(tg)}
+    {@const sources = sourcesOf.get(tg.to) ?? []}
+    {@const isOpen = !!ui.store.open[tg.to]}
+    {@const verdict = verdictOf(tg.to)}
     {@const vkey = verdict ? verdict.verdict : 'none'}
-    {@const best = sources.find((x) => x.from === t.cheapest.from)}
+    {@const best = sources.find((x) => x.from === tg.cheapest.from)}
     {@const flat = sameSaving(sources)}
     {@const showSaves = flat == null && sources.some((x) => x.saving != null)}
-    <GlassPanel as="section" class="card" data-to={t.to} data-verdict-kind={vkey}>
-      <button class="head" aria-expanded={isOpen} aria-controls="wb-src-{t.to}" onclick={() => { ui.store.open[t.to] = !isOpen; }}>
-        <ShipThumb ship={ship(t.to)} size="m" />
+    <GlassPanel as="section" class="card" data-to={tg.to} data-verdict-kind={vkey}>
+      <button class="head" aria-expanded={isOpen} aria-controls="wb-src-{tg.to}" onclick={() => { ui.store.open[tg.to] = !isOpen; }}>
+        <ShipThumb ship={ship(tg.to)} size="m" />
         <span class="info">
           <span class="title">
-            <span class="name">{t.name}</span>
-            {#if t.concept}<span class="tag concept">Concept</span>{/if}
-            {#if t.newSince}<span class="tag new" title="Appeared {day(t.newSince)}">New</span>{/if}
+            <span class="name">{tg.name}</span>
+            {#if tg.concept}<span class="tag concept">{t('Concept')}</span>{/if}
+            {#if tg.newSince}<span class="tag new" title={t('Appeared {date}', { date: day(tg.newSince) })}>{t('New')}</span>{/if}
           </span>
           <span class="line">
-            {bestLine(t, best, verdict)}
-            {#if ownText(best?.ownership)}<span class="tag own" title={best.ownership === 'ship' ? 'You own the best source ship' : 'You own an upgrade into the best source ship, not the ship itself'}>{ownText(best.ownership)}</span>{/if}
+            {bestLine(tg, best, verdict)}
+            {#if ownText(best?.ownership)}<span class="tag own" title={best.ownership === 'ship' ? t('You own the best source ship') : t('You own an upgrade into the best source ship, not the ship itself')}>{t(ownText(best.ownership))}</span>{/if}
           </span>
         </span>
         <span class="fig">
-          <span class="from">from <strong class="big" data-testid="wb-from">{usd(t.cheapest.cash)}</strong></span>
-          {#if t.cheapest.saving != null && t.cheapest.saving > 0}
-            <span class="minus" title="Standard {usd(t.cheapest.standard)}">−{usd(t.cheapest.saving)}</span>
-          {:else if t.cheapest.saving == null}
-            <span class="muted small">no Standard offer</span>
+          <span class="from">{t('from')} <strong class="big" data-testid="wb-from">{usd(tg.cheapest.cash)}</strong></span>
+          {#if tg.cheapest.saving != null && tg.cheapest.saving > 0}
+            <span class="minus" title={t('Standard {amount}', { amount: usd(tg.cheapest.standard) })}>−{usd(tg.cheapest.saving)}</span>
+          {:else if tg.cheapest.saving == null}
+            <span class="muted small">{t('no Standard offer')}</span>
           {/if}
         </span>
-        {#if verdict}<span class="verdict {vkey}" title={VERDICT_HELP[vkey]} data-verdict-chip>{VERDICT_LABEL[vkey]}</span>{/if}
-        <span class="chev">{isOpen ? 'Hide' : 'Details'} <span aria-hidden="true">{isOpen ? '▾' : '▸'}</span></span>
+        {#if verdict}<span class="verdict {vkey}" title={t(VERDICT_HELP[vkey])} data-verdict-chip>{t(VERDICT_LABEL[vkey])}</span>{/if}
+        <span class="chev">{isOpen ? t('Hide') : t('Details')} <span aria-hidden="true">{isOpen ? '▾' : '▸'}</span></span>
       </button>
       {#if isOpen}
-        <div class="sources" id="wb-src-{t.to}">
+        <div class="sources" id="wb-src-{tg.to}">
           <p class="srchead">
-            <span>{flat != null ? `All sources save ${usd(flat)} against Standard.` : 'Warbond against Standard price, cheapest first.'}</span>
-            <button type="button" class="linkbtn" data-hangar-upgrades onclick={() => openHangarUpgrades(t.name, `Back to ${t.name} offers`)}>See matching upgrades in my hangar</button>
+            <span>{flat != null ? t('All sources save {amount} against Standard.', { amount: usd(flat) }) : t('Warbond against Standard price, cheapest first.')}</span>
+            <button type="button" class="linkbtn" data-hangar-upgrades onclick={() => openHangarUpgrades(tg.name, t('Back to {name} offers', { name: tg.name }))}>{t('See matching upgrades in my hangar')}</button>
           </p>
           <div class="tablewrap">
             <table>
-              <thead><tr><th scope="col">From</th><th scope="col" class="num">Warbond</th><th scope="col" class="num">Standard</th>{#if showSaves}<th scope="col" class="num">Saves</th>{/if}<th scope="col">You own</th><th scope="col">Plan</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col">{t('From')}</th><th scope="col" class="num">{t('Warbond')}</th><th scope="col" class="num">{t('Standard')}</th>{#if showSaves}<th scope="col" class="num">{t('Saves')}</th>{/if}<th scope="col">{t('You own')}</th><th scope="col">{t('Plan')}</th><th scope="col"><span class="sr">{t('Actions')}</span></th></tr></thead>
               <tbody>
                 {#each keyed(sources, (x) => x.from) as { item: x, key: k } (k)}
-                  {@const inPlan = verdicts.pairs.get(checkKey(x.from, t.to))}
-                  {@const ck = checkKey(x.from, t.to)}
-                  <tr class:plan={!!inPlan} data-from={x.from} data-to={t.to}>
+                  {@const inPlan = verdicts.pairs.get(checkKey(x.from, tg.to))}
+                  {@const ck = checkKey(x.from, tg.to)}
+                  <tr class:plan={!!inPlan} data-from={x.from} data-to={tg.to}>
                     <th scope="row" class="fromcell"><ShipThumb ship={ship(x.from)} size="s" /> <span>{x.fromName}</span></th>
                     <td class="num price">{usd(x.cash)}</td>
                     <td class="num muted">{x.standard != null ? usd(x.standard) : '–'}</td>
-                    {#if showSaves}<td class="num" class:muted={!(x.saving > 0)}>{x.saving != null ? (x.saving > 0 ? usd(x.saving) : 'none') : ''}</td>{/if}
-                    <td>{#if x.ownership}<span class="tag own" title={x.ownership === 'ship' ? 'Ship owned' : 'Own an upgrade into this ship, not the ship itself'}>{OWN_CELL[x.ownership]}</span>{/if}</td>
-                    <td>{#if inPlan}<span class="tag plan" title="{inPlan.verdict === 'plan' ? 'Today lists this step to buy' : 'A step of'} {goalsText(inPlan)}">{inPlan.verdict === 'plan' ? 'In your plan' : 'Helps a goal'}</span>{/if}</td>
+                    {#if showSaves}<td class="num" class:muted={!(x.saving > 0)}>{x.saving != null ? (x.saving > 0 ? usd(x.saving) : t('none')) : ''}</td>{/if}
+                    <td>{#if x.ownership}<span class="tag own" title={x.ownership === 'ship' ? t('Ship owned') : t('Own an upgrade into this ship, not the ship itself')}>{t(OWN_CELL[x.ownership])}</span>{/if}</td>
+                    <td>{#if inPlan}<span class="tag plan" title={inPlan.verdict === 'plan' ? t('Today lists this step to buy {goals}', { goals: goalsText(inPlan) }) : t('A step of {goals}', { goals: goalsText(inPlan) })}>{inPlan.verdict === 'plan' ? t('In your plan') : t('Helps a goal')}</span>{/if}</td>
                     <td class="acts">
-                      <button type="button" class="more" aria-expanded={!!ui.store.checks[ck]} onclick={() => { ui.store.checks[ck] = !ui.store.checks[ck]; }}>Check against my goals</button>
-                      <RsiLink href={upgradeToolUrl({ from: x.from, to: t.to })} label="Buy on RSI" aria="Buy {x.fromName} to {t.name} on RSI" />
+                      <button type="button" class="more" aria-expanded={!!ui.store.checks[ck]} onclick={() => { ui.store.checks[ck] = !ui.store.checks[ck]; }}>{t('Check against my goals')}</button>
+                      <RsiLink href={upgradeToolUrl({ from: x.from, to: tg.to })} label={t('Buy on RSI')} aria={t('Buy {from} to {to} on RSI', { from: x.fromName, to: tg.name })} />
                     </td>
                   </tr>
                   {#if ui.store.checks[ck]}
-                    <tr class="checkrow"><td colspan={showSaves ? 7 : 6}><InlineCheck {app} from={x.from} to={t.to} kind="warbond" cash={x.cash} /></td></tr>
+                    <tr class="checkrow"><td colspan={showSaves ? 7 : 6}><InlineCheck {app} from={x.from} to={tg.to} kind="warbond" cash={x.cash} /></td></tr>
                   {/if}
                 {/each}
               </tbody>
@@ -165,58 +166,58 @@
 
 <div class="warbonds">
   <GlassPanel as="header">
-    <h2>On sale now</h2>
+    <h2>{t('On sale now')}</h2>
     <p class="summary">
-      <strong data-testid="wb-targets">{all.length}</strong> {all.length === 1 ? 'ship has' : 'ships have'} Warbond upgrades on sale
-      (<strong data-testid="wb-offers">{total}</strong> {total === 1 ? 'offer' : 'offers'} in all) · <strong data-testid="wb-new">{newInScope}</strong> new in the last {windowLabel}
+      <strong data-testid="wb-targets">{all.length}</strong> {all.length === 1 ? t('ship has Warbond upgrades on sale') : t('ships have Warbond upgrades on sale')}
+      (<strong data-testid="wb-offers">{total}</strong> {total === 1 ? t('offer in all') : t('offers in all')}) · <strong data-testid="wb-new">{newInScope}</strong> {t('new in the last {window}', { window: windowLabel })}
     </p>
-    {#if scope !== 'all'}<p class="summary" data-scope-note>Counting only offers from {scope === 'hangar' ? 'ships in your hangar' : 'ships you own an upgrade into'}.</p>{/if}
+    {#if scope !== 'all'}<p class="summary" data-scope-note>{scope === 'hangar' ? t('Counting only offers from ships in your hangar.') : t('Counting only offers from ships you own an upgrade into.')}</p>{/if}
     <div class="controls">
-      <label class="chk"><input type="checkbox" bind:checked={onlyMine} /> only my goals</label>
-      <span class="seg" role="group" aria-label="Source ships to list"><span class="muted segname">Upgrade from</span>
+      <label class="chk"><input type="checkbox" bind:checked={onlyMine} /> {t('only my goals')}</label>
+      <span class="seg" role="group" aria-label={t('Source ships to list')}><span class="muted segname">{t('Upgrade from')}</span>
         {#each SCOPES as [id, label] (id)}
-          <button class="chip-btn" class:active={scope === id} aria-pressed={scope === id} data-scope={id} onclick={() => { scope = id; }}>{label}</button>
+          <button class="chip-btn" class:active={scope === id} aria-pressed={scope === id} data-scope={id} onclick={() => { scope = id; }}>{t(label)}</button>
         {/each}
       </span>
     </div>
   </GlassPanel>
 
-  <SearchBox bind:value={query} label="Search the Store" placeholder="Search ships or manufacturers" shown={shown.length} total={all.length} />
+  <SearchBox bind:value={query} label={t('Search the Store')} placeholder={t('Search ships or manufacturers')} shown={shown.length} total={all.length} />
 
   {#if mineCards.length}
-    <h3 class="grp">For your goals ({mineCards.length})</h3>
-    {#each mineCards as { item: t, key } (key)}{@render offerCard(t)}{/each}
+    <h3 class="grp">{t('For your goals ({count})', { count: mineCards.length })}</h3>
+    {#each mineCards as { item: tg, key } (key)}{@render offerCard(tg)}{/each}
   {:else if all.length && !queryEmptied}
-    <p class="muted nomine">None of the Warbond offers on sale now is a step of your goals.</p>
+    <p class="muted nomine">{t('None of the Warbond offers on sale now is a step of your goals.')}</p>
   {/if}
   {#if otherCards.length}
-    <h3 class="grp">{mineCards.length ? 'Other offers' : 'All offers'} ({otherCards.length})</h3>
-    {#each otherShown as { item: t, key } (key)}{@render offerCard(t)}{/each}
+    <h3 class="grp">{t(mineCards.length ? 'Other offers ({count})' : 'All offers ({count})', { count: otherCards.length })}</h3>
+    {#each otherShown as { item: tg, key } (key)}{@render offerCard(tg)}{/each}
     {#if otherCards.length > OTHER_SHOWN && !searching}
-      <p><button type="button" aria-expanded={allOthers} onclick={() => { allOthers = !allOthers; }}>{allOthers ? `Show only the first ${OTHER_SHOWN}` : `Show all ${otherCards.length}`}</button></p>
+      <p><button type="button" aria-expanded={allOthers} onclick={() => { allOthers = !allOthers; }}>{allOthers ? t('Show only the first {n}', { n: OTHER_SHOWN }) : t('Show all {n}', { n: otherCards.length })}</button></p>
     {/if}
   {/if}
   {#if !cards.length}
-    <p class="muted">{!all.length ? 'No Warbond offers on sale.' : queryEmptied ? noMatchesText(query) : 'No ships match the filters.'}</p>
+    <p class="muted">{!all.length ? t('No Warbond offers on sale.') : queryEmptied ? noMatchesText(query) : t('No ships match the filters.')}</p>
   {/if}
-  <Fold title="Offers that appeared ({recent.appeared.length}) or ended ({recent.disappeared.length}) in the last {windowLabel}">
-  <span class="seg" role="group" aria-label="Time window"><span class="muted segname">Show the last</span>
+  <Fold title={t('Offers that appeared ({appeared}) or ended ({ended}) in the last {window}', { appeared: recent.appeared.length, ended: recent.disappeared.length, window: windowLabel })}>
+  <span class="seg" role="group" aria-label={t('Time window')}><span class="muted segname">{t('Show the last')}</span>
     {#each WINDOWS as [h, label] (h)}
-      <button class="chip-btn" class:active={hours === h} aria-pressed={hours === h} onclick={() => { hours = h; }}>{label}</button>
+      <button class="chip-btn" class:active={hours === h} aria-pressed={hours === h} onclick={() => { hours = h; }}>{t(label)}</button>
     {/each}
   </span>
-  <p class="muted">Many offers end together when a sale finishes, so a big number of ended offers is normal.{scope !== 'all' ? ' These lists cover every source ship, not only the ones chosen above.' : ''}</p>
+  <p class="muted">{t('Many offers end together when a sale finishes, so a big number of ended offers is normal.')}{scope !== 'all' ? ` ${t('These lists cover every source ship, not only the ones chosen above.')}` : ''}</p>
   {#if !(app.data.history ?? []).length}
-    <p class="muted">No offer history yet. It is recorded on each refresh.</p>
+    <p class="muted">{t('No offer history yet. It is recorded on each refresh.')}</p>
   {:else}
     <div class="cols">
       <div>
-        {#each appeared.slice(0, LIST_MAX) as { item: e, key } (key)}{@render event(e, '+')}{:else}<p class="muted">No Warbond appeared.</p>{/each}
-        {#if appeared.length > LIST_MAX}<p class="muted">+{appeared.length - LIST_MAX} more</p>{/if}
+        {#each appeared.slice(0, LIST_MAX) as { item: e, key } (key)}{@render event(e, '+')}{:else}<p class="muted">{t('No Warbond appeared.')}</p>{/each}
+        {#if appeared.length > LIST_MAX}<p class="muted">{t('+{n} more', { n: appeared.length - LIST_MAX })}</p>{/if}
       </div>
       <div>
-        {#each gone.slice(0, LIST_MAX) as { item: e, key } (key)}{@render event(e, '−')}{:else}<p class="muted">No offer disappeared.</p>{/each}
-        {#if gone.length > LIST_MAX}<p class="muted">+{gone.length - LIST_MAX} more</p>{/if}
+        {#each gone.slice(0, LIST_MAX) as { item: e, key } (key)}{@render event(e, '−')}{:else}<p class="muted">{t('No offer disappeared.')}</p>{/each}
+        {#if gone.length > LIST_MAX}<p class="muted">{t('+{n} more', { n: gone.length - LIST_MAX })}</p>{/if}
       </div>
     </div>
   {/if}

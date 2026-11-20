@@ -2,6 +2,7 @@
 // money figures and the alert text. Pure: the caller passes ships, overrides,
 // expected prices, availability and the saved Warbond prices. Which steps lock,
 // wait or get an alert comes from routeAdvice; this only formats it.
+import { t } from './i18n.mjs';
 import { startShip } from './chains.mjs';
 import { routeAdvice } from './advice.mjs';
 import { shipAvailability } from './availability.mjs';
@@ -41,7 +42,7 @@ export function journey(route, chain, ctx = {}) {
     if (s.kind === 'owned') return 'own';
     return buyOf.has(s) ? 'now' : 'wait';
   };
-  const targetName = chain ? ships?.get(chain.target)?.name ?? 'the target' : null;
+  const targetName = chain ? ships?.get(chain.target)?.name ?? t('the target') : null;
 
   const steps = route.steps.map((s) => {
     const state = stateOf(s);
@@ -51,7 +52,7 @@ export function journey(route, chain, ctx = {}) {
     let reason = null;
     // A waiting Standard step is either a slot any Warbond in its price range can fill, or a filler no Warbond fits.
     const fits = state === 'wait' && s.kind === 'standard' ? warbondCanFit(msrp(s.from), msrp(s.to)) : null;
-    const slot = fits ? { fromName: ships?.get(s.from)?.name ?? 'start', toName: ships?.get(s.to)?.name ?? 'target', fromMsrp: msrp(s.from), toMsrp: msrp(s.to), save: Math.max(0, s.cash - MIN_CCU), ...slotShips(ships, msrp(s.from), msrp(s.to)) } : null;
+    const slot = fits ? { fromName: ships?.get(s.from)?.name ?? t('start'), toName: ships?.get(s.to)?.name ?? t('target'), fromMsrp: msrp(s.from), toMsrp: msrp(s.to), save: Math.max(0, s.cash - MIN_CCU), ...slotShips(ships, msrp(s.from), msrp(s.to)) } : null;
     if (lock) reason = lockText;
     else if (state === 'wait') reason = waitReason(s, seen, ships, avail, fits, slot, fits === false ? msrp(s.to) - msrp(s.from) : null);
     const a = msrp(s.to);

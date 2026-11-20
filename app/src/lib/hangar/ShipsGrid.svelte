@@ -1,15 +1,20 @@
 <script>
+  import { t, getLocale } from '$logic/i18n.mjs';
   import ShipThumb from '../ShipThumb.svelte';
 
   // The Ships view: a grid of big ship pictures, the name on the picture, one line under it about where the ship came from. At most two badges: the insurance and one tag on the picture (Starting ship or Goal ...). Giftable is a filter and the card's hover text.
   // items: fleetItems() cards (owned ships and goal ships); ship(id) -> the planner ship (for its picture).
   let { items, ship, onopen, ongoal } = $props();
-  const labelOf = (c) => (c.kind === 'goal'
-    ? `${c.name}, ${c.tag}: open the goal`
-    : `${c.name}${c.count > 1 ? `, ${c.count} copies` : ''}${c.insurance ? `, ${c.insurance}` : ''}${c.startingText ? `, ${c.startingText.toLowerCase()}` : ''}${c.giftable ? `, ${c.giftableText.toLowerCase()}` : ''}: show ${c.pledges > 1 ? 'the first pledge' : 'the pledge'}`);
+  // Mid-sentence words are lower case in English; German nouns keep their capital.
+  const soft = (s) => (getLocale() === 'en' ? s.toLowerCase() : s);
+  const labelOf = (c) => {
+    if (c.kind === 'goal') return t('{name}, {tag}: open the goal', { name: c.name, tag: c.tag });
+    const label = [c.name, ...(c.count > 1 ? [t('{n} copies', { n: c.count })] : []), ...(c.insurance ? [c.insurance] : []), ...(c.startingText ? [soft(c.startingText)] : []), ...(c.giftable ? [soft(c.giftableText)] : [])].join(', ');
+    return c.pledges > 1 ? t('{label}: show the first pledge', { label }) : t('{label}: show the pledge', { label });
+  };
 </script>
 
-<ul class="grid" aria-label="Ships">
+<ul class="grid" aria-label={t('Ships')}>
   {#each items as c (c.key)}
     <li>
       <button type="button" class="card" class:goal={c.kind === 'goal'} data-owned-ship={c.kind === 'owned' ? (c.shipId ?? undefined) : undefined} data-goal-ship={c.kind === 'goal' ? c.goalId : undefined}

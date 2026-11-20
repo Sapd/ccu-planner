@@ -1,13 +1,14 @@
 <script>
   import { tick } from 'svelte';
-  import { GLOSSARY } from '$logic/glossary.mjs';
+  import { t } from '$logic/i18n.mjs';
+  import { glossaryList } from '$logic/glossary.mjs';
   import { matchesQuery, searchText } from '$logic/search.mjs';
   import { ui, closeGlossary } from './state.svelte.js';
 
   // The words the planner uses, one short entry each. ui.glossary names the entry to bring into view ('' = the top).
   let dialog = $state(null);
   let filter = $state('');
-  const shown = $derived(GLOSSARY.filter((e) => matchesQuery(searchText(e.term, e.text), filter)));
+  const shown = $derived(glossaryList().filter((e) => matchesQuery(searchText(e.term, e.text), filter)));
   const focusables = () => [...(dialog?.querySelectorAll('button:not([disabled]), input') ?? [])];
   const onkeydown = (e) => {
     if (e.key === 'Escape') { e.stopPropagation(); closeGlossary(); return; }
@@ -35,8 +36,8 @@
 
 <div class="backdrop" role="presentation" {onkeydown}>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="gl-title" tabindex="-1" bind:this={dialog}>
-    <header><h2 id="gl-title">Glossary</h2><button type="button" class="close" onclick={closeGlossary}>Close</button></header>
-    <label class="find">Find a word <input type="search" bind:value={filter} placeholder="For example melt, LTI, chain" /></label>
+    <header><h2 id="gl-title">{t('Glossary')}</h2><button type="button" class="close" onclick={closeGlossary}>{t('Close')}</button></header>
+    <label class="find">{t('Find a word')} <input type="search" bind:value={filter} placeholder={t('For example melt, LTI, chain')} /></label>
     <dl>
       {#each shown as e (e.key)}
         <div class="entry" class:on={ui.glossary === e.key}>
@@ -44,7 +45,7 @@
           <dd>{e.text}</dd>
         </div>
       {/each}
-      {#if !shown.length}<p class="none">No word matches “{filter}”.</p>{/if}
+      {#if !shown.length}<p class="none">{t('No word matches “{filter}”.', { filter })}</p>{/if}
     </dl>
   </div>
 </div>

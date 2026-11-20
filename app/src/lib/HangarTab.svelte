@@ -1,5 +1,6 @@
 <script>
-  import { hangarRows, meltView, buybackRows, keyed, pledgeOverview, pledgeById, plural, HANGAR_VIEWS as VIEWS } from './view/hangar.mjs';
+  import { t, tn } from '$logic/i18n.mjs';
+  import { hangarRows, meltView, buybackRows, keyed, pledgeOverview, pledgeById, HANGAR_VIEWS as VIEWS } from './view/hangar.mjs';
   import { usd } from '$logic/format.mjs';
   import { selOf, applyFilters, optionCounts, toggleOption, setRange, activeFilters, removeFilter, resetGroup, resetAll, resultsText, nextSort, sortBy } from './view/filters.mjs';
   import { standardPrices } from '$logic/melt.mjs';
@@ -41,8 +42,8 @@
   // "Worth melting" goes first when there are candidates (Today's melt tip lands here), otherwise last.
   const meltFirst = $derived(meltView(app).plan.candidates.length > 0);
   const tokenCfg = $derived(tokenSettings(app.plans));
-  const ltiIds = $derived(new Set((app.data.lti ?? []).map((t) => t.pledgeId)));
-  const poolIds = $derived(new Set(tokenPool(app.data.lti ?? [], tokenCfg).map((t) => t.pledgeId)));
+  const ltiIds = $derived(new Set((app.data.lti ?? []).map((tk) => tk.pledgeId)));
+  const poolIds = $derived(new Set(tokenPool(app.data.lti ?? [], tokenCfg).map((tk) => tk.pledgeId)));
 
   // The view, search, filters, sort and opened groups are kept for the session (ui.hangar): the page is rebuilt on every visit.
   const viewCount = $derived({ ships: overview.chips.ships, ccu: overview.chips.ccu, other: overview.chips.others });
@@ -76,9 +77,9 @@
   const openCopy = $derived(openId == null ? null : (view.rows.find((r) => String(r.copyId) === String(openId)) ?? null));
   async function setExcluded(excluded) {
     const released = await dispatch({ type: 'excludeCopy', copyId: String(openCopy.copyId), excluded });
-    if (released?.length) ui.notice = `Released the reserved chain of ${released.map((id) => app.plans.chains[id]?.name ?? id).join(', ')}: it used this copy.`;
+    if (released?.length) ui.notice = t('Released the reserved chain of {names}: it used this copy.', { names: released.map((id) => app.plans.chains[id]?.name ?? id).join(', ') });
   }
-  const goChain = (id) => openGoalFrom(id, 'Back to Hangar');
+  const goChain = (id) => openGoalFrom(id, t('Back to Hangar'));
 
   // ---- Ships ----
   const ownedC = $derived(ownedCards(fleet, pledges, app.data.ships, poolIds));
@@ -119,20 +120,20 @@
 
   // ---- The open view's filter column and bar ----
   const cfg = $derived(current === 'ccu'
-    ? { groups: CCU_GROUPS, sel: ccuSel, counts: ccuCounts, noun: 'upgrades', shown: ccuRes.shown, total: ccuRes.total }
+    ? { groups: CCU_GROUPS, sel: ccuSel, counts: ccuCounts, noun: 'upgrades', filterLabel: t('Filter upgrades'), shown: ccuRes.shown, total: ccuRes.total }
     : current === 'other'
-      ? { groups: OTHER_GROUPS, sel: otherSel, counts: otherCounts, noun: 'pledges', shown: otherShown.length, total: otherAll.length }
-      : { groups: FLEET_GROUPS, sel: fleetSel, counts: fleetCounts, noun: 'ships', shown: fleetShown.length, total: fleetTotal });
+      ? { groups: OTHER_GROUPS, sel: otherSel, counts: otherCounts, noun: 'pledges', filterLabel: t('Filter pledges'), shown: otherShown.length, total: otherAll.length }
+      : { groups: FLEET_GROUPS, sel: fleetSel, counts: fleetCounts, noun: 'ships', filterLabel: t('Filter ships'), shown: fleetShown.length, total: fleetTotal });
   const setSel = (next) => { if (current === 'ccu') ccuSel = next; else if (current === 'other') otherSel = next; else fleetSel = next; };
   const active = $derived(activeFilters(cfg.groups, cfg.sel));
   const countText = $derived(current === 'ships' ? fleetCountText(fleetShown, fleetAll, overview.chips.ships)
-    : current === 'ccu' && ccuRes.groups.length !== ccuRes.copies.length ? `${resultsText(cfg.shown, cfg.total, cfg.noun)} · ${ccuRes.groups.length} ${ccuRes.groups.length === 1 ? 'row' : 'rows'}`
+    : current === 'ccu' && ccuRes.groups.length !== ccuRes.copies.length ? `${resultsText(cfg.shown, cfg.total, cfg.noun)} · ${tn(ccuRes.groups.length, '{n} row', '{n} rows')}`
     : resultsText(cfg.shown, cfg.total, cfg.noun));
   // With a search that finds nothing here, say where it would find something.
   const elsewhere = $derived(!searching || cfg.shown > 0 ? [] : [
-    ['ships', 'Ships', fleetItems(ownedC, [], query).length],
-    ['ccu', 'Upgrades', ccuSearched.length],
-    ['other', 'Other pledges', otherSearched.length],
+    ['ships', t('Ships'), fleetItems(ownedC, [], query).length],
+    ['ccu', t('Upgrades'), ccuSearched.length],
+    ['other', t('Other pledges'), otherSearched.length],
   ].filter(([id, , n]) => id !== current && n > 0));
 
   // A link from a goal's owned step: open the group that holds that copy, scroll to it and focus it.
@@ -154,69 +155,69 @@
 
 <div class="hangar">
   {#if empty}
-    <GlassPanel class="emptyhangar" aria-label="Hangar empty">
-      <p class="big"><b>Your hangar is empty.</b></p>
-      <p class="muted">{ui.sample ? 'This sample has no pledges in this part.' : 'Open Sync and choose Hangar to load your pledges.'}</p>
+    <GlassPanel class="emptyhangar" aria-label={t('Hangar empty')}>
+      <p class="big"><b>{t('Your hangar is empty.')}</b></p>
+      <p class="muted">{ui.sample ? t('This sample has no pledges in this part.') : t('Open Sync and choose Hangar to load your pledges.')}</p>
     </GlassPanel>
   {:else}
-    <div class="views" role="group" aria-label="Hangar category">
+    <div class="views" role="group" aria-label={t('Hangar category')}>
       {#each VIEWS as v (v.id)}
-        <button type="button" class="chip-btn" class:active={current === v.id} aria-pressed={current === v.id} data-chip={v.id} onclick={() => pickView(v.id)}>{v.label} <span class="n">{viewCount[v.id]}</span></button>
+        <button type="button" class="chip-btn" class:active={current === v.id} aria-pressed={current === v.id} data-chip={v.id} onclick={() => pickView(v.id)}>{t(v.label)} <span class="n">{viewCount[v.id]}</span></button>
       {/each}
     </div>
     {#if meltFirst}<div id="hangar-melt"><MeltTab {app} query={query} /></div>{/if}
-    <GlassPanel class="hsummary" aria-label="Hangar summary">
-      <span><b>{overview.summary.count}</b> pledges</span>
+    <GlassPanel class="hsummary" aria-label={t('Hangar summary')}>
+      <span><b>{overview.summary.count}</b> {tn(overview.summary.count, 'pledge', 'pledges')}</span>
       <span class="sep" aria-hidden="true">·</span>
-      <span title="What you paid for your pledges (their melt value on RSI). Gifted pledges count as $0.">Spent <b>{usd(spentCents(pledges))}</b></span>
+      <span title={t('What you paid for your pledges (their melt value on RSI). Gifted pledges count as $0.')}>{t('Spent')} <b>{usd(spentCents(pledges))}</b></span>
       {#if ccuAll.length}
         <span class="sep" aria-hidden="true">·</span>
-        <span title="Sum of the Saving column of your upgrades: what the same upgrades would cost today as Standard upgrades, minus what you paid. Estimates where RSI sells no Standard version today."><b>≈ {usd(saved.cents)}</b> saved</span>
+        <span title={t('Sum of the Saving column of your upgrades: what the same upgrades would cost today as Standard upgrades, minus what you paid. Estimates where RSI sells no Standard version today.')}><b>≈ {usd(saved.cents)}</b> {t('saved')}</span>
         {#if unused.count}
           <span class="sep" aria-hidden="true">·</span>
-          <button type="button" class="link" data-unused onclick={showUnused} title="Upgrades no goal holds or uses in its current chain. Opens them in Upgrades."><b>{unused.count}</b> {unused.count === 1 ? 'upgrade' : 'upgrades'} not in use{unused.paid ? ` (${usd(unused.paid)})` : ''}</button>
+          <button type="button" class="link" data-unused onclick={showUnused} title={t('Upgrades no goal holds or uses in its current chain. Opens them in Upgrades.')}><b>{unused.count}</b> {unused.count === 1 ? t('upgrade not in use') : t('upgrades not in use')}{unused.paid ? ` (${usd(unused.paid)})` : ''}</button>
         {/if}
       {/if}
-      {#if !meltFirst}<span class="sep" aria-hidden="true">·</span><button type="button" class="link small" data-melt-status onclick={() => document.getElementById('hangar-melt')?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })}>Worth melting (0)</button>{/if}
+      {#if !meltFirst}<span class="sep" aria-hidden="true">·</span><button type="button" class="link small" data-melt-status onclick={() => document.getElementById('hangar-melt')?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })}>{t('Worth melting (0)')}</button>{/if}
       <Term term="hangar-money" />
     </GlassPanel>
 
-    <SearchBox bind:value={query} label="Search the hangar" placeholder={current === 'ccu' ? 'Search upgrades by ship' : 'Search ships, manufacturers, items'} />
+    <SearchBox bind:value={query} label={t('Search the hangar')} placeholder={current === 'ccu' ? t('Search upgrades by ship') : t('Search ships, manufacturers, items')} />
 
     <div class="body">
       <div class="barwrap">
   <FilterBar {active} {countText} bind:panelOpen panelId="hangar-filters" onremove={(a) => setSel(removeFilter(cfg.groups, cfg.sel, a))} onreset={() => setSel(resetAll(cfg.groups))} />
       </div>
-      <aside id="hangar-filters" class="side" class:open={panelOpen} aria-label="Filters">
-        <FilterColumn groups={cfg.groups} sel={cfg.sel} counts={cfg.counts} label="Filter {cfg.noun}"
+      <aside id="hangar-filters" class="side" class:open={panelOpen} aria-label={t('Filters')}>
+        <FilterColumn groups={cfg.groups} sel={cfg.sel} counts={cfg.counts} label={cfg.filterLabel}
           ontoggle={(g, o) => setSel(toggleOption(cfg.sel, g, o))} onreset={(g) => setSel(resetGroup(cfg.groups, cfg.sel, g))} onrange={(g, k, v) => setSel(setRange(cfg.sel, g, k, v))} />
       </aside>
       <div class="results">
 
         {#if elsewhere.length}
-          <p class="muted searchnote">No match here. Found in {#each elsewhere as [id, label, n], i (id)}{i ? ', ' : ''}<button type="button" class="link" onclick={() => pickView(id)}>{label} ({n})</button>{/each}.</p>
+          <p class="muted searchnote">{t('No match here. Found in')}{' '}{#each elsewhere as [id, label, n], i (id)}{i ? ', ' : ''}<button type="button" class="link" onclick={() => pickView(id)}>{label} ({n})</button>{/each}.</p>
         {/if}
 
         {#if current === 'ships'}
           {#if fleetShown.length}
             <ShipsGrid items={fleetShown} {ship} onopen={(id) => { openId = id; }} ongoal={goChain} />
           {:else if !elsewhere.length}
-            <p class="muted">{searching && fleetTotal ? noMatchesText(query) : active.length ? 'No ships match these filters.' : 'No ships in your hangar yet.'}</p>
+            <p class="muted">{searching && fleetTotal ? noMatchesText(query) : active.length ? t('No ships match these filters.') : t('No ships in your hangar yet.')}</p>
           {/if}
-          <Fold title={`Starting ships (cheap LTI ships): ${poolIds.size} available`}><TokenPanel {app} /></Fold>
+          <Fold title={t('Starting ships (cheap LTI ships): {n} available', { n: poolIds.size })}><TokenPanel {app} /></Fold>
         {:else if current === 'ccu'}
-          <p class="muted tabletools" data-ccu-counts>{plural(view.rows.length + view.review.length, 'upgrade pledge', 'upgrade pledges')} · {view.rows.length} matched · {view.review.length} {view.review.length === 1 ? 'needs' : 'need'} review
-            <label class="chk"><input type="checkbox" bind:checked={showMatch} /> Show how each was matched</label>
-            <RsiLink href={hangarUrl()} label="Open hangar" aria="Open your hangar on RSI" /></p>
+          <p class="muted tabletools" data-ccu-counts>{tn(view.rows.length + view.review.length, '{n} upgrade pledge', '{n} upgrade pledges')} · {t('{n} matched', { n: view.rows.length })} · {tn(view.review.length, '{n} needs review', '{n} need review')}
+            <label class="chk"><input type="checkbox" bind:checked={showMatch} /> {t('Show how each was matched')}</label>
+            <RsiLink href={hangarUrl()} label={t('Open hangar')} aria={t('Open your hangar on RSI')} /></p>
           {#if ccuRes.copies.length || !ccuRes.showReview}
-            <UpgradesTable groups={ccuGroups} sort={sort ?? DEFAULT_SORT} empty={view.rows.length === 0 && !searching && !active.length ? 'You have no upgrade pledges.' : 'No upgrades match.'} {ship} {expanded} {showMatch} onsort={onSort} ontoggle={toggleGroup} onopen={(id) => { openId = id; }} ongoal={goChain} />
+            <UpgradesTable groups={ccuGroups} sort={sort ?? DEFAULT_SORT} empty={view.rows.length === 0 && !searching && !active.length ? t('You have no upgrade pledges.') : t('No upgrades match.')} {ship} {expanded} {showMatch} onsort={onSort} ontoggle={toggleGroup} onopen={(id) => { openId = id; }} ongoal={goChain} />
           {/if}
           {#if ccuRes.showReview}
-            <h4>Needs review</h4>
+            <h4>{t('Needs review')}</h4>
             {#each reviewList as { item: r, key } (key)}
-              <div class="item" data-pledge={r.pledgeId}><b>{r.name}</b> <span class="muted">· {r.reason}</span> <RsiLink href={hangarUrl()} label="Hangar" aria="Open {r.name} in the RSI hangar" /></div>
+              <div class="item" data-pledge={r.pledgeId}><b>{r.name}</b> <span class="muted">· {r.reason}</span> <RsiLink href={hangarUrl()} label={t('Hangar')} aria={t('Open {name} in the RSI hangar', { name: r.name })} /></div>
             {:else}
-              <p class="muted">{searching && view.review.length ? noMatchesText(query) : 'Nothing needs review.'}</p>
+              <p class="muted">{searching && view.review.length ? noMatchesText(query) : t('Nothing needs review.')}</p>
             {/each}
           {/if}
           <VirtualCcus {app} />
@@ -224,13 +225,13 @@
           {#if otherShown.length}
             <OtherList items={otherShown} onopen={(id) => { openId = id; }} />
           {:else if !elsewhere.length}
-            <p class="muted">{searching && otherAll.length ? noMatchesText(query) : active.length ? 'No pledges match these filters.' : 'Nothing in this category.'}</p>
+            <p class="muted">{searching && otherAll.length ? noMatchesText(query) : active.length ? t('No pledges match these filters.') : t('Nothing in this category.')}</p>
           {/if}
-          <h4>Buy-back ({searching ? `${backList.length} of ${buyback.length}` : buyback.length})</h4>
+          <h4>{t('Buy-back ({count})', { count: searching ? t('{shown} of {total}', { shown: backList.length, total: buyback.length }) : buyback.length })}</h4>
           {#each backs as { item: b, key } (key)}
-            <div class="item" data-buyback={b.id}><b>{b.name}</b> <span class="muted">· {b.contained ?? ''}{b.reclaimDate ? ` · reclaimed ${b.reclaimDate}` : ''}</span> <RsiLink href={buybackUrl(b.id)} label="Buy back" aria="Buy back {b.name} on RSI" /></div>
+            <div class="item" data-buyback={b.id}><b>{b.name}</b> <span class="muted">· {b.contained ?? ''}{b.reclaimDate ? ` · ${t('reclaimed {date}', { date: b.reclaimDate })}` : ''}</span> <RsiLink href={buybackUrl(b.id)} label={t('Buy back')} aria={t('Buy back {name} on RSI', { name: b.name })} /></div>
           {:else}
-            <p class="muted">{searching && buyback.length ? noMatchesText(query) : 'No buy-back items.'}</p>
+            <p class="muted">{searching && buyback.length ? noMatchesText(query) : t('No buy-back items.')}</p>
           {/each}
         {/if}
       </div>
@@ -241,7 +242,7 @@
 </div>
 
 {#if openPledge}
-  {#key openPledge.pledgeId}<PledgeDetail pledge={openPledge} ships={app.data.ships} token={ltiIds.has(String(openPledge.pledgeId)) ? { settings: tokenCfg, inPool: poolIds.has(String(openPledge.pledgeId)) } : null} onclose={() => { openId = null; }} goal={openGoal ? { id: openGoal.reservedBy, name: openGoal.reservedByName } : null} ongoal={(id) => openGoalFrom(id, 'Back to Hangar')} copy={openCopy ? { excluded: openCopy.excluded } : null} onexclude={setExcluded} />{/key}
+  {#key openPledge.pledgeId}<PledgeDetail pledge={openPledge} ships={app.data.ships} token={ltiIds.has(String(openPledge.pledgeId)) ? { settings: tokenCfg, inPool: poolIds.has(String(openPledge.pledgeId)) } : null} onclose={() => { openId = null; }} goal={openGoal ? { id: openGoal.reservedBy, name: openGoal.reservedByName } : null} ongoal={(id) => openGoalFrom(id, t('Back to Hangar'))} copy={openCopy ? { excluded: openCopy.excluded } : null} onexclude={setExcluded} />{/key}
 {/if}
 
 <style>

@@ -1,6 +1,7 @@
 // The Goals list as a table row per goal, and its sorting. Pure.
 // One price per goal: what is left to pay in the shared plan, the same number the planned total adds up
 // (a reserved goal at its reserved price, the others at today's plan). Details are in the goal's own view.
+import { t, tn } from '../../../../src/logic/i18n.mjs';
 
 const KINDS = ['own', 'now', 'norush', 'optional', 'wait'];
 
@@ -18,7 +19,7 @@ export function chainProgress(j) {
 }
 
 /** "15 of 17 upgrades owned" (the line beside the money figure, and the Goals list's bar label). */
-export const progressText = ({ own, total }) => `${own} of ${total} ${total === 1 ? 'upgrade' : 'upgrades'} owned`;
+export const progressText = ({ own, total }) => tn(total, '{own} of {n} upgrade owned', '{own} of {n} upgrades owned', { own });
 
 /**
  * The one chip a goal shows in the list: its most urgent state, Buy now > On sale > Optional > Wait > Owned, with the count.
@@ -35,8 +36,8 @@ export function urgentChip(g, own = 0) {
 /** The bar's buckets of the counted chain as the counts urgentChip reads (so the chip counts the chain the bar and price count). */
 export const chipCounts = (bar) => ({ buyCount: bar?.now, noRushCount: bar?.norush, optionalCount: bar?.optional, waitCount: bar?.wait });
 
-/** "from your Pulse · LTI" -> "Pulse · LTI"; "from Carrack (fixed)" -> "Carrack (fixed)"; the no-starting-ship text stays out (the chip says it). */
-export const shortStart = (line) => (!line || /^needs a starting ship/i.test(line) ? null : line.replace(/^from (your )?/i, ''));
+/** "from your Pulse · LTI" -> "Pulse · LTI"; "from Carrack (fixed)" -> "Carrack (fixed)"; the no-starting-ship text stays out (the chip says it). German lines read "ab Pulse · LTI" and "braucht ein Startschiff". */
+export const shortStart = (line) => (!line || /^(needs a starting ship|braucht ein Startschiff)/i.test(line) ? null : line.replace(/^(from (your )?|ab )/i, ''));
 
 /** @param {object} g a todayView goal */
 export function goalRow(g) {
@@ -45,9 +46,9 @@ export function goalRow(g) {
   const counted = g.counted ?? g.journey;
   const { own, total } = chainProgress(counted);
   const left = stuck ? null : (g.countedCash ?? g.acceptedCash ?? g.cash ?? null);
-  const flag = g.status === 'no-token' ? { text: 'Needs a starting ship', tone: 'warn' }
-    : g.status === 'no-route' ? { text: 'No route', tone: 'warn' }
-    : g.status === 'done' ? { text: 'All upgrades owned', tone: 'own' }
+  const flag = g.status === 'no-token' ? { text: t('Needs a starting ship'), tone: 'warn' }
+    : g.status === 'no-route' ? { text: t('No route'), tone: 'warn' }
+    : g.status === 'done' ? { text: t('All upgrades owned'), tone: 'own' }
     : null;
   return {
     id: g.goalId, name: g.targetName ?? g.name, from: shortStart(g.startLine), left, own, total, bar: counted?.bar ?? null, chip: flag ? null : urgentChip(chipCounts(counted?.bar), own), flag,
@@ -86,4 +87,4 @@ export function sortRows(rows, sort) {
 export const ariaSort = (sort, key) => (sort?.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
 
 /** The line beside the planned total: "10 goals · nothing to buy today". */
-export const tableSummary = (goals, buyToday) => `${goals} ${goals === 1 ? 'goal' : 'goals'} · ${buyToday > 0 ? `${buyToday} to buy today` : 'nothing to buy today'}`;
+export const tableSummary = (goals, buyToday) => `${tn(goals, '{n} goal', '{n} goals')} · ${buyToday > 0 ? t('{n} to buy today', { n: buyToday }) : t('nothing to buy today')}`;

@@ -1,17 +1,18 @@
 // Import of the CCU Game browser extension's "Saved Chains" file into planner goals. Pure.
+import { N_, t } from './i18n.mjs';
 import { aliasShipId, findShipExact } from './hangar.mjs';
 import { tokenPool, tokenSettings } from './tokens.mjs';
 import { startOf } from './chains.mjs';
 
-export const NOT_SAVED_CHAINS = 'This is not a CCU Game saved-chains file';
+export const NOT_SAVED_CHAINS = N_('This is not a CCU Game saved-chains file');
 
 /** @returns {Array<{name:string, fromName:string, toName:string, longTerm:boolean}>} */
 export function parseSavedChains(text) {
   let doc;
-  try { doc = JSON.parse(text); } catch { throw new Error(NOT_SAVED_CHAINS); }
+  try { doc = JSON.parse(text); } catch { throw new Error(t(NOT_SAVED_CHAINS)); }
   const chains = doc?.chains;
   if (!Array.isArray(chains) || !chains.every((c) => typeof c?.fromShipName === 'string' && typeof c?.toShipName === 'string')) {
-    throw new Error(NOT_SAVED_CHAINS);
+    throw new Error(t(NOT_SAVED_CHAINS));
   }
   return chains.map((c) => ({
     name: typeof c.name === 'string' && c.name.trim() ? c.name.trim() : `${c.fromShipName} -> ${c.toShipName}`,

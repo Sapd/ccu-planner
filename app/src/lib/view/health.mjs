@@ -1,5 +1,6 @@
 // The hangar-health banner: upgrades in the hangar the planner could not read. A plan cannot use what it cannot read, so it
 // may propose buying an upgrade the user already owns. Pure.
+import { t } from '../../../../src/logic/i18n.mjs';
 
 /**
  * @param {{ review?: Array<{ pledgeId: number, fromShip?: number|null, toShip?: number|null }>, owned?: Array<unknown> }} data app.data
@@ -18,10 +19,10 @@ export function hangarHealth(data, goals) {
     const buys = (g.journey?.steps ?? []).filter((x) => x.state !== 'own');
     if (touched.has(g.targetId) || buys.some((x) => touched.has(x.step.to) || touched.has(x.step.from))) names.push(g.name);
   }
-  const what = review.length === 1 ? '1 upgrade in your hangar could not be read' : `${review.length} of ${total} upgrades in your hangar could not be read`;
+  const what = review.length === 1 ? t('1 upgrade in your hangar could not be read') : t('{n} of {total} upgrades in your hangar could not be read', { n: review.length, total });
   const effect = names.length
-    ? ` Plans for ${names.join(', ')} may suggest buying an upgrade you already own.`
-    : ' A plan may suggest buying an upgrade you already own.';
+    ? ` ${t('Plans for {names} may suggest buying an upgrade you already own.', { names: names.join(', ') })}`
+    : ` ${t('A plan may suggest buying an upgrade you already own.')}`;
   // Dismissing hides the banner for this exact set of upgrades; a new unreadable upgrade brings it back.
   const key = review.map((r) => String(r.pledgeId)).sort().join(',');
   return { count: review.length, total, goals: names, key, text: `${what}.${effect}` };

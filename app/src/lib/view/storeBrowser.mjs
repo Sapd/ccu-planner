@@ -6,12 +6,13 @@ import { norm } from '../../../../src/logic/ships.mjs';
 import { whenText } from '../../../../src/logic/describe.mjs';
 import { usd } from '../../../../src/logic/format.mjs';
 import { selOf, emptySel } from './filters.mjs';
+import { N_, loc } from '../../../../src/logic/i18n.mjs';
 
 /** RSI has no separate Concierge store: Concierge-only items are flagged. Pledge store = everything that is neither subscriber-only nor Concierge-only. */
 export const STORES = [
-  { id: 'pledge', label: 'Pledge store', test: (i) => !i.subscriber && !i.vip },
-  { id: 'subscriber', label: 'Subscriber store', test: (i) => i.subscriber },
-  { id: 'concierge', label: 'Concierge', test: (i) => i.vip },
+  { id: 'pledge', label: N_('Pledge store'), test: (i) => !i.subscriber && !i.vip },
+  { id: 'subscriber', label: N_('Subscriber store'), test: (i) => i.subscriber },
+  { id: 'concierge', label: N_('Concierge'), test: (i) => i.vip },
 ];
 export const storeIds = STORES.map((s) => s.id);
 
@@ -59,23 +60,23 @@ const PAINTS = CATALOG_CATEGORIES.find((c) => c.key === 'paints');
 // An item can be in several tag facets (subs); one in none is "Other". The group restricts and counts only its own category's items.
 const subsOf = (i) => (Array.isArray(i.subs) ? i.subs : []);
 const subGroup = (cat, id, label) => ({ id, label, parent: cat.key, appliesTo: (i) => i.category === cat.key, options: cat.facet.subs.map((s) => ({ id: s.key, label: s.label, test: (i) => subsOf(i).includes(s.key) }))
-  .concat([{ id: 'other', label: 'Other', test: (i) => !subsOf(i).length }]) });
+  .concat([{ id: 'other', label: N_('Other'), test: (i) => !subsOf(i).length }]) });
 
 /** Every group with every option: what the selection is built from (see selOf). */
 export const BROWSE_GROUPS = [
-  { id: 'category', label: 'Category', options: CATALOG_CATEGORIES.filter((c) => !c.subscriber).map((c) => ({ id: c.key, label: c.label, test: (i) => i.category === c.key })).concat([{ id: 'other', label: 'Other', test: (i) => i.category === 'other' }]) },
-  subGroup(GEAR, 'gear', 'Gear type'),
-  subGroup(PAINTS, 'paints', 'Paint type'),
-  { id: 'offer', label: 'Offer', options: [
-    { id: 'sale', label: 'On sale', test: onSale },
-    { id: 'warbond', label: 'Warbond', test: (i) => i.warbond },
-    { id: 'limited', label: 'Limited time', test: (i) => i.limited },
-    { id: 'stock', label: 'Limited stock', test: limitedStock },
+  { id: 'category', label: N_('Category'), options: CATALOG_CATEGORIES.filter((c) => !c.subscriber).map((c) => ({ id: c.key, label: c.label, test: (i) => i.category === c.key })).concat([{ id: 'other', label: N_('Other'), test: (i) => i.category === 'other' }]) },
+  subGroup(GEAR, 'gear', N_('Gear type')),
+  subGroup(PAINTS, 'paints', N_('Paint type')),
+  { id: 'offer', label: N_('Offer'), options: [
+    { id: 'sale', label: N_('On sale'), test: onSale },
+    { id: 'warbond', label: N_('Warbond'), test: (i) => i.warbond },
+    { id: 'limited', label: N_('Limited time'), test: (i) => i.limited },
+    { id: 'stock', label: N_('Limited stock'), test: limitedStock },
   ] },
-  { id: 'price', label: 'Price', kind: 'range', value: effectivePrice },
-  { id: 'mine', label: 'Your ships', options: [
-    { id: 'owned', label: 'In my hangar', test: (i) => i.mine?.owned === true },
-    { id: 'goal', label: 'Goal ship', test: (i) => i.mine?.goal === true },
+  { id: 'price', label: N_('Price'), kind: 'range', value: effectivePrice },
+  { id: 'mine', label: N_('Your ships'), options: [
+    { id: 'owned', label: N_('In my hangar'), test: (i) => i.mine?.owned === true },
+    { id: 'goal', label: N_('Goal ship'), test: (i) => i.mine?.goal === true },
   ] },
 ];
 export const emptyBrowseSel = () => emptySel(BROWSE_GROUPS);
@@ -98,10 +99,10 @@ export function visibleGroups(storeItemsList, sel) {
 
 // ---- Search and sort ----
 export const SORTS = [
-  { id: 'relevance', label: 'Relevance' },
-  { id: 'price-asc', label: 'Price, low to high' },
-  { id: 'price-desc', label: 'Price, high to low' },
-  { id: 'name', label: 'Name' },
+  { id: 'relevance', label: N_('Relevance') },
+  { id: 'price-asc', label: N_('Price, low to high') },
+  { id: 'price-desc', label: N_('Price, high to low') },
+  { id: 'name', label: N_('Name') },
 ];
 export const sortId = (v) => (SORTS.some((s) => s.id === v) ? v : 'relevance');
 
@@ -122,10 +123,10 @@ export function sortItems(items, id) {
 /** The tags on a card, at most two, never the one the open store already says. */
 export function cardTags(i, storeId) {
   const all = [];
-  if (i.vip && storeId !== 'concierge') all.push('Concierge');
-  if (i.subscriber && storeId !== 'subscriber') all.push('Subscriber');
-  if (i.warbond) all.push('Warbond');
-  if (i.limited) all.push('Limited time');
+  if (i.vip && storeId !== 'concierge') all.push(N_('Concierge'));
+  if (i.subscriber && storeId !== 'subscriber') all.push(N_('Subscriber'));
+  if (i.warbond) all.push(N_('Warbond'));
+  if (i.limited) all.push(N_('Limited time'));
   return all.slice(0, 2);
 }
 
@@ -138,13 +139,13 @@ export function cardView(i, storeId) {
 }
 
 /** "Store catalog from today, 14:05 · signed in", "Public store catalog from today, 14:05", "Catalog from the CCU Planner feed, today, 14:05" (source 'feed'), or "No store catalog yet". (The header's "Store: ..." stamp is the upgrade data.) */
-export const catalogAge = (fetchedAt, signedIn, now = new Date(), source = 'own') => { const w = whenText(fetchedAt, now); if (w && source === 'feed') return `Catalog from the CCU Planner feed, ${w}`; return w ? (signedIn ? `Store catalog from ${w} · signed in` : `Public store catalog from ${w}`) : 'No store catalog yet'; };
+export const catalogAge = loc('storeBrowser.catalogAge', (fetchedAt, signedIn, now = new Date(), source = 'own') => { const w = whenText(fetchedAt, now); if (w && source === 'feed') return `Catalog from the CCU Planner feed, ${w}`; return w ? (signedIn ? `Store catalog from ${w} · signed in` : `Public store catalog from ${w}`) : 'No store catalog yet'; });
 
 /** Why a store has nothing to show, when that is because of how the catalog was fetched (a public catalog never has Subscriber or Concierge items), else null. */
 export function emptyStoreReason(storeId, signedIn) {
   if (signedIn) return null;
-  if (storeId === 'subscriber') return 'Sync while signed in to see the Subscriber store. RSI shows it only to a signed-in account.';
-  if (storeId === 'concierge') return 'Sync while signed in to see Concierge items. RSI shows them only to a signed-in account.';
+  if (storeId === 'subscriber') return N_('Sync while signed in to see the Subscriber store. RSI shows it only to a signed-in account.');
+  if (storeId === 'concierge') return N_('Sync while signed in to see Concierge items. RSI shows them only to a signed-in account.');
   return null;
 }
 

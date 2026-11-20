@@ -1,4 +1,5 @@
 <script>
+  import { t, N_ } from '$logic/i18n.mjs';
   import { onMount } from 'svelte';
   import * as echarts from 'echarts/core';
   import { LineChart } from 'echarts/charts';
@@ -14,7 +15,7 @@
   const stair = $derived(staircase(route, ships));
   // Same kind colours as GraphTab: owned = own (grey), Warbond = buy now (green), Standard = wait (purple); values of --own/--now/--wait.
   const COLORS = { owned: '#64748b', standard: '#a78bfa', warbond: '#3ddc97' };
-  const LABELS = { owned: 'Owned', standard: 'Standard', warbond: 'Warbond' };
+  const LABELS = { owned: N_('Owned'), standard: N_('Standard'), warbond: N_('Warbond') };
 
   let el;
   let chart;
@@ -40,7 +41,7 @@
         splitLine: { lineStyle: { color: 'rgba(255,255,255,0.14)' } },
       },
       series: Object.entries(series).map(([kind, data]) => ({
-        name: LABELS[kind] ?? kind, type: 'line', data, showSymbol: true, symbolSize: 7,
+        name: LABELS[kind] ? t(LABELS[kind]) : kind, type: 'line', data, showSymbol: true, symbolSize: 7,
         lineStyle: { color: COLORS[kind] ?? '#a3afc2', width: 3 }, itemStyle: { color: COLORS[kind] ?? '#a3afc2' },
       })),
     };
@@ -60,7 +61,7 @@
 </script>
 
 {#if stair.empty}
-  <p class="none">No route today</p>
+  <p class="none">{t('No route today')}</p>
 {/if}
 <div class="chart" bind:this={el} hidden={stair.empty}></div>
 

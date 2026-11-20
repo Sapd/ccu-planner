@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { untrack } from 'svelte';
   import { searchShips } from './view/shipSearch.mjs';
   import ShipThumb from './ShipThumb.svelte';
@@ -51,10 +52,10 @@
 <div class="picker">
   <label for={id}>{label}</label>
   <input {id} role="combobox" aria-expanded={open && results.length > 0} aria-controls={listId} aria-activedescendant={open && results[active] ? `${id}-opt-${results[active].id}` : undefined} aria-autocomplete="list"
-    autocomplete="off" placeholder="Type a ship name" value={text} {oninput} {onkeydown}
+    autocomplete="off" placeholder={t('Type a ship name')} value={text} {oninput} {onkeydown}
     onfocus={() => { open = true; }} onblur={() => { open = false; }} />
   {#if open && results.length}
-    <ul id={listId} role="listbox" aria-label={text.trim() === '' ? 'Suggestions' : undefined}>
+    <ul id={listId} role="listbox" aria-label={text.trim() === '' ? t('Suggestions') : undefined}>
       {#each results as s, i (s.id)}
         <li id="{id}-opt-{s.id}" role="option" aria-selected={i === active} class:active={i === active}
           onmousedown={(e) => { e.preventDefault(); pick(s); }}>

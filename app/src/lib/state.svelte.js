@@ -1,4 +1,6 @@
 import { tick } from 'svelte';
+import { t, N_ } from '../../../src/logic/i18n.mjs';
+import { backendError } from './view/backendErrors.mjs';
 import { backend as realBackend } from './backend.js';
 import { createSampleBackend } from './view/sample.mjs';
 import { createBackendSwitch, switchBackend } from './view/backendSwitch.mjs';
@@ -94,7 +96,7 @@ const controller = createController(routed, aliases, {
 });
 
 export const load = async () => {
-  try { await controller.load(); } catch (e) { ui.notice = e?.message ?? String(e); ui.loaded = true; }
+  try { await controller.load(); } catch (e) { ui.notice = backendError(e); ui.loaded = true; }
 };
 /** Picks what the Browse store tab shows from the app's own catalog and the feed's (see chooseCatalog in src/logic/feed.mjs). */
 const chooseShownCatalog = (error = null) => {
@@ -104,7 +106,7 @@ const chooseShownCatalog = (error = null) => {
 /** Reads the store catalog file (it has its own sync and is not part of the planner data). A missing file is "no catalog yet" (the feed's may fill in). */
 export const loadCatalog = async () => {
   try { ui.ownCatalog = readCatalog(await realBackend.loadCatalog()); ui.ownLoaded = true; chooseShownCatalog(); }
-  catch (e) { ui.ownCatalog = null; ui.ownLoaded = true; chooseShownCatalog(e?.message ?? String(e)); }
+  catch (e) { ui.ownCatalog = null; ui.ownLoaded = true; chooseShownCatalog(backendError(e)); }
 };
 
 // ----- the signed data feed: sale events and a public catalog snapshot, checked by Rust (desktop) or the dev server (browser) -----
@@ -219,7 +221,7 @@ export async function goBack() {
 }
 
 /** Today (or anywhere) -> one step of a goal's chain: opens the goal, expands the run that holds the step, focuses the row. */
-export const openStep = (goalId, from, to, label = 'Back to Today') => navigate(label, () => {
+export const openStep = (goalId, from, to, label = N_('Back to Today')) => navigate(label, () => {
   ui.focusStep = { goalId, from, to };
   ui.selected = goalId;
   ui.section = 'goals'; ui.advanced = null;
@@ -233,14 +235,14 @@ export const openHangarCopy = (copyId, label) => navigate(label, () => {
 /** A goal's chain map. */
 export const openChainMap = (goalId, label) => navigate(label, () => { ui.selected = goalId; ui.advanced = 'graphs'; });
 /** Prices -> the Store's Sale events section. */
-export const openSaleEvents = (label = 'Back to Price assumptions') => navigate(label, () => { ui.focusSaleEvents = true; ui.storeTab = 'upgrades'; goSection('store'); }, { top: false });
+export const openSaleEvents = (label = N_('Back to Price assumptions')) => navigate(label, () => { ui.focusSaleEvents = true; ui.storeTab = 'upgrades'; goSection('store'); }, { top: false });
 /** A Store offer -> the upgrades you own into that ship, in the Hangar. */
 export const openHangarUpgrades = (shipName, label) => navigate(label, () => {
   ui.hangar.chip = 'ccu'; ui.hangar.sel.ccu = null; ui.hangar.query = shipName; ui.hangar.picked = true;
   goSection('hangar');
 });
 /** The hangar-health banner -> the Hangar's upgrades with only "Needs review" ticked: the upgrades the planner could not read. */
-export const openNeedsReview = (label = 'Back') => navigate(label, () => {
+export const openNeedsReview = (label = N_('Back')) => navigate(label, () => {
   ui.hangar.chip = 'ccu'; ui.hangar.sel.ccu = { use: ['review'] }; ui.hangar.query = ''; ui.hangar.picked = true;
   goSection('hangar');
 });
@@ -262,7 +264,7 @@ export const enterSample = async () => {
   ui.skipTour = true;
   try {
     try { await switchBackend(routed, controller, createSampleBackend(sampleData)); }
-    catch (e) { ui.notice = e?.message ?? String(e); return; }
+    catch (e) { ui.notice = backendError(e); return; }
     clearJobCache(); // answers of the other data set must not be shown here
     forgetPageState();
     // The sample opens on its chain (the Goals page), not on Today with a definition over it.
@@ -278,7 +280,7 @@ export const leaveSample = async () => {
   ui.switching = true;
   try {
     try { await switchBackend(routed, controller, realBackend); }
-    catch (e) { ui.notice = `Could not load your data, still on sample data: ${e?.message ?? e}`; return; }
+    catch (e) { ui.notice = t('Could not load your data, still on sample data: {error}', { error: backendError(e) }); return; }
     clearJobCache();
     forgetPageState();
     ui.sample = false; ui.selected = null; ui.advanced = null; ui.section = 'today'; ui.notice = null;

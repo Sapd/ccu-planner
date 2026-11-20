@@ -1,15 +1,16 @@
 <script>
+  import { t, N_ } from '$logic/i18n.mjs';
   import { dispatch } from '../state.svelte.js';
 
   // The override of one LTI ship pledge: "Default" follows the starting ship price limit.
   let { pledgeId, settings } = $props();
   const mark = $derived(settings.use.includes(pledgeId) ? 'use' : settings.never.includes(pledgeId) ? 'never' : null);
-  const CHOICES = [['use', 'Use as starting ship'], ['never', 'Never use as starting ship'], [null, 'Default']];
+  const CHOICES = [['use', N_('Use as starting ship')], ['never', N_('Never use as starting ship')], [null, N_('Default')]];
 </script>
 
-<div class="mark" role="group" aria-label="Starting ship setting">
+<div class="mark" role="group" aria-label={t('Starting ship setting')}>
   {#each CHOICES as [value, label] (label)}
-    <button type="button" class:on={mark === value} aria-pressed={mark === value} onclick={() => { if (mark !== value) dispatch({ type: 'markToken', pledgeId, mark: value }); }}>{#if mark === value}<span aria-hidden="true">✓ </span>{/if}{label}</button>
+    <button type="button" class:on={mark === value} aria-pressed={mark === value} onclick={() => { if (mark !== value) dispatch({ type: 'markToken', pledgeId, mark: value }); }}>{#if mark === value}<span aria-hidden="true">✓ </span>{/if}{t(label)}</button>
   {/each}
 </div>
 

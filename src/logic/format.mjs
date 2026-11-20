@@ -1,6 +1,7 @@
 // Money text. The store catalog says which currency the account pays in (app.pricing: currencyCode, currencySymbol,
 // exponent). The planner's prices are cents of USD, so every other currency is refused (see currencyProblem).
 
+import { loc } from './i18n.mjs';
 export const USD_PRICING = Object.freeze({ currencyCode: 'USD', currencySymbol: '$', exponent: 2 });
 
 /**
@@ -33,7 +34,7 @@ export function money(cents, pricing = current) {
 export const usd = (c) => money(c);
 
 /** Plain-English reason the planner cannot be used for this store account, or null when it can. Takes the catalog's pricing or its normalized form. */
-export function currencyProblem(pricing) {
+function currencyProblemEn(pricing) {
   const p = pricing?.declared === undefined ? normalizePricing(pricing) : pricing;
   if (!p.declared) return "This planner currently supports USD store accounts only, and the saved store data does not say which currency your account uses. Sync the store again to read your account's currency; no plan is shown until then.";
   if (p.currencyCode !== 'USD') {
@@ -48,3 +49,4 @@ export function currencyProblem(pricing) {
   }
   return null;
 }
+export const currencyProblem = loc('currencyProblem', currencyProblemEn);

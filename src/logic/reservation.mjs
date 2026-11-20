@@ -1,5 +1,6 @@
 // What reserving a chain holds, in words. A reservation holds the owned CCU copies a chain uses, the starting ship
 // (an LTI pledge) when the chain starts from one, and store credit. Pure: routes in, lines out.
+import { loc, N_ } from './i18n.mjs';
 import { usd } from './format.mjs';
 
 /**
@@ -18,30 +19,32 @@ export function reservationItems(route, paidOf = () => null) {
 }
 
 /** One line per held item: "Alpha → Beta upgrade you own (paid $25)", "Starting ship: Pulse", "Store credit: $5". Empty when nothing is held. */
-export function reservationLines(items, name) {
+function reservationLinesEn(items, name) {
   const lines = items.copies.map((c) => `${name(c.from)} → ${name(c.to)} upgrade you own${c.paid != null ? ` (paid ${usd(c.paid)})` : ''}`);
   if (items.token) lines.push(`Starting ship: ${items.token.ship != null ? name(items.token.ship) : 'your lifetime-insurance ship'}`);
   if (items.credit > 0) lines.push(`Store credit: ${usd(items.credit)}`);
   return lines;
 }
+export const reservationLines = loc('reservationLines', reservationLinesEn);
 
 /** The held items in one line: "16 upgrades you own, your starting ship Pulse and $5 store credit". Empty when nothing is held. */
-export function reservationSummary(items, name) {
+function reservationSummaryEn(items, name) {
   const parts = [];
   if (items.copies.length) parts.push(`${items.copies.length} ${items.copies.length === 1 ? 'upgrade' : 'upgrades'} you own`);
   if (items.token) parts.push(`your starting ship${items.token.ship != null ? ` ${name(items.token.ship)}` : ''}`);
   if (items.credit > 0) parts.push(`${usd(items.credit)} store credit`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : (parts[0] ?? '');
 }
+export const reservationSummary = loc('reservationSummary', reservationSummaryEn);
 
 /** More held items than this are folded behind a one-line summary. */
 export const HELD_FOLD_AFTER = 3;
 
-export const NOTHING_HELD = 'This chain holds nothing of yours: it only needs purchases.';
+export const NOTHING_HELD = N_('This chain holds nothing of yours: it only needs purchases.');
 
 /** Heading above the lines of a chain that is not reserved yet, and of one that is. */
-export const reserveHeading = (goalName, hasItems = true) => (hasItems ? `Reserving holds these for ${goalName}, so other goals cannot use them:` : `Reserve this chain for ${goalName}.`);
-export const reservedHeading = (goalName, hasItems = true) => (hasItems ? `Reserved for ${goalName}. Other goals can no longer use these:` : `Reserved for ${goalName}.`);
+export const reserveHeading = loc('reserveHeading', (goalName, hasItems = true) => (hasItems ? `Reserving holds these for ${goalName}, so other goals cannot use them:` : `Reserve this chain for ${goalName}.`));
+export const reservedHeading = loc('reservedHeading', (goalName, hasItems = true) => (hasItems ? `Reserved for ${goalName}. Other goals can no longer use these:` : `Reserved for ${goalName}.`));
 export const releaseHeading = 'Releasing gives these back to your other goals:';
 
 /**

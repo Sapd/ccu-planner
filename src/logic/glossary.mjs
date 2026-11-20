@@ -2,6 +2,7 @@
 // Listed in the order a newcomer meets the words: what a CCU is, the two kinds, money and insurance, planning, then selling back.
 // checked by test/glossary.test.mjs (no internal ids, no jargon left unexplained). Pure.
 
+import { loc } from './i18n.mjs';
 /** { key, term, text }: key is only for linking from a "?" next to the term. */
 export const GLOSSARY = [
   { key: 'ccu', term: 'CCU', text: 'A Cross-Chassis Upgrade. It turns one ship in your hangar into a more expensive one, and you pay the price difference.' },
@@ -31,4 +32,5 @@ export const GLOSSARY = [
   { key: 'giftable', term: 'Giftable and reclaimable', text: 'Giftable means you can give the pledge to another account. Reclaimable means that if you melt it, RSI lets you buy it back later.' },
 ];
 
-export const glossaryEntry = (key) => GLOSSARY.find((e) => e.key === key) ?? null;
+export const glossaryList = loc('glossaryList', () => GLOSSARY);
+export const glossaryEntry = (key) => glossaryList().find((e) => e.key === key) ?? null;

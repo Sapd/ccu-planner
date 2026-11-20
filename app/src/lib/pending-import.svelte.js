@@ -2,6 +2,8 @@
 // (pending-import.json), imported as goals once the store and the hangar are synced. The state lives in `ui`, so the welcome
 // screen being replaced by the app when the first sync loads data does not lose it.
 import { backend } from './backend.js';
+import { t } from '../../../src/logic/i18n.mjs';
+import { backendError } from './view/backendErrors.mjs';
 import { ui, dispatch } from './state.svelte.js';
 import aliases from '../../../src/logic/aliases.json';
 import { makePending, readPending, pendingReady, planPending, summarize } from './view/pendingImport.mjs';
@@ -13,7 +15,7 @@ export async function loadPending() {
 
 const keep = async (doc) => {
   try { await backend.savePending(doc); return true; }
-  catch (e) { ui.notice = `Could not save the CCU Game file for later (${e?.message ?? e}). It is kept until you close the app.`; return false; }
+  catch (e) { ui.notice = t('Could not save the CCU Game file for later ({error}). It is kept until you close the app.', { error: backendError(e) }); return false; }
 };
 
 /** Parses and validates the file now (throws the parser's message), then keeps it for after the sync. */

@@ -12,7 +12,9 @@ import { onboardingSteps, syncProgressView, syncKinds } from '../app/src/lib/vie
 import { createSampleBackend } from '../app/src/lib/view/sample.mjs';
 import { createController } from '../app/src/lib/view/controller.mjs';
 import { buildSample } from '../src/logic/sampleData.mjs';
-import { GLOSSARY, glossaryEntry } from '../src/logic/glossary.mjs';
+import { GLOSSARY, glossaryEntry, glossaryList } from '../src/logic/glossary.mjs';
+import { withLocale } from '../src/logic/i18n.mjs';
+import '../src/logic/i18n/de/index.mjs';
 import { createBackendSwitch, switchBackend } from '../app/src/lib/view/backendSwitch.mjs';
 import { recordPlanSnapshot, snapshotQuietly } from '../app/src/lib/plan-snapshot.js';
 import { SNAPSHOT_MAX } from '../src/logic/changes.mjs';
@@ -150,6 +152,26 @@ test('glossary: the required terms, short plain entries, no internal ids', () =>
   assert.match(glossaryEntry('insurance').text, /best insurance of the pledge/);
   assert.match(glossaryEntry('buyback').text, /does not use buyback/);
   assert.match(glossaryEntry('downward').text, /Only buying a new upgrade that goes down/);
+});
+
+test('German glossary keeps the English keys in order and explains the terms without internal ids', () => {
+  assert.equal(glossaryList(), GLOSSARY);
+  withLocale('de', () => {
+    const entries = glossaryList();
+    assert.deepEqual(entries.map((e) => e.key), GLOSSARY.map((e) => e.key));
+    for (const e of entries) {
+      assert.equal(glossaryEntry(e.key), e);
+      assert.doesNotMatch(`${e.term} ${e.text}`, /\bc\d+\b|\b\d{3,}\b|undefined|\[object/, e.key);
+      assert.ok(e.text.length > 30 && e.text.length < 400, e.key);
+    }
+    assert.equal(glossaryEntry('nope'), null);
+    assert.equal(glossaryEntry('standard-warbond').term, 'Standard und Warbond');
+    assert.match(glossaryEntry('store-credit').text, /nur Standard-Upgrades/);
+    assert.match(glossaryEntry('standard-warbond').text, /regulären Preis.*Store-Guthaben.*neues Geld.*meist günstiger/);
+    assert.match(glossaryEntry('insurance').text, /beste Versicherung des Pledges/);
+    assert.match(glossaryEntry('buyback').text, /Buyback in seinen Plänen nicht/);
+    assert.match(glossaryEntry('downward').text, /blockiert nur den Neukauf/);
+  });
 });
 
 // ----- layers and Store-only sale events -----

@@ -1,7 +1,7 @@
 <script module>
   // One window listener for every SearchBox: "/" outside text fields focuses the first visible one on the page.
   const boxes = new Set();
-  const typing = (t) => t instanceof Element && (t.closest('input, textarea, select') || t.isContentEditable);
+  const typing = (el) => el instanceof Element && (el.closest('input, textarea, select') || el.isContentEditable);
   function onSlash(e) {
     if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || typing(e.target)) return;
     const first = [...boxes]
@@ -21,8 +21,9 @@
 
 <script>
   import { onMount } from 'svelte';
+  import { t } from '$logic/i18n.mjs';
 
-  let { value = $bindable(''), placeholder = 'Search', label = 'Search', shown = null, total = null } = $props();
+  let { value = $bindable(''), placeholder = null, label = null, shown = null, total = null } = $props();
   let input = $state(null);
   onMount(() => register(input));
   const active = $derived(String(value ?? '').trim() !== '');
@@ -30,8 +31,8 @@
 </script>
 
 <div class="searchbox">
-  <input bind:this={input} type="search" bind:value {placeholder} aria-label={label} {onkeydown} autocomplete="off" spellcheck="false" />
-  {#if active && shown != null && total != null}<span class="count" role="status">{shown} of {total}</span>{/if}
+  <input bind:this={input} type="search" bind:value placeholder={placeholder ?? t('Search')} aria-label={label ?? t('Search')} {onkeydown} autocomplete="off" spellcheck="false" />
+  {#if active && shown != null && total != null}<span class="count" role="status">{t('{shown} of {total}', { shown, total })}</span>{/if}
   {#if !active}<kbd class="hint" aria-hidden="true">/</kbd>{/if}
 </div>
 

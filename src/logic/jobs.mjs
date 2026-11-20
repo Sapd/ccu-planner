@@ -6,6 +6,7 @@
 // Ops: wanted { chainId, slack? } · whatIf { change } · buyEffect { from, to, kind, cash, maxCopies? } · checkOffer { from, to, kind, cash }
 //      · compareCcuGame { text } · ownedInto { shipId, goalId? }
 // whatIf, buyEffect and checkOffer take an optional `before`: summarize(session) of the app, so the first answer does not plan it again.
+import { t } from './i18n.mjs';
 import { sessionOf, sessionFor } from './session.mjs';
 import { snapshotKey } from './changes.mjs';
 import { whatIf, buyEffect } from './whatif.mjs';
@@ -27,7 +28,7 @@ export const JOB_OPS = Object.keys(OPS);
 /** Runs one job. `onProgress({ done, total })` is called by the jobs that can report it (wanted). */
 export function runJob(app, op, args = {}, { onProgress = null, aliases = null } = {}) {
   const run = OPS[op];
-  if (!run) throw new Error(`unknown job ${op}`);
+  if (!run) throw new Error(t('unknown job {op}', { op: String(op) }));
   return run(app, args, { onProgress, aliases });
 }
 

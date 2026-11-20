@@ -1,5 +1,6 @@
 <script>
-  import { valueLabel, keyed } from './view/hangar.mjs';
+  import { t } from '$logic/i18n.mjs';
+  import { valueLabel, keyed, PLEDGE_CATEGORY } from './view/hangar.mjs';
   import { hangarUrl } from '$logic/links.mjs';
   import ShipThumb from './ShipThumb.svelte';
   import RsiLink from './RsiLink.svelte';
@@ -31,43 +32,43 @@
 <dialog bind:this={dialog} aria-labelledby="pledge-title" {onclose} onclick={outside} data-detail={pledge.pledgeId}>
   <header>
     <h3 id="pledge-title">{pledge.name}</h3>
-    <RsiLink href={hangarUrl()} label="Hangar" aria="Open {pledge.name} in the RSI hangar" />
-    <button type="button" class="x" aria-label="Close" onclick={() => dialog.close()}>×</button>
+    <RsiLink href={hangarUrl()} label={t('Hangar')} aria={t('Open {name} in the RSI hangar', { name: pledge.name })} />
+    <button type="button" class="x" aria-label={t('Close')} onclick={() => dialog.close()}>×</button>
   </header>
   <dl>
-    <dt>Value</dt><dd>{valueLabel(pledge.value)}</dd>
-    {#if pledge.configurationValue}<dt>Configuration value</dt><dd>{valueLabel(pledge.configurationValue)}</dd>{/if}
-    <dt>Created</dt><dd>{pledge.created ?? '?'}</dd>
-    <dt>Category</dt><dd>{pledge.category}{pledge.upgraded ? ' · upgraded' : ''}</dd>
-    {#if pledge.insurance}<dt>Insurance</dt><dd>{pledge.insurance}</dd>{/if}
-    <dt>Flags</dt>
+    <dt>{t('Value')}</dt><dd>{valueLabel(pledge.value)}</dd>
+    {#if pledge.configurationValue}<dt>{t('Configuration value')}</dt><dd>{valueLabel(pledge.configurationValue)}</dd>{/if}
+    <dt>{t('Created')}</dt><dd>{pledge.created ?? '?'}</dd>
+    <dt>{t('Category')}</dt><dd>{t(PLEDGE_CATEGORY[pledge.category] ?? pledge.category)}{pledge.upgraded ? ` · ${t('upgraded')}` : ''}</dd>
+    {#if pledge.insurance}<dt>{t('Insurance')}</dt><dd>{pledge.insurance}</dd>{/if}
+    <dt>{t('Flags')}</dt>
     <dd>
-      <span class="tag">{pledge.giftable ? 'giftable' : 'not giftable'}</span>
-      <span class="tag">{pledge.reclaimable ? 'meltable' : 'not meltable'}</span>
-      <span class="tag">{pledge.buybackable ? 'buy-back' : 'no buy-back'}</span>
+      <span class="tag">{pledge.giftable ? t('giftable') : t('not giftable')}</span>
+      <span class="tag">{pledge.reclaimable ? t('meltable') : t('not meltable')}</span>
+      <span class="tag">{pledge.buybackable ? t('buy-back') : t('no buy-back')}</span>
     </dd>
-    {#if goal}<dt>Reserved</dt><dd>for {goal.name} <button type="button" class="gl" data-view-chain onclick={() => { dialog.close(); ongoal?.(goal.id); }}>View {goal.name} chain</button></dd>{/if}
+    {#if goal}<dt>{t('Reserved')}</dt><dd>{t('for {name}', { name: goal.name })} <button type="button" class="gl" data-view-chain onclick={() => { dialog.close(); ongoal?.(goal.id); }}>{t('View {name} chain', { name: goal.name })}</button></dd>{/if}
   </dl>
   {#if copy}
-    <h4>Planning</h4>
-    <label class="excl" data-exclude-copy><input type="checkbox" checked={copy.excluded} onchange={(e) => onexclude?.(e.currentTarget.checked)} /> Don't use this copy in plans</label>
-    <p class="muted small">{EXCLUDE_COPY_HELP}</p>
+    <h4>{t('Planning')}</h4>
+    <label class="excl" data-exclude-copy><input type="checkbox" checked={copy.excluded} onchange={(e) => onexclude?.(e.currentTarget.checked)} /> {t("Don't use this copy in plans")}</label>
+    <p class="muted small">{t(EXCLUDE_COPY_HELP)}</p>
   {/if}
   {#if token}
-    <h4>Starting ship {#if token.inPool}<span class="tag tok">Starting ship</span>{/if}</h4>
+    <h4>{t('Starting ship')} {#if token.inPool}<span class="tag tok">{t('Starting ship')}</span>{/if}</h4>
     <TokenMark pledgeId={String(pledge.pledgeId)} settings={token.settings} />
   {/if}
   {#if pledge.ships.length}
-    <h4>Ships</h4>
+    <h4>{t('Ships')}</h4>
     {#each ships as { item: s, key } (key)}
-      <div class="line" data-ship={s.shipId ?? undefined}>{#if s.shipId != null}<ShipThumb ship={shipMap?.get(s.shipId) ?? null} size="s" />{/if} {s.title} <span class="muted">{s.manufacturer ?? ''}{s.shipId == null ? ' · not matched to the catalog' : ''}</span></div>
+      <div class="line" data-ship={s.shipId ?? undefined}>{#if s.shipId != null}<ShipThumb ship={shipMap?.get(s.shipId) ?? null} size="s" />{/if} {s.title} <span class="muted">{s.manufacturer ?? ''}{s.shipId == null ? ` · ${t('not matched to the catalog')}` : ''}</span></div>
     {/each}
   {/if}
-  <h4>Items ({pledge.items.length})</h4>
+  <h4>{t('Items ({count})', { count: pledge.items.length })}</h4>
   {#each items as { item: it, key } (key)}
-    <div class="line" data-item><b>{it.title}</b> <span class="muted">{it.kind ?? 'other'}{it.liner ? ` · ${it.liner}` : ''}</span></div>
+    <div class="line" data-item><b>{it.title}</b> <span class="muted">{it.kind ?? t('other')}{it.liner ? ` · ${it.liner}` : ''}</span></div>
   {:else}
-    <p class="muted">No items recorded.</p>
+    <p class="muted">{t('No items recorded.')}</p>
   {/each}
 </dialog>
 

@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { LEVEL_TEXT, noTokenHelp } from '$logic/describe.mjs';
   import { usd } from '$logic/format.mjs';
   import { goalRow, nextSort, sortRows, ariaSort, progressText } from '../view/goalTable.mjs';
@@ -8,28 +9,28 @@
 
   // The goals as one compact table, grouped by planning level (group rows), one price per goal.
   // levels: [{ priority, goals: todayView goals }]; ship(id) -> ship; onOpen(goalId); noRouteTitle(goal) -> tooltip.
-  let { levels, currentId = null, ship, onOpen, noRouteTitle = () => '', grouped = true, label = 'Your goals, in planning order' } = $props();
+  let { levels, currentId = null, ship, onOpen, noRouteTitle = () => '', grouped = true, label = t('Your goals, in planning order') } = $props();
   let sort = $state(null);
   const groups = $derived(levels.map((l) => ({ priority: l.priority, rows: sortRows(l.goals.map((g) => ({ ...goalRow(g), goal: g })), sort) })));
   const click = (key) => { sort = nextSort(sort, key); };
   const arrow = (key) => (sort?.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  const titleOf = (r) => (r.goal.status === 'no-token' ? noTokenHelp(r.goal.start) : r.goal.status === 'no-route' ? noRouteTitle(r.goal) : r.nowCash != null ? `Reserved at ${usd(r.left)}; ${usd(r.nowCash)} at today's prices.${r.cheaperBy ? ' Open the goal to switch to the cheaper chain.' : ''}` : undefined);
+  const titleOf = (r) => (r.goal.status === 'no-token' ? noTokenHelp(r.goal.start) : r.goal.status === 'no-route' ? noRouteTitle(r.goal) : r.nowCash != null ? `${t("Reserved at {reserved}; {now} at today's prices.", { reserved: usd(r.left), now: usd(r.nowCash) })}${r.cheaperBy ? ` ${t('Open the goal to switch to the cheaper chain.')}` : ''}` : undefined);
 </script>
 
 <div class="gt">
 <table class="goaltable" aria-label={label}>
   <thead>
     <tr>
-      <th scope="col" class="img"><span class="sr">Ship</span></th>
-      <th scope="col" class="goal">Goal</th>
-      <th scope="col" class="num" aria-sort={ariaSort(sort, 'left')}><button type="button" class="sortbtn" onclick={() => click('left')} title="New cash still needed in the shared plan. Sort by it.">Left{arrow('left')}</button></th>
-      <th scope="col" class="prog" aria-sort={ariaSort(sort, 'progress')}><button type="button" class="sortbtn" onclick={() => click('progress')} title="Upgrades owned out of the whole chain. Sort by it.">Progress{arrow('progress')}</button></th>
-      <th scope="col" class="state"><span class="sr">What to do next</span></th>
+      <th scope="col" class="img"><span class="sr">{t('Ship')}</span></th>
+      <th scope="col" class="goal">{t('Goal')}</th>
+      <th scope="col" class="num" aria-sort={ariaSort(sort, 'left')}><button type="button" class="sortbtn" onclick={() => click('left')} title={t('New cash still needed in the shared plan. Sort by it.')}>{t('Left')}{arrow('left')}</button></th>
+      <th scope="col" class="prog" aria-sort={ariaSort(sort, 'progress')}><button type="button" class="sortbtn" onclick={() => click('progress')} title={t('Upgrades owned out of the whole chain. Sort by it.')}>{t('Progress')}{arrow('progress')}</button></th>
+      <th scope="col" class="state"><span class="sr">{t('What to do next')}</span></th>
     </tr>
   </thead>
   {#each groups as g (g.priority)}
     <tbody>
-      {#if grouped}<tr class="group {g.priority}"><th scope="colgroup" colspan="5" title={LEVEL_TEXT[g.priority].help}>{LEVEL_TEXT[g.priority].title} <span class="gn">{g.rows.length}</span></th></tr>{/if}
+      {#if grouped}<tr class="group {g.priority}"><th scope="colgroup" colspan="5" title={t(LEVEL_TEXT[g.priority].help)}>{t(LEVEL_TEXT[g.priority].title)} <span class="gn">{g.rows.length}</span></th></tr>{/if}
       {#each g.rows as r (r.id)}
         <tr class="row" class:active={r.id === currentId} data-goal={r.id}>
           <td class="img"><ShipThumb ship={ship(r.goal.targetId)} size="s" /></td>
@@ -38,7 +39,7 @@
               <span class="nm">{r.name}</span>{#if r.from}<span class="from">{r.from}</span>{/if}
             </button>
           </th>
-          <td class="num"><span class="left" class:none={r.left == null} title={titleOf(r)}>{r.left == null ? '–' : usd(r.left)}</span>{#if r.cheaperBy}<span class="possible" role="img" aria-label="A chain {usd(r.cheaperBy)} cheaper is available" title="A chain {usd(r.cheaperBy)} cheaper is available">↓</span>{/if}</td>
+          <td class="num"><span class="left" class:none={r.left == null} title={titleOf(r)}>{r.left == null ? '–' : usd(r.left)}</span>{#if r.cheaperBy}<span class="possible" role="img" aria-label={t('A chain {amount} cheaper is available', { amount: usd(r.cheaperBy) })} title={t('A chain {amount} cheaper is available', { amount: usd(r.cheaperBy) })}>↓</span>{/if}</td>
           <td class="prog">
             {#if r.total && !r.flag}<span class="bar" title={progressText(r)}><JourneyBar bar={r.bar} label={progressText(r)} /></span>{/if}
           </td>

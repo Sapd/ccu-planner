@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { chainStrip, stripText } from './view/chainStrip.mjs';
   import ShipThumb from './ShipThumb.svelte';
 
@@ -6,11 +7,11 @@
   // steps: a journey's steps; ships: Map id -> ship.
   let { steps, ships } = $props();
   const strip = $derived(chainStrip(steps));
-  const name = (id) => ships.get(id)?.name ?? 'unknown ship';
+  const name = (id) => ships.get(id)?.name ?? t('unknown ship');
 </script>
 
 {#if strip.nodes.length}
-  <div class="strip" role="img" aria-label="The chain at a glance: {stripText(strip, name)}" data-chain-strip>
+  <div class="strip" role="img" aria-label={t('The chain at a glance: {chain}', { chain: stripText(strip, name) })} data-chain-strip>
     {#each strip.nodes as n, i (i)}
       <div class="stop"><ShipThumb ship={ships.get(n) ?? null} size="s" /><span class="nm">{name(n)}</span></div>
       {#if i < strip.segments.length}

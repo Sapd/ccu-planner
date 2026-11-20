@@ -1,11 +1,12 @@
 // The chain as a subway line: ship pictures as stops, the upgrades between them as coloured segments.
 // Pure: a journey's steps in, nodes and segments out. Runs of owned upgrades collapse into one segment ("16 owned").
 import { usd } from '../../../../src/logic/format.mjs';
+import { t, N_ } from '../../../../src/logic/i18n.mjs';
 
 /** The look of a step: 'own' | 'now' | 'norush' | 'optional' | 'wait'. */
 export const stripState = (item) => (item.state === 'now' && (item.urgency === 'norush' || item.urgency === 'optional') ? item.urgency : item.state);
 
-const WORD = { own: 'Owned', now: 'Buy now', norush: 'On sale', optional: 'Optional', wait: 'Wait' };
+const WORD = { own: N_('Owned'), now: N_('Buy now'), norush: N_('On sale'), optional: N_('Optional'), wait: N_('Wait') };
 
 /**
  * @param {{ state: string, urgency?: string|null, step: { from: number, to: number, cash: number } }[]} steps a journey's steps
@@ -22,12 +23,12 @@ export function chainStrip(steps) {
       let end = i;
       while (end + 1 < steps.length && steps[end + 1].state === 'own') end++;
       const count = end - i + 1;
-      segments.push({ kind: 'own', label: count === 1 ? 'Owned' : `${count} owned`, sub: null, count });
+      segments.push({ kind: 'own', label: count === 1 ? t('Owned') : t('{n} owned', { n: count }), sub: null, count });
       nodes.push(steps[end].step.to);
       i = end + 1;
     } else {
       const kind = stripState(steps[i]);
-      segments.push({ kind, label: usd(steps[i].step.cash), sub: WORD[kind], count: 1 });
+      segments.push({ kind, label: usd(steps[i].step.cash), sub: t(WORD[kind]), count: 1 });
       nodes.push(steps[i].step.to);
       i++;
     }

@@ -1,4 +1,5 @@
 <script>
+  import { t, tn } from '$logic/i18n.mjs';
   import { todayView } from './view/today.mjs';
   import { usd } from '$logic/format.mjs';
   import { shortDay } from '$logic/availability.mjs';
@@ -20,8 +21,8 @@
   const v = $derived(todayView(app));
   const ships = $derived(app.data.ships);
   const ship = (id) => ships.get(id) ?? null;
-  const name = (id) => ships.get(id)?.name ?? 'unknown ship';
-  const goalName = (id) => v.goals.find((g) => g.goalId === id)?.targetName ?? 'a goal';
+  const name = (id) => ships.get(id)?.name ?? t('unknown ship');
+  const goalName = (id) => v.goals.find((g) => g.goalId === id)?.targetName ?? t('a goal');
   const hero = $derived(v.hero.shipId != null ? ship(v.hero.shipId) : null);
   const anyNoRoute = $derived(v.goals.some((g) => g.status === 'no-route'));
   const anyNoToken = $derived(v.goals.some((g) => g.status === 'no-token'));
@@ -40,7 +41,7 @@
   <ImportSummary />
   {#if v.empty}
     <GlassPanel class="empty">
-      <h2 class="headline">Welcome</h2>
+      <h2 class="headline">{t('Welcome')}</h2>
       <Explainer inline />
       <Onboarding {app} />
     </GlassPanel>
@@ -60,7 +61,7 @@
     {#each GROUPS as g (g)}
       {#if v.buyList[g].length}
         <GlassPanel class="buygroup {g}">
-          <h2 title={BUY_GROUPS[g].help}><StateChip state={g === 'today' ? 'now' : g} />{#if g === 'today'} {BUY_GROUPS[g].title}{/if}</h2>
+          <h2 title={t(BUY_GROUPS[g].help)}><StateChip state={g === 'today' ? 'now' : g} />{#if g === 'today'} {t(BUY_GROUPS[g].title)}{/if}</h2>
           <ul class="buys">
             {#each v.buyList[g] as row (row.key)}<TodayBuy {app} {row} {ships} />{/each}
           </ul>
@@ -71,15 +72,15 @@
     {#if v.waiting.count > 0}
       <GlassPanel class="waiting">
         <h2><button type="button" class="foldbtn" aria-expanded={goalsOpen} aria-controls="today-goals" onclick={() => { goalsOpen = !goalsOpen; }}><StateChip state="wait" /> {waitingHeadline(v.waiting.count, v.waiting.goals.length)} <span class="chev" aria-hidden="true">{goalsOpen ? '▾' : '▸'}</span></button></h2>
-        {#if v.waiting.event}<p class="event">{v.waiting.event.name} ends {shortDay(v.waiting.event.to)}</p>{/if}
+        {#if v.waiting.event}<p class="event">{t('{event} ends {day}', { event: v.waiting.event.name, day: shortDay(v.waiting.event.to) })}</p>{/if}
         {#each shownNotices as n (n.from + '>' + n.to)}
           <p class="line">{name(n.from)} → {name(n.to)}: {n.text}</p>
         {/each}
         {#if v.waiting.notices.length > NOTICE_LIMIT}
-          <p><button type="button" class="more" aria-expanded={showAllNotices} onclick={() => { showAllNotices = !showAllNotices; }}>{showAllNotices ? 'Show fewer' : `Show ${v.waiting.notices.length - NOTICE_LIMIT} more`}</button></p>
+          <p><button type="button" class="more" aria-expanded={showAllNotices} onclick={() => { showAllNotices = !showAllNotices; }}>{showAllNotices ? t('Show fewer') : t('Show {n} more', { n: v.waiting.notices.length - NOTICE_LIMIT })}</button></p>
         {/if}
         {#if goalsOpen}
-          <div id="today-goals" class="goalsbody"><GoalsTable levels={[{ priority: 'normal', goals: v.goals }]} grouped={false} label="Your goals" ship={ship} onOpen={openGoal} {noRouteTitle} /></div>
+          <div id="today-goals" class="goalsbody"><GoalsTable levels={[{ priority: 'normal', goals: v.goals }]} grouped={false} label={t('Your goals')} ship={ship} onOpen={openGoal} {noRouteTitle} /></div>
         {/if}
       </GlassPanel>
     {/if}
@@ -87,7 +88,7 @@
     {#if v.melt}
       <GlassPanel class="melt">
         <span>{meltTipText(v.melt.count, usd(v.melt.credit))}<Term term="melt" /></span>
-        <button type="button" onclick={() => goSection('hangar')}>See in Hangar</button>
+        <button type="button" onclick={() => goSection('hangar')}>{t('See in Hangar')}</button>
       </GlassPanel>
     {/if}
   {/if}

@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { onDestroy, untrack } from 'svelte';
   import { Job } from './jobs.svelte.js';
   import { buyRowText, buyVerdictText } from '$logic/whatifText.mjs';
@@ -25,16 +26,16 @@
 </script>
 
 <span class="wi">
-  <button type="button" class="toggle" aria-expanded={open} aria-controls="wi-{uid}" onclick={() => { open = !open; }}>If I buy this {open ? '▴' : '▾'}</button>
+  <button type="button" class="toggle" aria-expanded={open} aria-controls="wi-{uid}" onclick={() => { open = !open; }}>{t('If I buy this')} {open ? '▴' : '▾'}</button>
   {#if open}
     <span class="body" id="wi-{uid}">
       {#if many}
-        <span class="pick" role="group" aria-label="How many copies">
-          <label><input type="radio" bind:group={copies} value={1} /> 1 copy</label>
-          <label><input type="radio" bind:group={copies} value={2} /> 2 copies (one for another goal)</label>
+        <span class="pick" role="group" aria-label={t('How many copies')}>
+          <label><input type="radio" bind:group={copies} value={1} /> {t('1 copy')}</label>
+          <label><input type="radio" bind:group={copies} value={2} /> {t('2 copies (one for another goal)')}</label>
         </span>
       {/if}
-      <JobStatus {job} what="Planning again" />
+      <JobStatus {job} what={t('Planning again')} />
       {#if row}
         <span class="out" data-whatif>{buyRowText(row)}</span>
         {#if copies === 2 && buyVerdictText(job.value)}<span class="out" data-whatif-verdict>{buyVerdictText(job.value)}</span>{/if}

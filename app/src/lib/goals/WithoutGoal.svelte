@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { onDestroy, untrack } from 'svelte';
   import { Job } from '../jobs.svelte.js';
   import { removeGoalText, signed } from '$logic/whatifText.mjs';
@@ -18,13 +19,13 @@
 </script>
 
 <div class="without">
-  <JobStatus {job} what="Planning the other goals again" />
+  <JobStatus {job} what={t('Planning the other goals again')} />
   {#if r}
     <p data-without>{removeGoalText(r)}</p>
     {#if r.deltas.length}
       <ul>
         {#each r.deltas as d (d.id)}
-          <li>{d.name}: {d.was == null ? 'no route' : usd(d.was)} → {d.now == null ? 'no route' : usd(d.now)} {#if d.delta != null}<span class="d">({signed(d.delta)})</span>{/if}</li>
+          <li>{d.name}: {d.was == null ? t('no route') : usd(d.was)} → {d.now == null ? t('no route') : usd(d.now)} {#if d.delta != null}<span class="d">({signed(d.delta)})</span>{/if}</li>
         {/each}
       </ul>
     {/if}

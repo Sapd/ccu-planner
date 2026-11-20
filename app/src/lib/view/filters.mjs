@@ -4,6 +4,8 @@
 // Inside a group the ticked options are alternatives (OR); groups combine (AND). An empty group does not restrict, unless it is `strict`
 // (then nothing ticked shows nothing). `defaults` are the options ticked from the start; a chip is shown only for what differs from them.
 
+import { t, loc } from '../../../../src/logic/i18n.mjs';
+
 /** The ticked options of every group at the start (a range group is two empty fields). */
 export const emptySel = (groups) => Object.fromEntries(groups.map((g) => [g.id, g.kind === 'range' ? { min: '', max: '' } : [...(g.defaults ?? [])]]));
 
@@ -77,6 +79,9 @@ export function resetGroup(groups, sel, groupId) {
 }
 export const resetAll = (groups) => emptySel(groups);
 
+/** The chip of a default-on option that was unticked, when the option has no offLabel of its own. */
+const notLabel = loc('filters.notLabel', (label) => `Not ${label.toLowerCase()}`);
+
 const money = (c) => (c == null ? '' : `$${c % 100 === 0 ? c / 100 : (c / 100).toFixed(2)}`);
 
 /**
@@ -89,15 +94,15 @@ export function activeFilters(groups, sel) {
     if (g.kind === 'range') {
       const r = rangeOf(sel[g.id]);
       if (r.min == null && r.max == null) continue;
-      const text = r.min != null && r.max != null ? `${money(r.min)} to ${money(r.max)}` : r.min != null ? `${money(r.min)} or more` : `up to ${money(r.max)}`;
-      out.push({ id: `${g.id}:range`, groupId: g.id, optionId: null, kind: 'range', label: `${g.label} ${text}` });
+      const text = r.min != null && r.max != null ? t('{min} to {max}', { min: money(r.min), max: money(r.max) }) : r.min != null ? t('{min} or more', { min: money(r.min) }) : t('up to {max}', { max: money(r.max) });
+      out.push({ id: `${g.id}:range`, groupId: g.id, optionId: null, kind: 'range', label: `${t(g.label)} ${text}` });
       continue;
     }
     const ticked = sel[g.id] ?? [];
     const defaults = g.defaults ?? [];
     for (const o of g.options) {
-      if (ticked.includes(o.id) && !defaults.includes(o.id)) out.push({ id: `${g.id}:${o.id}`, groupId: g.id, optionId: o.id, kind: 'on', label: o.label });
-      else if (!ticked.includes(o.id) && defaults.includes(o.id)) out.push({ id: `${g.id}:${o.id}`, groupId: g.id, optionId: o.id, kind: 'off', label: o.offLabel ?? `Not ${o.label.toLowerCase()}` });
+      if (ticked.includes(o.id) && !defaults.includes(o.id)) out.push({ id: `${g.id}:${o.id}`, groupId: g.id, optionId: o.id, kind: 'on', label: t(o.label) });
+      else if (!ticked.includes(o.id) && defaults.includes(o.id)) out.push({ id: `${g.id}:${o.id}`, groupId: g.id, optionId: o.id, kind: 'off', label: o.offLabel ? t(o.offLabel) : notLabel(o.label) });
     }
   }
   return out;
@@ -109,10 +114,10 @@ export function removeFilter(groups, sel, entry) {
 }
 
 /** "Showing 23 of 197", or just "197 upgrades" when nothing is filtered out. */
-export const resultsText = (shown, total, noun) => (shown === total ? `${total} ${total === 1 ? noun.replace(/s$/, '') : noun}` : `Showing ${shown} of ${total}`);
+export const resultsText = loc('filters.resultsText', (shown, total, noun) => (shown === total ? `${total} ${total === 1 ? noun.replace(/s$/, '') : noun}` : `Showing ${shown} of ${total}`));
 
 /** The "Filters (2 active)" button of the narrow layout. */
-export const filtersButtonText = (n) => (n > 0 ? `Filters (${n} active)` : 'Filters');
+export const filtersButtonText = (n) => (n > 0 ? t('Filters ({n} active)', { n }) : t('Filters'));
 
 /** Next sort after a click on a header: the column's natural direction first, then the other, then none. */
 export function nextSort(sort, key, firstDir = 'asc') {

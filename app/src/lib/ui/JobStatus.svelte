@@ -1,16 +1,20 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   // The state of a Job (jobs.svelte.js): a spinner with progress and a Cancel button while it runs, a note when it was cancelled or failed.
-  let { job, what = 'Calculating', unit = 'pairs' } = $props();
+  let { job, what = null, unit = null } = $props();
+  // `what` and `unit` come from the caller already in the current language; the defaults are ours.
+  const label = $derived(what ?? t('Calculating'));
+  const unitLabel = $derived(unit ?? t('pairs'));
 </script>
 
 {#if job.status === 'running'}
   <span class="job">
     <span role="status"><i class="spin" aria-hidden="true"></i>
-    {what}{job.progress ? ` · checked ${job.progress.done} of ${job.progress.total} ${unit}` : '…'}</span>
-    <button type="button" onclick={() => job.cancel()}>Cancel</button>
+    {label}{job.progress ? ` · ${t('checked {done} of {total} {unit}', { done: job.progress.done, total: job.progress.total, unit: unitLabel })}` : '…'}</span>
+    <button type="button" onclick={() => job.cancel()}>{t('Cancel')}</button>
   </span>
 {:else if job.status === 'cancelled'}
-  <span class="note">Stopped waiting.</span>
+  <span class="note">{t('Stopped waiting.')}</span>
 {:else if job.status === 'error'}
   <span class="err" role="alert">{job.error}</span>
 {/if}

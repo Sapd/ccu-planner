@@ -9,6 +9,7 @@ import { journey } from '../../../../src/logic/journey.mjs';
 import { edgeKey } from '../../../../src/logic/planner.mjs';
 import { neededBecause } from '../../../../src/logic/sharedEffect.mjs';
 import { meltView } from './hangar.mjs';
+import { t } from '../../../../src/logic/i18n.mjs';
 
 /** The one-click "Don't lock this goal" action of a lock row. */
 export const dontLockAction = (chainId) => ({ type: 'setLock', chainId, value: 'off' });
@@ -59,7 +60,7 @@ function computeTodayView(app, today) {
     const status = proposal.noToken ? 'no-token' : !route ? 'no-route' : j.done ? 'done' : buyCount ? 'buy' : noRushCount || optionalCount ? 'norush' : 'wait';
     const start = startOf(chain);
     const tokenUsed = route?.start?.token ? { pledgeId: route.start.token.pledgeId, ship: route.start.ship } : null;
-    const sName = (id) => data.ships?.get(id)?.name ?? 'unknown ship';
+    const sName = (id) => data.ships?.get(id)?.name ?? t('unknown ship');
     // Nothing to say about a token goal that found no route for another reason than a missing token.
     const startLine = start.kind === 'ship' ? startLineText(start, null, sName(start.ship))
       : tokenUsed ? startLineText(start, tokenUsed, sName(tokenUsed.ship))
@@ -76,7 +77,7 @@ function computeTodayView(app, today) {
       startShip: startShip(chain, route ?? null), token: tokenUsed, noToken: proposal.noToken });
 
     const order = goalChains.indexOf(chain);
-    const nm = (id) => data.ships?.get(id)?.name ?? 'unknown ship';
+    const nm = (id) => data.ships?.get(id)?.name ?? t('unknown ship');
     for (const x of j.steps) {
       if (x.state === 'now') {
         // A goal with an accepted route holds its CCUs: nothing is "needed because" of others there.
@@ -148,7 +149,7 @@ function computeTodayView(app, today) {
     if (RANK[b.urgency] < RANK[row.bucket]) row.bucket = b.urgency;
   }
   const rowList = [...rowMap.values()];
-  const gNameOf = (id) => goals.find((g) => g.goalId === id)?.targetName ?? 'a goal';
+  const gNameOf = (id) => goals.find((g) => g.goalId === id)?.targetName ?? t('a goal');
   for (const r of rowList) {
     for (const b of r.steps) {
       b.effective = b.urgency === 'optional' ? 'optional' : r.bucket;
@@ -178,7 +179,7 @@ function computeTodayView(app, today) {
   buyList.creditLine = credit > 0 && rowList.some((r) => r.kind === 'standard') ? creditLineText(credit) : null;
   // The limited mark is ignored for a kind whose offers nearly all carry it; say so once when that kind is in the list.
   const share = data.meta?.limitedShare;
-  buyList.limitedNote = share && rowList.some((r) => isSaturated(share[r.kind] ?? 0)) ? LIMITED_IGNORED_NOTE : null;
+  buyList.limitedNote = share && rowList.some((r) => isSaturated(share[r.kind] ?? 0)) ? t(LIMITED_IGNORED_NOTE) : null;
   const todayCount = buyList.today.reduce((n, r) => n + r.count, 0);
   const otherRows = [...buyList.norush, ...buyList.optional];
   const otherCount = otherRows.reduce((n, r) => n + r.count, 0);

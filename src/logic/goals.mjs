@@ -11,6 +11,7 @@
 // - Accepting re-checks every claim against the current state; a copy taken in
 //   the meantime is a conflict, not a silent overwrite.
 
+import { loc, t } from './i18n.mjs';
 import { edgeKey } from './planner.mjs';
 
 export const PRIORITY = { high: 0, normal: 1, low: 2 };
@@ -29,8 +30,8 @@ export const startOf = (chain) => chain.start;
 // `base` is an input shorthand for a fixed ship start; it is never stored.
 export function addChain(state, { name, start, base, target, priority = 'normal', mode = 'watch' }) {
   start ??= base != null ? { kind: 'ship', ship: base } : undefined;
-  if (!(priority in PRIORITY)) throw new Error(`priority must be one of ${Object.keys(PRIORITY).join(', ')}`);
-  if (!MODES.includes(mode)) throw new Error(`mode must be one of ${MODES.join(', ')}`);
+  if (!(priority in PRIORITY)) throw new Error(t('priority must be one of {values}', { values: Object.keys(PRIORITY).join(', ') }));
+  if (!MODES.includes(mode)) throw new Error(t('mode must be one of {values}', { values: MODES.join(', ') }));
   const id = `c${state.nextId++}`;
   state.chains[id] = { id, name: name ?? id, start, target, priority, mode, objective: 'cash', createdAt: new Date().toISOString(), accepted: null, lastSeen: null, history: [] };
   return state.chains[id];
@@ -40,19 +41,19 @@ export const OBJECTIVES = ['cash', 'allin'];
 
 /** cash: least new cash · allin: lowest all-in cost (new purchases + consumed CCUs' cost) */
 export function setObjective(state, chainId, objective) {
-  if (!OBJECTIVES.includes(objective)) throw new Error(`objective must be one of ${OBJECTIVES.join(', ')}`);
+  if (!OBJECTIVES.includes(objective)) throw new Error(t('objective must be one of {values}', { values: OBJECTIVES.join(', ') }));
   state.chains[chainId].objective = objective;
 }
 
 export function setMode(state, chainId, mode) {
-  if (!MODES.includes(mode)) throw new Error(`mode must be one of ${MODES.join(', ')}`);
+  if (!MODES.includes(mode)) throw new Error(t('mode must be one of {values}', { values: MODES.join(', ') }));
   state.chains[chainId].mode = mode;
 }
 
 export const LOCKS = ['auto', 'on', 'off'];
 
 export function setLock(state, chainId, lock) {
-  if (!LOCKS.includes(lock)) throw new Error(`lock must be one of ${LOCKS.join(', ')}`);
+  if (!LOCKS.includes(lock)) throw new Error(t('lock must be one of {values}', { values: LOCKS.join(', ') }));
   state.chains[chainId].lock = lock;
 }
 
@@ -230,12 +231,12 @@ export function acceptRoute(state, chainId, route, meta = {}, { graph = null } =
   const chain = state.chains[chainId];
   const others = reservations(state, chainId);
   const clash = route.steps.filter((s) => s.copyId && others.has(s.copyId));
-  if (clash.length) throw new ConflictError(`copies already reserved: ${clash.map((s) => `${s.copyId} by ${others.get(s.copyId)}`).join(', ')}`);
+  if (clash.length) throw new ConflictError(reservedCopiesError(clash, others));
   const tk = route.start?.token;
-  if (tk && others.has(tk.copyId)) throw new ConflictError(`token already used by ${others.get(tk.copyId)}`);
-  if (chain.via != null && route.start?.ship !== chain.via && !route.steps.some((s) => s.to === chain.via)) throw new ConflictError('this route does not pass through the ship the goal must route through');
+  if (tk && others.has(tk.copyId)) throw new ConflictError(t('token already used by {goal}', { goal: others.get(tk.copyId) }));
+  if (chain.via != null && route.start?.ship !== chain.via && !route.steps.some((s) => s.to === chain.via)) throw new ConflictError(t('this route does not pass through the ship the goal must route through'));
   const free = Math.max(0, (state.profile.credit ?? 0) - creditCommitted(state, chainId, graph));
-  if (route.creditUsed > free) throw new ConflictError(`needs ${route.creditUsed} credit, only ${free} uncommitted`);
+  if (route.creditUsed > free) throw new ConflictError(reservedCreditError(route.creditUsed, free));
   const rev = (chain.accepted?.rev ?? 0) + 1;
   if (chain.accepted) chain.history.push(chain.accepted);
   chain.accepted = {
@@ -252,3 +253,7 @@ export function releaseChain(state, chainId) {
   if (chain.accepted) chain.history.push({ ...chain.accepted, releasedAt: new Date().toISOString() });
   chain.accepted = null;
 }
+
+const reservedCopiesError = loc('goals.reservedCopiesError', (clash, others) =>
+  `copies already reserved: ${clash.map((s) => `${s.copyId} by ${others.get(s.copyId)}`).join(', ')}`);
+const reservedCreditError = loc('goals.reservedCreditError', (needed, free) => `needs ${needed} credit, only ${free} uncommitted`);

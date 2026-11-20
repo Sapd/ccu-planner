@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$logic/i18n.mjs';
   import { offerTile, offerCheckLines } from '$logic/whatifText.mjs';
 
   // The result of one offer check as a verdict tile: one tone, one headline, one sentence; the details sit behind "Why".
@@ -13,7 +14,7 @@
   <span class="text">{tile.text}</span>
 </div>
 <details class="why">
-  <summary>Why</summary>
+  <summary>{t('Why')}</summary>
   <ul>{#each lines as line, i (i)}<li>{line}</li>{/each}</ul>
 </details>
 

@@ -1,4 +1,5 @@
 <script>
+  import { t, N_ } from '$logic/i18n.mjs';
   import * as echarts from 'echarts/core';
   import { GraphChart } from 'echarts/charts';
   import { TooltipComponent } from 'echarts/components';
@@ -36,6 +37,9 @@
   const taken = $derived(takenFor(sessionOf(app), chain?.id));
   const goalName = $derived(goalNamer(app.plans, ships));
   const incident = $derived(selected == null ? [] : [...app.graph.edges.values()].flat().filter((e) => e.from === selected || e.to === selected));
+  // Kinds and roles as the drawing names them (the raw words are the data; they are shown through t()).
+  const kindText = (k) => ({ owned: t('owned'), warbond: t('warbond'), standard: t('standard') }[k] ?? k);
+  const roleText = (r) => ({ base: t('base'), target: t('target'), route: t('route'), other: t('other') }[r] ?? r);
   const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   let el = $state();
   let chart;
@@ -51,8 +55,8 @@
     return {
       animation: false, backgroundColor: 'transparent',
       tooltip: { trigger: 'item', formatter: ({ data: d, dataType }) => {
-        if (dataType !== 'edge') return `${esc(d.name)}<br/>${usd(d.msrp)}${d.concept ? '<br/>Concept' : ''}<br/>${esc(d.role)}`;
-        return `${esc(name(d.from))} → ${esc(name(d.to))}<br/>${d.hypothetical ? 'Wanted: below ' : ''}${usd(d.cash)} · ${esc(d.kind)}${d.copyId != null ? `<br/>Owned CCU · paid ${usd(d.paid)}` : ''}${d.skuId != null ? `<br/>SKU ${esc(d.skuId)}` : ''}${d.reservedBy ? `<br/>Reserved by ${esc(goalName(d.reservedBy))}` : ''}${d.onRoute ? '<br/>Best route' : ''}`;
+        if (dataType !== 'edge') return `${esc(d.name)}<br/>${usd(d.msrp)}${d.concept ? `<br/>${esc(t('Concept'))}` : ''}<br/>${esc(roleText(d.role))}`;
+        return `${esc(name(d.from))} → ${esc(name(d.to))}<br/>${d.hypothetical ? esc(t('Wanted: below {amount}', { amount: usd(d.cash) })) : usd(d.cash)} · ${esc(kindText(d.kind))}${d.copyId != null ? `<br/>${esc(t('Owned CCU · paid {amount}', { amount: usd(d.paid) }))}` : ''}${d.skuId != null ? `<br/>${esc(t('SKU {id}', { id: d.skuId }))}` : ''}${d.reservedBy ? `<br/>${esc(t('Reserved by {name}', { name: goalName(d.reservedBy) }))}` : ''}${d.onRoute ? `<br/>${esc(t('Best route'))}` : ''}`;
       } },
       series: [{ id: 'network', type: 'graph', layout: 'none', roam: true, scaleLimit: { min: 0.3, max: 8 },
         left: 50, right: 70, top: 40, bottom: 40, edgeSymbol: ['none', 'arrow'], edgeSymbolSize: 5,
@@ -98,52 +102,52 @@
 
 <GlassPanel>
 <div class="head">
-  <h2>{mode === 'decision' ? 'Why this route' : 'All ships and upgrades'}</h2>
+  <h2>{mode === 'decision' ? t('Why this route') : t('All ships and upgrades')}</h2>
   <GoalPicker {app} />
 </div>
-<div class="modes" role="group" aria-label="Graph mode">
-  <button class:active={mode === 'decision'} aria-pressed={mode === 'decision'} disabled={!chain} onclick={() => { picked = 'decision'; }}>Decision</button>
-  <button class:active={mode === 'network'} aria-pressed={mode === 'network'} onclick={() => { picked = 'network'; }}>Network</button>
+<div class="modes" role="group" aria-label={t('Graph mode')}>
+  <button class:active={mode === 'decision'} aria-pressed={mode === 'decision'} disabled={!chain} onclick={() => { picked = 'decision'; }}>{t('Decision')}</button>
+  <button class:active={mode === 'network'} aria-pressed={mode === 'network'} onclick={() => { picked = 'network'; }}>{t('Network')}</button>
 </div>
 {#if mode === 'decision'}
   <DecisionGraph {app} {chain} />
 {:else}
 <div class="controls">
   {#each ['owned', 'warbond', 'standard'] as kind (kind)}
-    <label class={kind}><input type="checkbox" bind:group={kinds} value={kind} />{kind}</label>
+    <label class={kind}><input type="checkbox" bind:group={kinds} value={kind} />{kindText(kind)}</label>
   {/each}
-  <label>Min MSRP $ <input class="price" type="number" min="0" bind:value={min} /></label>
-  <label>Max MSRP $ <input class="price" type="number" min="0" bind:value={max} /></label>
-  <label><input type="checkbox" bind:checked={onlyChainEdges} disabled={!chain} />Only route edges</label>
-  <label><input type="checkbox" bind:checked={showWanted} disabled={!chain} />Show wanted</label>
+  <label>{t('Min MSRP $')} <input class="price" type="number" min="0" bind:value={min} /></label>
+  <label>{t('Max MSRP $')} <input class="price" type="number" min="0" bind:value={max} /></label>
+  <label><input type="checkbox" bind:checked={onlyChainEdges} disabled={!chain} />{t('Only route edges')}</label>
+  <label><input type="checkbox" bind:checked={showWanted} disabled={!chain} />{t('Show wanted')}</label>
 </div>
 <div class="inspect">
-  <ShipPicker {ships} bind:value={selected} id="inspect-ship" label="Inspect a ship" />
-  {#if selected != null}<button type="button" onclick={() => { selected = null; }}>Clear</button>{/if}
+  <ShipPicker {ships} bind:value={selected} id="inspect-ship" label={t('Inspect a ship')} />
+  {#if selected != null}<button type="button" onclick={() => { selected = null; }}>{t('Clear')}</button>{/if}
 </div>
-<p class="hint">Price increases left to right. Thick edges: best route · dashed grey: reserved by another goal · dashed green: wanted. Scroll to zoom; drag to pan. Click a ship, or pick one in “Inspect a ship”, for its CCUs.</p>
-{#if view.hidden}<p class="hint">{view.hidden} more upgrades are not drawn. Narrow the price range or the kinds to see them.</p>{/if}
+<p class="hint">{t('Price increases left to right. Thick edges: best route · dashed grey: reserved by another goal · dashed green: wanted. Scroll to zoom; drag to pan. Click a ship, or pick one in “Inspect a ship”, for its CCUs.')}</p>
+{#if view.hidden}<p class="hint">{t('{n} more upgrades are not drawn. Narrow the price range or the kinds to see them.', { n: view.hidden })}</p>{/if}
 <div class="network">
-  <div class="chart" bind:this={el} role="img" aria-label="CCU network graph. Use Inspect a ship to explore it with the keyboard."></div>
+  <div class="chart" bind:this={el} role="img" aria-label={t('CCU network graph. Use Inspect a ship to explore it with the keyboard.')}></div>
   <aside class:has={selected != null}>
     {#if selected != null}
       <ShipThumb ship={ships.get(selected) ?? null} size="m" />
       <h3>{name(selected)} · {usd(ships.get(selected)?.msrp)}</h3>
-      {#each [['In', 'to'], ['Out', 'from']] as [label, field] (label)}
-        <h4>{label}</h4>
+      {#each [[N_('In'), 'to'], [N_('Out'), 'from']] as [label, field] (label)}
+        <h4>{t(label)}</h4>
         <ul>
           {#each incident.filter((e) => e[field] === selected) as e}
-            <li class={e.kind}>{name(e.from)} → {name(e.to)} · {e.kind} · {usd(e.cash)}
-              {#if e.skuId != null}<span>SKU {e.skuId}</span>{/if}
-              {#each e.copies ?? [] as c}<span>Owned CCU · paid {usd(c.paid?.cents)}{taken.has(c.copyId) ? ` · reserved by ${goalName(taken.get(c.copyId))}` : ''}</span>{/each}
+            <li class={e.kind}>{name(e.from)} → {name(e.to)} · {kindText(e.kind)} · {usd(e.cash)}
+              {#if e.skuId != null}<span>{t('SKU {id}', { id: e.skuId })}</span>{/if}
+              {#each e.copies ?? [] as c}<span>{t('Owned CCU · paid {amount}', { amount: usd(c.paid?.cents) })}{taken.has(c.copyId) ? ` · ${t('reserved by {name}', { name: goalName(taken.get(c.copyId)) })}` : ''}</span>{/each}
             </li>
-          {:else}<li>None</li>{/each}
+          {:else}<li>{t('None')}</li>{/each}
         </ul>
       {/each}
-    {:else}<p class="hint">Select a ship to list all its incoming and outgoing CCUs.</p>{/if}
+    {:else}<p class="hint">{t('Select a ship to list all its incoming and outgoing CCUs.')}</p>{/if}
   </aside>
 </div>
-{#if !view.nodes.length}<p class="hint">No ships in this price range.</p>{/if}
+{#if !view.nodes.length}<p class="hint">{t('No ships in this price range.')}</p>{/if}
 {/if}
 </GlassPanel>
 
