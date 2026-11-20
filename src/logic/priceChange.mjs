@@ -3,6 +3,7 @@
 import { searchRoutes, edgeKey, buildGraph, withEdge } from './planner.mjs';
 import { shipAvailability } from './availability.mjs';
 import { goalStarts } from './sharedPlan.mjs';
+import { warbondCanFit } from './warbondFit.mjs';
 
 
 // The graph as it will be after the price change: today's owned copies and tokens, the expected offers.
@@ -88,7 +89,8 @@ export function expectedChanges(route, expected, ships = null, avail = null, ctx
     const a = avail ? shipAvailability(avail, s.to) : null;
     const event = a && a.status !== 'regular' ? a.event : null;
     if (e.cash > s.cash) alerts.push({ step: s, now: s.cash, expected: e.cash, reason: 'pricier' });
-    else if (event) alerts.push({ step: s, now: s.cash, expected: e.cash === s.cash ? null : e.cash, reason: 'event', event });
+    // Only a ship proven to be sold during events alone, and only for a filler: a step a Warbond can still fill waits for one anyway.
+    else if (event && a.status === 'event-only' && warbondCanFit(ships?.get(s.from)?.msrp, ships?.get(s.to)?.msrp) === false) alerts.push({ step: s, now: s.cash, expected: e.cash === s.cash ? null : e.cash, reason: 'event', event });
     else if (e.cash !== s.cash) alerts.push({ step: s, now: s.cash, expected: e.cash, reason: 'cheaper' });
     else if (!e.assumed && ships?.get(s.to)?.concept) alerts.push({ step: s, now: s.cash, expected: null, reason: 'concept' });
   }

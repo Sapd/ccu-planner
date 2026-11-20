@@ -29,7 +29,7 @@ const FIXTURES = {
   'concept target locks by itself': { offers: [std(1, 2, 5000), std(2, 4, 10000)], concept: [4], goal: {} },
   'finish mode buys everything now': { offers: [wb(1, 2, 1000), std(2, 4, 10000)], expected: [std(2, 4, 12000)], goal: { mode: 'finish' } },
   'a step that goes away': { offers: [std(1, 2, 1000), std(2, 4, 1000), std(1, 3, 4000), std(3, 4, 1000)], expected: [std(2, 4, 1000), std(1, 3, 4000), std(3, 4, 1000)], goal: { lock: 'off' } },
-  'an ongoing sale event makes the target lock now': { offers: [std(1, 2, 5000), std(2, 4, 10000)], event: true, goal: {} },
+  'an ongoing sale event makes an event-only target lock now': { offers: [std(1, 2, 5000), std(2, 4, 10000)], event: true, goal: {} },
   'a saturated limited flag is ignored': { offers: [{ ...wb(1, 2, 1000), limited: true }, std(2, 4, 10000)], meta: { limitedShare: { warbond: 1, standard: 0 } }, goal: {} },
   'a buy-before alert that saves money is promoted to buy today': { offers: [std(1, 2, 5000), std(2, 4, 10000)], expected: [std(1, 2, 5000), std(2, 4, 12000)], promoted: true, goal: { lock: 'off' } },
   'a limited-time Warbond is bought today': { offers: [{ ...wb(1, 2, 1000), limited: true }, std(2, 4, 10000)], goal: {} },
@@ -46,7 +46,8 @@ function appFor(f) {
   if (f.goal.lock) plans.chains.c1.lock = f.goal.lock;
   return {
     data: { ships, offers: f.offers, owned, meta: { catalogAt: 'C', hangarAt: 'H', ...f.meta }, warbondPrices: null, saleHistory: f.event ? { ships: { 4: { onSaleDays: [DAY] } } } : null },
-    graph: buildGraph({ offers: f.offers, owned, ships }), plans, overrides: emptyOverrides(),
+    // During the event fixtures the target has only ever been sold during events (the lock and alerts need that proof).
+    graph: buildGraph({ offers: f.offers, owned, ships }), plans, overrides: f.event ? { ...emptyOverrides(), ships: { 4: { availability: 'event-only' } } } : emptyOverrides(),
     saleEvents: f.event ? { rev: 1, events: [{ id: 'e', name: 'IAE 2956', from: '2026-11-14', to: f.eventTo ?? '2026-11-27' }] } : emptySaleEvents(), expected: f.expected ?? f.offers,
   };
 }

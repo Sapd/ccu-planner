@@ -109,8 +109,9 @@ test('a sale event ending within two days moves every on-sale row to Buy today; 
   const goals = [{ name: 'Liberator', base: 1, target: 4, lock: 'off' }];
   const ev = (to) => ({ rev: 1, events: [{ id: 'e1', name: 'IAE 2956', from: '2026-11-14', to }] });
   const soon = todayView(world({ offers, goals, saleEvents: ev('2026-11-20') }), DAY);
-  // The later Standard step into Liberator is only known on sale during the event, so it is bought today too.
-  assert.deepEqual(rowsOf(soon).today, ['warbond:1-2', 'standard:2-4']);
+  // The later Standard step into Liberator is not bought: it is not proven to be sold only during events, and a Warbond
+  // can still fill its price range, so it waits for one.
+  assert.deepEqual(rowsOf(soon).today, ['warbond:1-2']);
   assert.deepEqual(soon.buyList.today[0].reasonTexts, ['IAE 2956 ends Nov 20']);
   const later = todayView(world({ offers, goals, saleEvents: ev('2026-12-02') }), DAY);
   assert.deepEqual(rowsOf(later).norush, ['warbond:1-2']);

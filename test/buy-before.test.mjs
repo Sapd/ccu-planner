@@ -82,17 +82,19 @@ test('no route after the change: the alert stays and says waiting leaves no rout
 });
 
 test('concept and event alerts are not checked', () => {
+  // The event alert needs a filler into a ship sold only during events: ships $5 apart, ship 2 marked event-only.
   const concept = new Map([...ships].map(([id, s]) => [id, { ...s, concept: id === 2 }]));
   const x = setup({ alt: 2000, expectedFn: (o) => o, shipMap: concept }); // same-cost alternative, nothing expected to change
   const ch = expectedChanges(x.route, x.expected, concept, null, x.ctx);
   assert.deepEqual(ch.buyBefore.map((a) => [a.step.to, a.reason, a.saves]), [[2, 'concept', undefined]]);
   assert.deepEqual(texts(x).length, 1);
 
-  const eventData = { ships: new Map([...ships].map(([id, s]) => [id, { ...s }])), saleHistory: { ships: { 2: { onSaleDays: ['2026-11-18'] } } }, saleEvents: { rev: 1, events: [{ id: 'e', name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' }] } };
-  const avail = availCtx({ data: eventData, overrides: { ships: {} } }, '2026-11-18');
+  const fillers = new Map([...ships].map(([id, s]) => [id, { ...s, msrp: 9000 + id * 500 }]));
+  const eventData = { ships: fillers, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-18'] } } }, saleEvents: { rev: 1, events: [{ id: 'e', name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' }] } };
+  const avail = availCtx({ data: eventData, overrides: { ships: { 2: { availability: 'event-only' } } } }, '2026-11-18');
   const e = setup({ alt: 2000, expectedFn: (o) => o });
-  const ev = expectedChanges(e.route, e.expected, e.shipMap, avail, e.ctx);
-  assert.ok(ev.buyBefore.length >= 1);
+  const ev = expectedChanges(e.route, e.expected, fillers, avail, e.ctx);
+  assert.ok(ev.buyBefore.some((a) => a.reason === 'event' && a.saves === undefined));
   assert.ok(ev.buyBefore.every((a) => a.reason === 'event' && a.saves === undefined));
 });
 

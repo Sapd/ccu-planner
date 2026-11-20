@@ -7,11 +7,11 @@ import { noRouteMessage, eventLockWhy } from '../src/logic/describe.mjs';
 
 const TODAY = '2026-11-20';
 const ships = (concepts = []) => new Map([[1, 5000], [2, 7500], [3, 10000], [4, 15000]].map(([id, msrp]) => [id, { id, name: 'ABCD'[id - 1], msrp, concept: concepts.includes(id) }]));
-function build({ offers = [], owned = [], concepts = [], base = 1, target = 4, saleEvents, saleHistory } = {}) {
+function build({ offers = [], owned = [], concepts = [], base = 1, target = 4, saleEvents, saleHistory, availability = {} } = {}) {
   const sh = ships(concepts);
   const plans = newState();
   addChain(plans, { base, target });
-  return { data: { ships: sh, offers, owned, saleHistory }, graph: buildGraph({ offers, owned }), plans, overrides: { ships: {} }, expected: offers, saleEvents };
+  return { data: { ships: sh, offers, owned, saleHistory }, graph: buildGraph({ offers, owned }), plans, overrides: { ships: availability }, expected: offers, saleEvents };
 }
 const std = (from, to) => ({ from, to, kind: 'standard', cash: ships().get(to).msrp - ships().get(from).msrp });
 const run = (app, opts = {}) => decisionGraph(app, 'c1', { wanted: null, today: TODAY, ...opts });
@@ -76,13 +76,16 @@ test('a concept target with lock auto locks the last step', () => {
   assert.equal(step.options.find((o) => o.chosen).why, 'concept: lock now');
 });
 
-test('a Standard step into a ship only known on sale during the ongoing event locks now', () => {
+test('a Standard step into a ship sold only during events locks now during the ongoing event', () => {
   const event = { id: 'e1', name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' };
-  const app = build({ offers: [std(1, 2)], target: 2, saleEvents: { rev: 1, events: [event] }, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-15'] } } } });
+  const app = build({ offers: [std(1, 2)], target: 2, saleEvents: { rev: 1, events: [event] }, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-15'] } } }, availability: { 2: { availability: 'event-only' } } });
   const [step] = run(app).steps;
   assert.equal(step.options.find((o) => o.chosen).why, eventLockWhy(event));
   assert.match(step.decision, /IAE 2956/);
-  assert.match(step.decision, /buy before it ends/);
+  assert.match(step.decision, /saves waiting for the next event/);
+  // Only seen during this event so far (not proven event-only): nothing is locked.
+  const unknown = build({ offers: [std(1, 2)], target: 2, saleEvents: { rev: 1, events: [event] }, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-15'] } } } });
+  assert.doesNotMatch(run(unknown).steps[0].decision, /lock/i);
   // Outside the event nothing is locked.
   assert.doesNotMatch(run(app, { today: '2026-12-05' }).steps[0].decision, /lock/i);
 });

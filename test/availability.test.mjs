@@ -221,9 +221,11 @@ function watchChain(target = 3) {
 }
 const eventAvail = (over = {}) => availCtx({ data: { ships, saleHistory: hist('2026-11-18'), saleEvents: IAE }, overrides: { ships: over } }, '2026-11-18');
 
-test('buy later: during the event a Standard last step into an unknown target is locked now with reason event', () => {
+test('buy later: during the event a Standard last step into an event-only target is locked now; an unknown one is not', () => {
   const { c, route } = watchChain();
-  const avail = eventAvail();
+  // A target the history has not seen outside an event yet may be new to it: no lock.
+  assert.equal(lockReason(c, ships, null, eventAvail()), null);
+  const avail = eventAvail({ 3: { availability: 'event-only' } });
   assert.equal(lockReason(c, ships, null, avail), 'event');
   const sp = splitRoute(route, { lock: !!lockReason(c, ships, null, avail) });
   assert.equal(sp.lockNow.length, 1);
@@ -244,15 +246,22 @@ test('buy later: the same step outside any event with a regular target stays Lat
   assert.equal(lockReason(c, ships, null), null);
 });
 
-test('buy later: expectedChanges alerts event for later Standard steps into non-regular targets', () => {
+// The same ids priced $5 apart: every step is a filler no Warbond fits.
+const fillerShips = new Map([1, 2, 3].map((id) => [id, { ...ships.get(id), msrp: 9000 + id * 500 }]));
+const eventOnly = { 2: { availability: 'event-only' }, 3: { availability: 'event-only' } };
+
+test('buy later: expectedChanges alerts event only for filler steps into event-only targets', () => {
   const { route } = watchChain();
-  const alerts = expectedChanges(route, offers, ships, eventAvail()).alerts.filter((a) => a.reason === 'event');
+  const alerts = expectedChanges(route, offers, fillerShips, eventAvail(eventOnly)).alerts.filter((a) => a.reason === 'event');
   assert.ok(alerts.length >= 1);
   assert.equal(alerts[0].event.name, 'IAE 2956');
-  assert.equal(eventAlertText(alerts[0]), 'only known on sale during IAE 2956 (ends Nov 27): buy before it ends or risk losing this upgrade path');
-  assert.equal(expectedChanges(route, offers, ships, eventAvail({ 2: { availability: 'regular' }, 3: { availability: 'regular' } })).alerts.length, 0);
-  assert.equal(expectedChanges(route, offers, ships).alerts.length, 0, 'without a context nothing changes');
-  assert.equal(expectedChanges(route, offers, ships, eventAvail()).buyBefore.some((a) => a.reason === 'event'), true);
+  assert.equal(eventAlertText(alerts[0]), 'sold only during events so far (IAE 2956 until Nov 27); no Warbond fits this step, so buying it now saves waiting for the next event');
+  assert.equal(expectedChanges(route, offers, fillerShips, eventAvail({ 2: { availability: 'regular' }, 3: { availability: 'regular' } })).alerts.length, 0);
+  assert.equal(expectedChanges(route, offers, fillerShips).alerts.length, 0, 'without a context nothing changes');
+  assert.equal(expectedChanges(route, offers, fillerShips, eventAvail(eventOnly)).buyBefore.some((a) => a.reason === 'event'), true);
+  // Not seen outside an event yet (unknown): no alert. A gap a Warbond can fill: the goal waits for one, no alert.
+  assert.equal(expectedChanges(route, offers, fillerShips, eventAvail()).alerts.some((a) => a.reason === 'event'), false);
+  assert.equal(expectedChanges(route, offers, ships, eventAvail(eventOnly)).alerts.some((a) => a.reason === 'event'), false);
 });
 
 test('buy later: a price rise still wins over the event reason', () => {
@@ -283,7 +292,8 @@ function appFor(raw) {
 
 test('routeAdvice moves the Standard last step into the lock group through the event reason', () => {
   const { c, route } = watchChain();
-  const locked = routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: eventAvail() });
+  const locked = routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: eventAvail({ 3: { availability: 'event-only' } }) });
+  assert.equal(routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: eventAvail() }).groups.lockNow.length, 0, 'an unknown target is not locked');
   assert.equal(locked.groups.lockNow.length, 1);
   assert.equal(locked.lockCode, 'event');
   assert.equal(routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: null }).groups.lockNow.length, 0);

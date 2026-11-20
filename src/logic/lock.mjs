@@ -32,7 +32,7 @@ export function splitRoute(route, { lock = false } = {}) {
 // that save nothing), so a lock need not cost new money.
 //   auto (default): lock when the target is a concept ship or you set a higher
 //                   expected price for it; on: always; off: never.
-/** Why this chain locks its target now ('on' | 'expected' | 'concept' | 'event'), or null. 'event': a sale event is on and the target is not known to stay on sale after it. */
+/** Why this chain locks its target now ('on' | 'expected' | 'concept' | 'event'), or null. 'event': a sale event is on and the target has only ever been sold during events. */
 export function lockReason(chain, ships = null, overrides = null, avail = null) {
   const lock = chain.lock ?? 'auto';
   if (lock === 'off') return null;
@@ -43,7 +43,8 @@ export function lockReason(chain, ships = null, overrides = null, avail = null) 
   if (t?.concept) return 'concept';
   if (avail) {
     const a = shipAvailability(avail, chain.target);
-    if (a.status !== 'regular' && a.event) return 'event';
+    // Only a target proven to be sold during events alone: a ship not seen outside one yet may simply be new to the history.
+    if (a.status === 'event-only' && a.event) return 'event';
   }
   return null;
 }

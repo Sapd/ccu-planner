@@ -88,7 +88,7 @@ export function priceLine(shipName, today, o, covered) {
 export const assumptionsCoverText = (n) => `Your assumptions cover ${plural(n, 'Standard offer', 'Standard offers')} in all.`;
 
 /** Alert text for a Standard step only known on sale during the ongoing event (expectedChanges reason 'event'). */
-export const eventAlertText = (a) => `only known on sale during ${a.event.name} (ends ${shortDay(a.event.to)}): buy before it ends or risk losing this upgrade path`;
+export const eventAlertText = (a) => `sold only during events so far (${a.event.name} until ${shortDay(a.event.to)}); no Warbond fits this step, so buying it now saves waiting for the next event`;
 
 /** The CLI's notice when no sale event is entered: sale days would then count as normal on-sale days. (The app's is NO_EVENTS_NOTICE_APP.) */
 export const NO_EVENTS_NOTICE = 'No sale events entered — days during sales like IAE count as normal on-sale days. Add the current event with: chain event add "<name>" <from> <to>.';
@@ -147,6 +147,8 @@ export const STATE_LABEL = { own: 'Owned', now: 'Buy now', wait: 'Wait', norush:
 
 /** Chip label for a step that locks its price now. */
 export const LOCK_LABEL = 'Buy now · locks the price';
+/** The label of a waiting step no Warbond can make cheaper: bought whenever, with store credit too. */
+export const FILLER_LABEL = 'Filler · any time';
 
 /** Shown where a lock would have been when an owned CCU into the target already caps a price rise. */
 export const lockCoveredText = (fromName, targetName, extraCash) => `Price rise covered: your ${fromName} → ${targetName} CCU limits it to ${usd(extraCash)} more`;
@@ -157,11 +159,17 @@ export function lockReasonText(code, { event = null } = {}) {
   return { on: 'You chose to lock the price of this step.', expected: 'The normal price of this ship is expected to go up.', concept: 'This ship is a concept; its price usually rises when it becomes flyable.' }[code] ?? null;
 }
 
-/** Why a step waits: 'normal' | 'off-store' | 'event-only' | 'seen' (a lower sale price was seen). */
-export function waitReasonText(kind, { event = null, seen = null, cash = null } = {}) {
+/**
+ * Why a step waits: 'slot' (a Warbond into any ship in the price range could fill it), 'filler' (no Warbond fits:
+ * buy the Standard upgrade whenever), 'normal' | 'off-store' | 'event-only' | 'seen' (a lower sale price was seen).
+ * slot: { fromName, toName, fromMsrp, toMsrp, save } (cents); filler: { gap } (cents).
+ */
+export function waitReasonText(kind, { event = null, seen = null, cash = null, slot = null, gap = null } = {}) {
+  if (kind === 'slot') return `Wait for a Warbond into any ship from ${usd(slot.fromMsrp)} to ${usd(slot.toMsrp)} (${slot.fromName} to ${slot.toName}). One could save up to ${usd(slot.save)} here.`;
+  if (kind === 'filler') return `No saving possible here: Warbonds at this price are discounted by more than the ${usd(gap)} gap, so none fits. Buy the Standard upgrade whenever you like; store credit works.`;
   if (kind === 'normal') return `Only at the normal price right now (${usd(cash)}). Warbonds for it show up during sales.`;
   if (kind === 'off-store') return 'Not in the store right now. It usually comes back during sales.';
-  if (kind === 'event-only') return `Only known on sale during ${event.name}. Buy before ${shortDay(event.to)} or it may be gone.`;
+  if (kind === 'event-only') return `Sold only during events so far (now ${event.name}, until ${shortDay(event.to)}). If you miss it, the next chance is usually the next event.`;
   if (kind === 'seen') return `Seen for ${usd(seen.cash)} during ${event?.name ?? 'an earlier sale'}.`;
   return null;
 }

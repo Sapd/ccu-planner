@@ -41,6 +41,8 @@ function world({ ships, offers = [], owned = [], goals = [], expected = offers, 
 }
 const owned = (copyId, from, to) => ({ copyId, from, to, paid: null });
 const SHIPS = [ship(1, 'A', 5000), ship(2, 'B', 7500), ship(3, 'C', 10000), ship(4, 'D', 12500), ship(5, 'E', 15000), ship(9, 'Z', 20000)];
+// B priced $5 above A: no Warbond fits A → B, so it is a filler (the event-only notices are about fillers).
+const FILLER_SHIPS = [ship(1, 'A', 5000), ship(2, 'B', 5500)];
 
 test('todayView: zero goals -> empty, hero nothing, no goal, no melt, catalog and hangar dates', () => {
   const v = todayView(world({ ships: SHIPS }));
@@ -192,10 +194,10 @@ test('todayView: waiting lists goals with wait steps, the wait count, and the ex
   assert.ok(v.waiting.alerts[0].text.length > 0);
 });
 
-test('todayView: eventOnly lists a later Standard step into an event-only target while an event is ongoing', () => {
+test('todayView: eventOnly lists a later filler step into an event-only target while an event is ongoing', () => {
   const saleEvents = { rev: 1, events: [{ id: 'e1', ...IAE_EVENT }] };
   const app = world({
-    ships: SHIPS,
+    ships: FILLER_SHIPS,
     offers: [std(1, 2, 2500)],
     saleEvents,
     overrides: { rev: 1, ships: { 2: { availability: 'event-only' } } },
@@ -208,7 +210,11 @@ test('todayView: eventOnly lists a later Standard step into an event-only target
   assert.equal(v.waiting.eventOnly[0].step.kind, 'standard');
   assert.deepEqual(v.waiting.eventOnly[0].event, { name: 'IAE 2956', to: '2026-11-27' });
   assert.equal(v.waiting.alerts.length, 1);
-  assert.equal(v.goals[0].journey.steps[0].reason, 'Only known on sale during IAE 2956. Buy before Nov 27 or it may be gone.');
+  assert.match(v.goals[0].journey.steps[0].reason, /^No saving possible here: .* Sold only during events so far \(now IAE 2956, until Nov 27\)\./);
+  // The same step into a ship a Warbond can still reach (B $25 above A) waits for one: no event notice.
+  const slot = todayView(world({ ships: SHIPS, offers: [std(1, 2, 2500)], saleEvents, overrides: { rev: 1, ships: { 2: { availability: 'event-only' } } }, goals: [{ name: 'Wait', base: 1, target: 2, lock: 'off' }] }), '2026-11-18');
+  assert.deepEqual(slot.waiting.eventOnly, []);
+  assert.match(slot.goals[0].journey.steps[0].reason, /^Wait for a Warbond into any ship/);
 
   const after = todayView(app, '2026-12-01');
   assert.equal(after.waiting.event, null);
@@ -239,7 +245,7 @@ test('todayView: the same inputs give the memoised view; a new day or plans rev 
 // ----- waiting notices (R8): one line per distinct from-to pair -----
 
 const eventWorld = (goals) => world({
-  ships: SHIPS,
+  ships: FILLER_SHIPS,
   offers: [std(1, 2, 2500)],
   saleEvents: { rev: 1, events: [{ id: 'e1', ...IAE_EVENT }] },
   overrides: { rev: 1, ships: { 2: { availability: 'event-only' } } },
@@ -259,7 +265,7 @@ test('todayView notices: event-only and alert for the same pair become one event
   assert.equal(v.waiting.alerts.length, 1);
   assert.equal(v.waiting.eventOnly.length, 1);
   assert.equal(v.waiting.notices.length, 1);
-  assert.equal(v.waiting.notices[0].text, 'Only known on sale during IAE 2956. Buy before Nov 27 or it may be gone.');
+  assert.equal(v.waiting.notices[0].text, 'Sold only during events so far (now IAE 2956, until Nov 27). If you miss it, the next chance is usually the next event.');
   assert.equal(v.waiting.notices[0].eventOnly, true);
 });
 

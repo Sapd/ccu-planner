@@ -7,6 +7,7 @@ import { routeAdvice } from './advice.mjs';
 import { shipAvailability } from './availability.mjs';
 import { seenSalePrice, warbondDiscounts } from './salePrices.mjs';
 import { lockReasonText, waitReasonText, lockTradeText } from './describe.mjs';
+import { warbondCanFit, slotShips, MIN_CCU } from './warbondFit.mjs';
 
 const MIN_RUN = 3; // this many consecutive owned steps collapse into one group
 
@@ -48,13 +49,16 @@ export function journey(route, chain, ctx = {}) {
     const lock = !!buy?.lock;
     const seen = state === 'wait' ? seenSalePrice(warbondPrices, s.from, s.to, saleEvents) : null;
     let reason = null;
+    // A waiting Standard step is either a slot any Warbond in its price range can fill, or a filler no Warbond fits.
+    const fits = state === 'wait' && s.kind === 'standard' ? warbondCanFit(msrp(s.from), msrp(s.to)) : null;
+    const slot = fits ? { fromName: ships?.get(s.from)?.name ?? 'start', toName: ships?.get(s.to)?.name ?? 'target', fromMsrp: msrp(s.from), toMsrp: msrp(s.to), save: Math.max(0, s.cash - MIN_CCU), ...slotShips(ships, msrp(s.from), msrp(s.to)) } : null;
     if (lock) reason = lockText;
-    else if (state === 'wait') reason = waitReason(s, seen, ships, avail);
+    else if (state === 'wait') reason = waitReason(s, seen, ships, avail, fits, slot, fits === false ? msrp(s.to) - msrp(s.from) : null);
     const a = msrp(s.to);
     const b = msrp(s.from);
     const trade = lock ? lockTradeText({ targetName, cash: s.cash, code: adv.lockCode, event: adv.lockEvent, extraCash: adv.dec.cover?.extraCash ?? null }) : null;
     return {
-      step: s, state, lock, reason, cover: s === adv.dec.coveredStep ? adv.coverText : null, alert: alertOf.get(s) ?? null, seen, value: a == null || b == null ? null : a - b, token: false,
+      step: s, state, lock, reason, slot, filler: fits === false, cover: s === adv.dec.coveredStep ? adv.coverText : null, alert: alertOf.get(s) ?? null, seen, value: a == null || b == null ? null : a - b, token: false,
       urgency: buy?.bucket ?? null, urgencyReasons: buy?.reasons ?? [], since: buy?.since ?? null, until: buy?.until ?? null, untilBy: buy?.untilBy ?? null, note: buy?.note ?? null, trade,
     };
   });
@@ -106,10 +110,16 @@ function waitReasonKind(step, ships, avail) {
   return 'normal';
 }
 
-/** Why a waiting step waits: a lower sale price seen, else waitReasonKind's text. */
-function waitReason(s, seen, ships, avail) {
+/** Why a waiting step waits: a lower sale price seen, else a Warbond slot or a filler, else waitReasonKind's text. */
+function waitReason(s, seen, ships, avail, fits = null, slot = null, gap = null) {
   if (seen && seen.cash < s.cash) return waitReasonText('seen', { event: seen.event, seen, cash: s.cash });
   const kind = waitReasonKind(s, ships, avail);
+  if (fits) return waitReasonText('slot', { slot });
+  if (fits === false) {
+    // A filler is bought whenever; a ship sold only during events or missing from the store says so after.
+    const extra = kind === 'normal' ? '' : ` ${kind === 'event-only' ? waitReasonText(kind, { event: shipAvailability(avail, s.to).event }) : waitReasonText(kind)}`;
+    return waitReasonText('filler', { gap }) + extra;
+  }
   if (kind === 'event-only') return waitReasonText(kind, { event: shipAvailability(avail, s.to).event });
   return waitReasonText(kind, { cash: s.cash });
 }

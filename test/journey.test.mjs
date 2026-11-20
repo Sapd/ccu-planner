@@ -42,7 +42,11 @@ test('watch: owned step is own, Warbond is buy now, Standard is wait; today sums
   assert.equal(j.figures.saveToday, 3000);
   assert.equal(j.figures.saveIfSales, null);
   assert.equal(j.done, false);
-  assert.equal(j.steps[2].reason, 'Only at the normal price right now ($100). Warbonds for it show up during sales.');
+  // Three ($100) → Five ($200): a Warbond into any ship in between can fill this step, so it waits for one.
+  assert.equal(j.steps[2].reason, 'Wait for a Warbond into any ship from $100 to $200 (Three to Five). One could save up to $95 here.');
+  assert.deepEqual(j.steps[2].slot.examples.map((x) => x.name), ['Five', 'Four']);
+  assert.equal(j.steps[2].slot.count, 2);
+  assert.equal(j.steps[2].filler, false);
   assert.equal(j.steps[2].seen, null);
 });
 
@@ -91,16 +95,24 @@ test('a Standard step with a raised expected price gets an alert; other steps ge
   assert.equal(j.steps[1].alert, null);
 });
 
-test('an event-only target gets the event wait reason and alert', () => {
-  const avail = availCtx({
-    data: { ships, saleHistory: null },
+// Five priced $5 above Three: no Warbond fits the Three → Five step, it is a filler.
+const fillerShips = new Map(ships).set(5, { ...ships.get(5), msrp: 10500 });
+
+test('an event-only target: a Warbond slot still waits calmly; a filler says it is sold only during events and alerts', () => {
+  const avail = (shipMap) => availCtx({
+    data: { ships: shipMap, saleHistory: null },
     saleEvents: { rev: 1, events: [{ id: 'e1', ...IAE_EVENT }] },
     overrides: { ships: { 5: { availability: 'event-only' } } },
   }, '2026-11-18');
-  const j = journey(W, watch(1, 5, { lock: 'off' }), ctxFor(W, { avail }));
+  const slot = journey(W, watch(1, 5, { lock: 'off' }), ctxFor(W, { avail: avail(ships) }));
+  assert.equal(slot.steps[2].state, 'wait');
+  assert.match(slot.steps[2].reason, /^Wait for a Warbond into any ship/);
+  assert.equal(slot.steps[2].alert, null);
+  const j = journey(W, watch(1, 5, { lock: 'off' }), ctxFor(W, { ships: fillerShips, avail: avail(fillerShips) }));
   assert.equal(j.steps[2].state, 'wait');
-  assert.equal(j.steps[2].reason, 'Only known on sale during IAE 2956. Buy before Nov 27 or it may be gone.');
-  assert.equal(j.steps[2].alert, 'Three → Five $100: only known on sale during IAE 2956 (ends Nov 27): buy before it ends or risk losing this upgrade path');
+  assert.equal(j.steps[2].filler, true);
+  assert.equal(j.steps[2].reason, 'No saving possible here: Warbonds at this price are discounted by more than the $5 gap, so none fits. Buy the Standard upgrade whenever you like; store credit works. Sold only during events so far (now IAE 2956, until Nov 27). If you miss it, the next chance is usually the next event.');
+  assert.equal(j.steps[2].alert, 'Three → Five $100: sold only during events so far (IAE 2956 until Nov 27); no Warbond fits this step, so buying it now saves waiting for the next event');
 });
 
 test('unknown msrp: bar counts steps, fullPrice is null and no NaN appears', () => {
@@ -179,8 +191,10 @@ test('waitReasonText gives each wait kind its plain sentence', () => {
   assert.equal(waitReasonText('off-store'), 'Not in the store right now. It usually comes back during sales.');
   assert.equal(
     waitReasonText('event-only', { event: { name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' } }),
-    'Only known on sale during IAE 2956. Buy before Nov 27 or it may be gone.',
+    'Sold only during events so far (now IAE 2956, until Nov 27). If you miss it, the next chance is usually the next event.',
   );
+  assert.equal(waitReasonText('slot', { slot: { fromName: 'Ursa Medivac', toName: 'Syulen', fromMsrp: 12000, toMsrp: 15000, save: 2500 } }), 'Wait for a Warbond into any ship from $120 to $150 (Ursa Medivac to Syulen). One could save up to $25 here.');
+  assert.equal(waitReasonText('filler', { gap: 500 }), 'No saving possible here: Warbonds at this price are discounted by more than the $5 gap, so none fits. Buy the Standard upgrade whenever you like; store credit works.');
   assert.equal(waitReasonText('seen', { seen: { cash: 9000 }, event: null }), 'Seen for $90 during an earlier sale.');
   assert.equal(waitReasonText('seen', { seen: { cash: 9000 }, event: { name: 'IAE 2956' } }), 'Seen for $90 during IAE 2956.');
 });
@@ -215,19 +229,25 @@ test('today follows route.cash, not the raw step sum, when a Warbond and credit 
   assert.equal(j.figures.today, C.cash);
 });
 
-test('wait reasons: event-only during an event, off-store when there is no Standard SKU, else normal', () => {
-  const reasonFor = (shipMap, extra) => journey(W, watch(1, 5), ctxFor(W, { ships: shipMap, ...extra })).steps[2].reason;
+test('wait reasons of a filler: event-only during an event, off-store when there is no Standard SKU, else just the filler', () => {
+  // lock off: an event-only target would otherwise lock the step (its own test above).
+  const reasonFor = (shipMap, extra) => journey(W, watch(1, 5, { lock: 'off' }), ctxFor(W, { ships: shipMap, ...extra })).steps[2].reason;
+  const filler = waitReasonText('filler', { gap: 500 });
   const eventAvail = availCtx({
-    data: { ships, saleHistory: null },
+    data: { ships: fillerShips, saleHistory: null },
     saleEvents: { rev: 1, events: [{ id: 'e1', ...IAE_EVENT }] },
     overrides: { ships: { 5: { availability: 'event-only' } } },
   }, '2026-11-18');
-  assert.match(reasonFor(ships, { avail: eventAvail }), /^Only known on sale during /);
-  const offStore = new Map(ships).set(5, { ...ships.get(5), standard: false });
-  assert.equal(reasonFor(offStore, { avail: null }), waitReasonText('off-store'));
-  assert.equal(reasonFor(offStore, { avail: availCtx({ data: { ships: offStore, saleHistory: null } }, '2026-11-18') }), waitReasonText('off-store'));
-  assert.match(reasonFor(ships, { avail: null }), /^Only at the normal price/);
-  assert.match(reasonFor(ships, { avail: availCtx({ data: { ships, saleHistory: null } }, '2026-11-18') }), /^Only at the normal price/);
+  assert.match(reasonFor(fillerShips, { avail: eventAvail }), /Sold only during events so far/);
+  const offStore = new Map(fillerShips).set(5, { ...fillerShips.get(5), standard: false });
+  assert.equal(reasonFor(offStore, { avail: null }), `${filler} ${waitReasonText('off-store')}`);
+  assert.equal(reasonFor(offStore, { avail: availCtx({ data: { ships: offStore, saleHistory: null } }, '2026-11-18') }), `${filler} ${waitReasonText('off-store')}`);
+  assert.equal(reasonFor(fillerShips, { avail: null }), filler);
+  // Not seen outside this event yet (unknown) is not event-only.
+  assert.equal(reasonFor(fillerShips, { avail: availCtx({ data: { ships: fillerShips, saleHistory: null } }, '2026-11-18') }), filler);
+  // An unknown price: neither a slot nor a filler, the plain reason stays.
+  const unknownPrice = new Map(ships).set(5, { ...ships.get(5), msrp: null });
+  assert.match(reasonFor(unknownPrice, { avail: null }), /^Only at the normal price/);
 });
 
 test('fullPrice uses the start ship of a start-only fixed-ship goal', () => {

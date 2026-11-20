@@ -36,6 +36,9 @@ everything in memory and leaves your own data alone; **Leave sample data** takes
 - **Today** tells you what to buy now, what can wait for a sale, and what is optional. Each row has a
   **Buy on RSI** link that opens the RSI website; the app buys nothing.
 - **Goals** are the ships you want. Each shows its chain of upgrades step by step: own, buy now, or wait.
+  A waiting step either waits for a Warbond into any ship in its price range, or is a filler no Warbond
+  can make cheaper (buy it whenever, store credit works). An opened owned step lists which goals use your
+  other copies of that CCU.
 - **Hangar** lists your pledges and which unused CCUs are worth melting.
 - **Store** holds the current sale events and Warbond prices. Enter a running sale there so the planner
   knows an offer is only around for now. Its **Browse store** tab lists RSI's whole public store (Pledge,

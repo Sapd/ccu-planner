@@ -1,6 +1,6 @@
 <script>
   import { upgradeToolUrl, hangarUrl } from '$logic/links.mjs';
-  import { waitReasonText, wouldHelpLine, onSaleText, urgencyReasonText } from '$logic/describe.mjs';
+  import { waitReasonText, wouldHelpLine, onSaleText, urgencyReasonText, FILLER_LABEL } from '$logic/describe.mjs';
   import { usd } from '$logic/format.mjs';
   import ShipThumb from '../ShipThumb.svelte';
   import RsiLink from '../RsiLink.svelte';
@@ -39,7 +39,7 @@
         <ShipThumb ship={ships.get(s.to) ?? null} size="s" />
         <span class="names"><span class="nm">{name(s.from)}</span> <span aria-hidden="true">→</span> <span class="nm">{name(s.to)}</span></span>
       </span>
-      <span class="chipcell"><span aria-hidden={phrase ? 'true' : undefined}><StateChip state={item.state === 'now' && item.urgency === 'norush' ? 'norush' : item.state} lock={item.lock} /></span>{#if item.alert}<span class="warnmark" role="img" aria-label="Alert: {item.alert}" title={item.alert}>!</span>{/if}</span>
+      <span class="chipcell"><span aria-hidden={phrase ? 'true' : undefined}><StateChip state={item.state === 'now' && item.urgency === 'norush' ? 'norush' : item.state} lock={item.lock} text={item.state === 'wait' && item.filler ? FILLER_LABEL : null} /></span>{#if item.alert}<span class="warnmark" role="img" aria-label="Alert: {item.alert}" title={item.alert}>!</span>{/if}</span>
       <span class="cost" aria-hidden={phrase ? 'true' : undefined}>{#if item.state !== 'own'}<b class="price">{usd(s.cash)}</b><span class="kind">{s.kind === 'warbond' ? 'Warbond' : 'Standard'}</span>{/if}</span>
       <span class="chev" aria-hidden="true">{open ? '▾' : '›'}</span>
     </button>
@@ -72,6 +72,7 @@
       {:else if item.state === 'wait'}
         <div class="expand">
           <p>{item.reason}</p>
+          {#if item.slot?.count}<p class="slot" data-slot>Ships in this range: {item.slot.examples.map((x) => x.name).join(', ')}{item.slot.count > item.slot.examples.length ? ` and ${item.slot.count - item.slot.examples.length} more` : ''}.</p>{/if}
           {#if seenLine && seenLine !== item.reason}<p>{seenLine}</p>{/if}
           {#if below != null}<p>{wouldHelpLine(usd(below))}</p>{/if}
         </div>
