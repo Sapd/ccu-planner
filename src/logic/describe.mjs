@@ -316,7 +316,7 @@ export const LEVEL_TEXT = {
 };
 
 /** Where reserving is offered (the list's "Reserve all chains" and the goal's "Reserve this chain"). */
-export const ACCEPT_HELP = 'Nothing is bought. Reserving a chain holds the CCUs, starting ship and store credit it uses, so other goals cannot take them. Prices are not locked: if one changes you are told. You can release the reservation any time.';
+export const ACCEPT_HELP = 'Optional, and nothing is bought. Reserving keeps this exact chain: it holds the CCUs, starting ship and store credit it uses so other goals cannot take them, and the planner stops switching it to a cheaper route (it tells you if a price changes). Leave it off to always get the cheapest plan. You can release it any time.';
 export const ACCEPT_THIS_HELP = ACCEPT_HELP;
 
 /** Release is explained by listing what it frees (see reservation.mjs); this is the one-line fallback. */
