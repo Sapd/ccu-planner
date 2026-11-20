@@ -9,7 +9,9 @@ import { createSyncRunner } from '../app/dev-sync.js';
 import { appDataDir } from '../src/data.mjs';
 import { shipThumbs } from '../src/logic/images.mjs';
 const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/raw-small.json', import.meta.url)));
-function memory(initial = {}, request = async () => '') {
+// What RSI answers past the last page, or for an empty hangar: the hangar page with an empty pledge list.
+const EMPTY = '<html><head><title>My Hangar</title></head><body><ul class="list-items"></ul></body></html>';
+function memory(initial = {}, request = async () => EMPTY) {
   const files = structuredClone(initial), events = [], logs = [];
   return { files, events, logs, request,
     readJson: async (name, fallback) => name === 'upgrades'
@@ -153,7 +155,7 @@ test('a hangar with no pledges is saved but warns', async () => {
   await sync('hangar', io, { full: true });
   assert.deepEqual(io.files['hangar.json'].entries, {});
   assert.ok(io.logs.some((l) => /^warning: RSI listed no pledges/.test(l)), io.logs.join('\n'));
-  const one = memory({}, async (r) => (r.path.includes('page=1&') ? '<li><input class="js-pledge-id" value="1"><input class="js-pledge-name" value="Alpha"></li>' : ''));
+  const one = memory({}, async (r) => (r.path.includes('page=1&') ? '<li><input class="js-pledge-id" value="1"><input class="js-pledge-name" value="Alpha"></li>' : EMPTY));
   await sync('hangar', one, { full: true });
   assert.ok(!one.logs.some((l) => /no pledges/.test(l)));
 });
@@ -161,7 +163,7 @@ test('a hangar with no pledges is saved but warns', async () => {
 test('hangar incremental early stop, full disappearance, and empty first run keep existing formats', async () => {
   const html = '<li><input class="js-pledge-id" value="1"><input class="js-pledge-name" value="Alpha"></li>';
   let calls = 0;
-  const io = memory({}, async () => ++calls % 2 ? html : '');
+  const io = memory({}, async () => ++calls % 2 ? html : EMPTY);
   await sync('hangar', io);
   assert.equal(calls, 2);
   assert.equal(io.files['hangar.json'].entries['1'].data.name, 'Alpha');
@@ -330,10 +332,54 @@ test('hangar progress counts pages against the pager\u2019s last page', async ()
   assert.equal(pagerLast('<p>no pager</p>'), null);
   const row = (id) => `<li><input class="js-pledge-id" value="${id}"><input class="js-pledge-name" value="P${id}"></li>`;
   const page2 = '<a href="?page=2" class="raquo btn">»</a>';
-  const io = memory({}, async (r) => (r.path.includes('page=1&') ? row(1) + page2 : r.path.includes('page=2&') ? row(2) + page2 : ''));
+  const io = memory({}, async (r) => (r.path.includes('page=1&') ? row(1) + page2 : r.path.includes('page=2&') ? row(2) + page2 : EMPTY));
   await sync('hangar', io, { full: true });
   const events = io.events;
   const hangar = events.filter((e) => e.phase === 'hangar');
   assert.ok(hangar.length >= 2, JSON.stringify(events));
   assert.deepEqual(hangar.slice(0, 2).map((e) => [e.done, e.total]), [[1, 2], [2, 2]]);
+});
+
+// A full hangar sync over 3 pages of 2 pledges (the pager says 3); `pageFor(n)` may replace a page.
+async function threePageHangar(pageFor) {
+  const row = (id) => `<li><input class="js-pledge-id" value="${id}"><input class="js-pledge-name" value="P${id}"></li>`;
+  const pager = '<a href="?page=3&pagesize=10" class="raquo btn">»</a>';
+  const good = (n) => `<html><head><title>My Hangar</title></head><body><ul class="list-items">${row(n * 10 + 1)}${row(n * 10 + 2)}</ul>${pager}</body></html>`;
+  const previous = { entries: Object.fromEntries([11, 12, 21, 22, 31, 32].map((id) => [id, { data: { pledgeId: id, name: `P${id}` }, firstSeen: 'x', lastSeen: 'x' }])), lastFullSync: null, lastSync: null };
+  const io = memory({ 'hangar.json': previous }, async (r) => {
+    const n = Number(/page=(\d+)/.exec(r.path)[1]);
+    return n > 3 ? EMPTY : pageFor(n) ?? good(n);
+  });
+  return { io, previous, run: () => sync('hangar', io, { full: true }) };
+}
+
+test('a hangar page without the pledge list (maintenance, error page) stops the sync and changes nothing', async () => {
+  for (const bad of ['<html><body><h1>Down for maintenance</h1></body></html>', '']) {
+    const { io, previous, run } = await threePageHangar((n) => (n === 2 ? bad : null));
+    await assert.rejects(run(), /page 2 of your hangar without the pledge list.*Nothing was changed/);
+    assert.deepEqual(io.files['hangar.json'], previous);
+  }
+  const small = memory({ 'hangar.json': oldHangar(5) }, async () => '<html><body>Service unavailable</body></html>');
+  await assert.rejects(sync('hangar', small, { full: true }), /without the pledge list/);
+  assert.ok(Object.values(small.files['hangar.json'].entries).every((e) => !e.goneSince));
+});
+
+test('a cut-off hangar page before the pager’s last page marks nothing as gone and warns', async () => {
+  const row = '<li><input class="js-pledge-id" value="21"><input class="js-pledge-name" value="P21"></li>';
+  const { io, run } = await threePageHangar((n) => (n === 2 ? `<html><head><title>My Hangar</title></head><body><ul class="list-items">${row}</ul></body></html>` : null));
+  await run();
+  const entries = io.files['hangar.json'].entries;
+  assert.ok(Object.values(entries).every((e) => !e.goneSince), JSON.stringify(entries));
+  assert.equal(io.files['hangar.json'].lastFullSync, null, 'not a complete full sync');
+  assert.ok(io.logs.some((l) => /^warning: RSI's hangar page 2 of 3 came back incomplete/.test(l)), io.logs.join('\n'));
+});
+
+test('losing more than a fifth of the hangar in one full sync asks first; a few melts do not', async () => {
+  const hangarOf = (ids) => `<html><head><title>My Hangar</title></head><body><ul class="list-items">${ids.map((id) => `<li><input class="js-pledge-id" value="${id}"><input class="js-pledge-name" value="P${id}"></li>`).join('')}</ul></body></html>`;
+  const previous = { entries: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [String(i), { data: { pledgeId: i, name: `P${i}` } }])) };
+  const ask = memory({ 'hangar.json': previous }, async (r) => (r.path.includes('page=1&') ? hangarOf(Array.from({ length: 30 }, (_, i) => i)) : EMPTY));
+  await assert.rejects(sync('hangar', ask, { full: true }), /unusually small hangar/); // 10 of 40 gone
+  const fine = memory({ 'hangar.json': previous }, async (r) => (r.path.includes('page=1&') ? hangarOf(Array.from({ length: 35 }, (_, i) => i)) : EMPTY));
+  await sync('hangar', fine, { full: true }); // 5 of 40 gone
+  assert.equal(Object.values(fine.files['hangar.json'].entries).filter((e) => e.goneSince).length, 5);
 });

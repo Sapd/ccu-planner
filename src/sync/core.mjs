@@ -7,7 +7,7 @@ import { QUERIES } from './queries.mjs';
 import { CATALOG_PATH } from './catalog-query.mjs';
 import { fetchItems, assessCatalog, catalogDoc, signedInWarning, shortListings } from './catalog-fetch.mjs';
 import { readCatalog } from '../logic/store-catalog.mjs';
-import { hasSigninForm, isAccessDenied } from './signin.mjs';
+import { hasSigninForm, isAccessDenied, isSignedInPage } from './signin.mjs';
 
 // RSI's upgrade GraphQL answers at most 5 operations per request ("Maximum subquery limit of 5 reached").
 // Requests are spaced 1 s apart by the transport, so sending 5 per request makes the long phases about 5x faster.
@@ -241,6 +241,11 @@ export async function sync(cmd, io, options = {}) {
     for (;;) {
       const html = await client.getHtml(urlFor(page, pagesize));
       const rows = parse(html);
+      // A hangar page with no pledges that is not recognisably the hangar (a maintenance or error page RSI answered with 200)
+      // must not read as "the hangar ends here": a full sync would mark every pledge after it as gone.
+      if (name === 'hangar' && rows.length === 0 && !isSignedInPage(html)) {
+        throw new Error(`RSI sent page ${page} of your hangar without the pledge list (maintenance or a temporary error). Nothing was changed; sync again later.`);
+      }
       pageSize ??= rows.length;
       if (page === 1) pages = pagerLast(html);
       if (rows.length > 0 && rows.every((r) => seen.has(idOf(r)))) { complete = true; break; } // RSI repeats the last page
@@ -255,13 +260,18 @@ export async function sync(cmd, io, options = {}) {
       }
       await progress({ phase: name, done: page, total: pages && pages >= page ? pages : null });
       log(`${name} page ${page}: ${rows.length} entries, ${rows.length - unchangedOnPage} new/changed`);
-      if (rows.length === 0 || rows.length < pageSize) { complete = true; break; }
+      if (rows.length === 0 || rows.length < pageSize) {
+        // A short page before the pager's last page is a cut-off answer, not the end: keep what was read, mark nothing gone.
+        if (pages && page < pages) { log(`warning: RSI's ${name} page ${page} of ${pages} came back incomplete; nothing was marked as gone. Sync again later`); break; }
+        complete = true; break;
+      }
       if (!full && rows.length > 0 && unchangedOnPage === rows.length) break; // rest is cached
       page++;
     }
     if (full && complete) {
       const active = Object.values(store.entries).filter((e) => !e.goneSince).length;
-      if (name === 'hangar' && active >= 10 && seen.size < active / 2 && !flag('force')) {
+      // More than a fifth (and more than 5) of the pledges gone at once is more likely a page RSI cut short than real melts and applies.
+      if (name === 'hangar' && active >= 10 && active - seen.size > Math.max(5, active * 0.2) && !flag('force')) {
         const message = `RSI returned ${seen.size} of ${active} pledges. Overwrite anyway?`;
         const accepted = await io.confirmOverwrite?.({ current: seen.size, previous: active, message });
         if (!accepted && options.cancelled?.()) throw new SyncCancelled();
