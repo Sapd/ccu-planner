@@ -27,6 +27,7 @@ export function catalogCacheOk(doc) {
 export function shipSourcesOk(doc) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc) || !doc.ships || typeof doc.ships !== 'object' || Array.isArray(doc.ships)) return false;
   return Object.entries(doc.ships).every(([id, e]) => /^[1-9]\d*$/.test(id) && e && typeof e === 'object'
+    && ['checkedAt', 'failedAt'].every((k) => e[k] == null || (typeof e[k] === 'string' && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(e[k]) && Number.isFinite(Date.parse(e[k]))))
     && (e.url == null || shipImageUrl(e.url) === e.url) && (e.page == null || (typeof e.page === 'string' && shipPageUrl(new URL(e.page).pathname) === e.page)));
 }
 

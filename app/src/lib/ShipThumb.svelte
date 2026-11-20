@@ -1,5 +1,5 @@
 <script>
-  import { thumbSize, thumbFile, shipPicture } from './view/thumb.mjs';
+  import { thumbSize, thumbFile, shipPictures } from './view/thumb.mjs';
   import { backend } from './backend.js';
   import { ui } from './state.svelte.js';
 
@@ -8,16 +8,18 @@
   let { ship = null, size = 'xs', label = '' } = $props();
   const sz = $derived(thumbSize(size));
   // The local file ({ s, l } names under images/): the small one for xs/s/m, the large one for card and hero. A ship the picture sync has not
-  // reached shows the signed feed's picture (ui.feed.ships, filled as the feed's pictures arrive), so pictures are there before any sync.
-  const src = $derived(backend.imageSrc(thumbFile(shipPicture(ship, ui.feed.ships), sz)));
-  // The src that failed to load; a different picture gets a fresh chance.
-  let failedSrc = $state(null);
-  const showImage = $derived(!!src && failedSrc !== src);
+  // reached shows the signed feed's picture (ui.feed.ships, filled as the feed's pictures arrive), so pictures are there before any sync. Sample
+  // data has made-up ships whose ids are real ones: they get no feed pictures. A picture that fails to load hands over to the next one.
+  // The srcs that failed to load; a different picture gets a fresh chance.
+  let failed = $state([]);
+  const srcs = $derived(shipPictures(ship, ui.feed.ships, { sample: ui.sample }).map((p) => backend.imageSrc(thumbFile(p, sz))).filter(Boolean));
+  const src = $derived(srcs.find((s) => !failed.includes(s)) ?? null);
+  const showImage = $derived(!!src);
 </script>
 
 <span class="thumb {sz}" aria-hidden={showImage || label ? undefined : 'true'} role={!showImage && label ? 'img' : undefined} aria-label={!showImage && label ? label : undefined}>
   {#if showImage}
-    <img {src} alt={label} loading="lazy" decoding="async" onerror={() => { failedSrc = src; }} />
+    <img {src} alt={label} loading="lazy" decoding="async" onerror={() => { failed = [...failed, src]; }} />
   {:else}
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5 14.2 9l7.3 4.2v2.3L14.5 13.8l-.4 3.7 2.4 1.6v1.9L12 19.6 7.5 21v-1.9l2.4-1.6-.4-3.7-7 1.7v-2.3L9.8 9z" fill="currentColor"/></svg>
   {/if}

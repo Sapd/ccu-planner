@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { syncShipPictures, fetchShipList, shipPictureName, MIN_SHIPS, RETRY_AFTER_MS } from '../src/ship-pictures.mjs';
+import { syncShipPictures, fetchShipList, shipPictureName, sourcesNeedSave, MIN_SHIPS, RETRY_AFTER_MS, DATES_SAVE_MS } from '../src/ship-pictures.mjs';
 import { QUERIES } from '../src/sync/queries.mjs';
 
 const HOST = 'https://robertsspaceindustries.com';
@@ -137,7 +137,7 @@ test('three rate-limited ships in a row stop the run cleanly and the pictures so
 test('ships RSI no longer lists lose their picture and note', async () => {
   const first = await run({ n: MIN_SHIPS + 3 });
   const second = await run({ n: MIN_SHIPS, written: first.written, previous: first.r.sources });
-  assert.deepEqual(second.removed.sort(), ['ships/21.webp', 'ships/22.webp', 'ships/23.webp']);
+  assert.deepEqual(second.removed.sort(), ['ships/21.webp', 'ships/22.webp', 'ships/23.webp']); // 22 of 23 listed is a plausible full list
   assert.equal(second.r.sources.ships[22], undefined);
   assert.equal(second.r.ids.length, MIN_SHIPS);
 });
@@ -146,4 +146,53 @@ test('a failing listing throws before anything is changed (the caller publishes 
   const written = { 'ships/1.webp': Buffer.from('keep') };
   await assert.rejects(run({ written, list: () => res(500) }), /HTTP 500/);
   assert.deepEqual(Object.keys(written), ['ships/1.webp']);
+});
+
+test('a short listing (30 of 243) removes nothing and the feed still carries every cached picture', async () => {
+  const first = await run({ n: 243 });
+  assert.equal(first.r.ids.length, 243);
+  const second = await run({ n: 30, written: first.written, previous: first.r.sources });
+  assert.deepEqual(second.removed, []);
+  assert.equal(Object.keys(second.written).length, 243);
+  assert.equal(Object.keys(second.r.sources.ships).length, 243);
+  assert.equal(second.r.ids.length, 243, 'all cached pictures are published again');
+  // A plausible list (at least 80 % of what was known) does drop the ships that are gone.
+  const third = await run({ n: 200, written: first.written, previous: first.r.sources });
+  assert.equal(third.removed.length, 43);
+});
+
+test('the listing request is followed by a second of quiet before the first page', async () => {
+  const order = [];
+  const { fetch } = rsi({ n: MIN_SHIPS });
+  await syncShipPictures({ fetch: async (u, i) => { order.push(i.method === 'POST' ? 'list' : 'get'); return fetch(u, i); }, sleep: async (ms) => { order.push(`sleep${ms}`); }, resize: async (b) => b, writeImage: () => {}, exists: () => false, interval: 1000, log: () => {} });
+  assert.deepEqual(order.slice(0, 3), ['list', 'sleep1000', 'get']);
+});
+
+test('the recheck rotation moves on across runs when the notes are persisted, and a future failure date holds nothing back', async () => {
+  const first = await run({ n: MIN_SHIPS });
+  let persisted = first.r.sources;
+  const seen = new Set();
+  for (let day = 1; day <= 4; day++) {
+    const now = new Date(Date.parse('2026-11-20T10:00:00.000Z') + day * 86400000).toISOString();
+    const r = await run({ n: MIN_SHIPS, written: first.written, previous: persisted, recheck: 5, now });
+    for (const c of r.calls.filter((c) => /Ship-\d+$/.test(c.url))) seen.add(Number(/\d+$/.exec(c.url)[0]));
+    persisted = r.r.sources;
+  }
+  assert.equal(seen.size, MIN_SHIPS, 'every ship was looked at within four days');
+  const future = structuredClone(first.r.sources);
+  future.ships[3] = { ...future.ships[3], failedAt: '2030-01-01T00:00:00.000Z' };
+  delete first.written['ships/3.webp'];
+  const r = await run({ n: MIN_SHIPS, written: first.written, previous: future });
+  assert.equal(r.r.ids.includes(3), true);
+});
+
+test('sourcesNeedSave: a changed address or dates older than the save interval make the cache worth saving, fresh dates alone do not', () => {
+  const doc = (url, at) => ({ ships: { 1: { url, checkedAt: at } } });
+  const T = Date.parse('2026-11-20T10:00:00.000Z');
+  const at = (ms) => new Date(T - ms).toISOString();
+  assert.equal(sourcesNeedSave(doc('u', at(3600000)), doc('u', at(0)), T), false);
+  assert.equal(sourcesNeedSave(doc('u', at(DATES_SAVE_MS + 1000)), doc('u', at(0)), T), true);
+  assert.equal(sourcesNeedSave(doc('u', at(1000)), doc('v', at(0)), T), true);
+  assert.equal(sourcesNeedSave(null, doc('u', at(0)), T), true);
+  assert.equal(sourcesNeedSave(doc('u', at(-86400000)), doc('u', at(0)), T), true, 'a date in the future is stale');
 });

@@ -480,16 +480,26 @@ test('the restored cache keeps ship pictures up to 640 px and ship notes that na
   fs.writeFileSync(path.join(folder, '2.webp'), await webpOf(641, 360));
   fs.writeFileSync(path.join(folder, '3.webp'), Buffer.from('<html></html>'));
   fs.writeFileSync(path.join(folder, 'x.webp'), await webpOf(8, 8));
-  const good = { ships: { 1: { page: 'https://robertsspaceindustries.com/en/pledge/ships/a/B', url: 'https://robertsspaceindustries.com/media/abc/source.jpg', checkedAt: 'T' } } };
+  const good = { ships: { 1: { page: 'https://robertsspaceindustries.com/en/pledge/ships/a/B', url: 'https://robertsspaceindustries.com/media/abc/source.jpg', checkedAt: '2026-11-20T10:00:00.000Z' } } };
   fs.writeFileSync(path.join(cache, 'ship-sources.json'), JSON.stringify(good));
   const r = await sanitizeFeedCache({ cacheDir: cache, sharp });
   assert.deepEqual(r.removed.map((n) => path.basename(n)).sort(), ['2.webp', '3.webp', 'x.webp']);
   assert.deepEqual(fs.readdirSync(folder), ['1.webp']);
   assert.deepEqual(r.shipSources, good);
-  for (const bad of [{ ships: { 1: { url: 'https://evil.test/a.jpg' } } }, { ships: { 1: { page: 'https://evil.test/en/pledge/ships/a/B' } } }, { ships: { abc: {} } }, { ships: [] }, [], { ships: { 1: { page: 'not a url' } } }]) {
+  for (const bad of [{ ships: { 1: { url: 'https://evil.test/a.jpg' } } }, { ships: { 1: { page: 'https://evil.test/en/pledge/ships/a/B' } } }, { ships: { abc: {} } }, { ships: [] }, [], { ships: { 1: { page: 'not a url' } } }, { ships: { 1: { failedAt: 'tomorrow' } } }, { ships: { 1: { checkedAt: 5 } } }]) {
     fs.writeFileSync(path.join(cache, 'ship-sources.json'), JSON.stringify(bad));
     const again = await sanitizeFeedCache({ cacheDir: cache, sharp });
     assert.equal(again.shipSources, null, JSON.stringify(bad));
     assert.equal(fs.existsSync(path.join(cache, 'ship-sources.json')), false);
   }
+});
+
+test('buildFeed never signs a ship picture over the per-file cap', () => {
+  const images = tmp();
+  fs.mkdirSync(path.join(images, 'ships'), { recursive: true });
+  const big = webp('x'); const body = Buffer.concat([big.subarray(0, big.length), Buffer.alloc(4 * 1024 * 1024)]);
+  body.writeUInt32LE(body.length - 8, 4);
+  fs.writeFileSync(path.join(images, 'ships', '4.webp'), body);
+  const r = buildFeed({ outDir: path.join(tmp(), 'o'), privateKey: KEY.priv, publicKey: KEY.pub, events: { events: [] }, imagesDir: images, shipIds: [4] });
+  assert.deepEqual([r.ships, r.rejectedImages], [0, ['ships/4.webp']]);
 });

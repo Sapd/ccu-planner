@@ -22,6 +22,25 @@ export const RECHECK_PER_RUN = 5;
 export const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
 /** A listing with fewer ships than this is not believed (RSI has about 250). */
 export const MIN_SHIPS = 20;
+/** Cached pictures of ships missing from the listing are dropped only when the listing has at least this share of the ships known before. */
+export const PLAUSIBLE_LISTING = 0.8;
+/** The notes (checked/failed dates) are saved to the cache at least this often, though no picture changed (see sourcesNeedSave). */
+export const DATES_SAVE_MS = 20 * 60 * 60 * 1000;
+
+const stampMs = (v) => { const t = Date.parse(v ?? ''); return Number.isFinite(t) ? t : -Infinity; };
+
+/** The newest checkedAt/failedAt in a ship-sources document (ms), or -Infinity. */
+export const newestNote = (sources) => Object.values(sources?.ships ?? {}).reduce((m, e) => Math.max(m, stampMs(e?.checkedAt), stampMs(e?.failedAt)), -Infinity);
+
+/**
+ * Whether the working notes are worth saving to the CI cache: a picture address was added, changed or dropped, or the dates the cache holds
+ * are older than DATES_SAVE_MS (so the "least recently checked" rotation and the failure back-off persist, about once a day).
+ */
+export function sourcesNeedSave(persisted, current, nowMs) {
+  const key = (d) => JSON.stringify(Object.entries(d?.ships ?? {}).map(([id, e]) => [id, e.url ?? null]));
+  const newest = newestNote(persisted); // a date in the future (a damaged cache) counts as stale too
+  return key(persisted) !== key(current) || !(nowMs - newest >= 0 && nowMs - newest <= DATES_SAVE_MS);
+}
 
 const IMAGE_TYPE = /^image\/(jpeg|png|webp|avif|gif)\s*(;|$)/i;
 const same = (u) => new URL(u).origin === ORIGIN;
@@ -78,11 +97,13 @@ async function fetchPicture(url, ctx) {
 export async function syncShipPictures({ previous = null, fetch, sleep, resize, writeImage, exists = () => true, listImages = () => [], removeImage = () => {}, now = () => new Date().toISOString(), save = () => {}, cancelled = () => false, interval = 1000, imageInterval = 300, recheck = RECHECK_PER_RUN, log = () => {} }) {
   const ctx = { fetch, sleep, interval, log };
   const ships = await fetchShipList(ctx);
+  await sleep(interval); // the listing is a request too: a second before the first page
   const sources = { ships: { ...(previous?.ships ?? {}) } };
   const at = now();
   const nowMs = Date.parse(at);
   const has = (s) => exists(shipPictureName(s.id)) && sources.ships[s.id]?.url;
-  const waiting = (s) => { const f = Date.parse(sources.ships[s.id]?.failedAt ?? ''); return Number.isFinite(f) && nowMs - f < RETRY_AFTER_MS; };
+  // A failure date in the future (a damaged cache) never holds a ship back.
+  const waiting = (s) => { const f = Date.parse(sources.ships[s.id]?.failedAt ?? ''); return Number.isFinite(f) && f <= nowMs && nowMs - f < RETRY_AFTER_MS; };
   const fresh = ships.filter((s) => s.page && !has(s) && !waiting(s));
   const known = ships.filter((s) => s.page && has(s) && !waiting(s))
     .sort((a, b) => String(sources.ships[a.id].checkedAt ?? '').localeCompare(String(sources.ships[b.id].checkedAt ?? '')))
@@ -124,15 +145,18 @@ export async function syncShipPictures({ previous = null, fetch, sleep, resize, 
     if (limited >= STOP_AFTER_RATE_LIMITED) { log('RSI is rate-limiting; stopped, the rest follows next run'); stopped = true; break; }
     if (n < todo.length - 1) await sleep(interval);
   }
-  // Pictures and notes of ships RSI no longer lists go away (the list was believable, see fetchShipList).
+  // Pictures and notes of ships RSI no longer lists go away, but only when the listing is a plausible full one: a short answer (a proxy, a partial
+  // page) must never empty the cache. Otherwise the cached pictures stay and are published as they are.
   const listed = new Set(ships.map((s) => s.id));
+  const cachedIds = new Set(listImages().map((n) => /^ships\/(\d+)\.webp$/.exec(n)?.[1]).filter(Boolean).map(Number));
+  const everKnown = new Set([...Object.keys(previous?.ships ?? {}).map(Number), ...cachedIds]);
+  const plausible = everKnown.size === 0 || listed.size >= PLAUSIBLE_LISTING * everKnown.size;
   let removed = 0;
-  for (const name of listImages()) {
-    const m = /^ships\/(\d+)\.webp$/.exec(name);
-    if (m && !listed.has(Number(m[1]))) { removeImage(name); removed++; }
-  }
-  for (const id of Object.keys(sources.ships)) if (!listed.has(Number(id))) { delete sources.ships[id]; }
+  if (plausible) {
+    for (const id of cachedIds) if (!listed.has(id)) { removeImage(shipPictureName(id)); removed++; }
+    for (const id of Object.keys(sources.ships)) if (!listed.has(Number(id))) delete sources.ships[id];
+  } else log(`ship list has ${listed.size} of ${everKnown.size} known ships: keeping the cached pictures of the others`);
   save(sources);
-  const ids = ships.filter((s) => exists(shipPictureName(s.id))).map((s) => s.id);
+  const ids = [...new Set([...ships.map((s) => s.id), ...(plausible ? [] : cachedIds)])].filter((id) => exists(shipPictureName(id)));
   return { ids, ships: ships.length, fetched, failed, downloaded, removed, stopped, sources };
 }

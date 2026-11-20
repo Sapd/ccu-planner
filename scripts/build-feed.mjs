@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { buildFeed } from '../src/feed-build.mjs';
-import { syncShipPictures, SHIP_PICTURE_MAX, SHIP_PICTURE_QUALITY } from '../src/ship-pictures.mjs';
+import { syncShipPictures, sourcesNeedSave, SHIP_PICTURE_MAX, SHIP_PICTURE_QUALITY } from '../src/ship-pictures.mjs';
 import { syncCatalog } from '../src/catalog-sync.mjs';
 import { sanitizeFeedCache } from '../src/feed-cache.mjs';
 import { isWebp } from '../src/logic/feed.mjs';
@@ -83,7 +83,7 @@ if (wantCatalog || wantShips) {
   }
   if (wantShips) {
     const started = Date.now();
-    let lastSources = JSON.stringify(Object.entries(checked.shipSources?.ships ?? {}).map(([id, e]) => [id, e.url ?? null]));
+    const persisted = checked.shipSources; // what the restored cache holds: the comparison point for the whole run
     const resize = (buf) => sharp(buf, { limitInputPixels: 100e6 }).rotate().resize({ width: SHIP_PICTURE_MAX, height: SHIP_PICTURE_MAX, fit: 'inside', withoutEnlargement: true }).webp({ quality: SHIP_PICTURE_QUALITY }).toBuffer();
     try {
       const r = await syncShipPictures({
@@ -91,9 +91,8 @@ if (wantCatalog || wantShips) {
         writeImage: (name, bytes) => { cacheChanged = true; writeAtomic(path.join(imagesDir, name), bytes); }, exists, listImages: () => listIn('ships'),
         removeImage: (name) => { cacheChanged = true; fs.rmSync(path.join(imagesDir, name), { force: true }); },
         save: (sources) => {
-          // Only a new or different picture address makes the cache worth saving again (a page looked at once more changes a date, nothing else).
-          const key = JSON.stringify(Object.entries(sources.ships).map(([id, e]) => [id, e.url ?? null]));
-          if (key !== lastSources) { cacheChanged = true; lastSources = key; }
+          // A new or different picture address, or dates in the cache older than a day, make the cache worth saving (so the recheck rotation persists).
+          if (sourcesNeedSave(persisted, sources, Date.now())) cacheChanged = true;
           writeAtomic(shipSourcesFile, JSON.stringify(sources, null, 2));
         },
         log: console.log,

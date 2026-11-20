@@ -43,3 +43,11 @@ test('shipPicture: the picture sync wins, the feed fills in, a ship without eith
   assert.equal(shipPicture({ id: 7, image: null }), null);
   assert.equal(thumbFile(shipPicture({ id: 7, image: null }, feed), 'hero'), 'feed/ships/7.webp');
 });
+
+test('shipPictures: sample data gets no feed pictures; the feed picture is the fallback when the sync picture fails to load', async () => {
+  const { shipPictures } = await import('../../app/src/lib/view/thumb.mjs');
+  const feed = { 1: 'feed/ships/1.webp' };
+  assert.deepEqual(shipPictures({ id: 1, name: 'Alpha', image: null }, feed, { sample: true }), []);
+  assert.deepEqual(shipPictures({ id: 1, name: 'Alpha', image: null }, feed, { sample: false }), [{ s: 'feed/ships/1.webp', l: 'feed/ships/1.webp' }]);
+  assert.deepEqual(shipPictures({ id: 1, image: { s: '1-s.webp', l: '1-l.webp' } }, feed).map((p) => p.s), ['1-s.webp', 'feed/ships/1.webp']);
+});

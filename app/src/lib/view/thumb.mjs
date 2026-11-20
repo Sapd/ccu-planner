@@ -23,7 +23,15 @@ export const thumbFile = (image, size) => (size === 'hero' || size === 'card' ? 
  * @param {Record<string, string>} feedShips feedShipFiles() of the feed cache
  */
 export function shipPicture(ship, feedShips = {}) {
-  if (ship?.image) return ship.image;
-  const file = ship?.id != null ? feedShips?.[ship.id] : null;
-  return file ? { s: file, l: file } : null;
+  return shipPictures(ship, feedShips)[0] ?? null;
+}
+
+/** Every picture a ship may show, best first: the picture sync's, then the feed's (the next one is tried when a file fails to load). */
+export function shipPictures(ship, feedShips = {}, { sample = false } = {}) {
+  const out = [];
+  if (ship?.image) out.push(ship.image);
+  // Sample data has made-up ships with real-looking ids: the feed's pictures belong to the real ones.
+  const file = !sample && ship?.id != null ? feedShips?.[ship.id] : null;
+  if (file) out.push({ s: file, l: file });
+  return out;
 }
