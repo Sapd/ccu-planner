@@ -8,6 +8,11 @@ import { CATALOG_PATH } from './catalog-query.mjs';
 import { fetchItems, assessCatalog, catalogDoc, signedInWarning, shortListings } from './catalog-fetch.mjs';
 import { readCatalog } from '../logic/store-catalog.mjs';
 
+// RSI's upgrade GraphQL answers at most 5 operations per request ("Maximum subquery limit of 5 reached").
+// Requests are spaced 1 s apart by the transport, so sending 5 per request makes the long phases about 5x faster.
+export const RSI_MAX_OPS = 5;
+const chunks = (list, n) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n));
+
 export class SyncCancelled extends Error { constructor() { super('Sync cancelled; progress saved'); } }
 export async function sync(cmd, io, options = {}) {
   const { readJson, writeJson, appendLine, log = () => {}, progress = () => {} } = io;
@@ -26,6 +31,7 @@ export async function sync(cmd, io, options = {}) {
       const data = await request({ method: 'POST', path: '/pledge-store/api/upgrade/v2/graphql', body: ops.map(({ operationName, variables = {} }) => ({ operationName, variables, query: QUERIES[operationName] })) });
       const errors = data.flatMap((d) => d.errors ?? []);
       if (errors.length) throw new Error(`GraphQL errors: ${JSON.stringify(errors).slice(0, 500)}`);
+      if (!Array.isArray(data) || data.length !== ops.length) throw new Error(`RSI answered ${Array.isArray(data) ? data.length : 'no list'} of ${ops.length} queries`);
       return data.map((d) => d.data);
     },
   };
@@ -78,36 +84,40 @@ export async function sync(cmd, io, options = {}) {
       log(message);
       await progress({ phase: 'upgrades', done: resume, total: sources.length, message });
     }
-    for (const [i, fromId] of sources.entries()) {
-      if (i < resume) continue;
-      const [d] = await client.upgrade({ operationName: 'filterShips', variables: { fromId, fromFilters: [], toFilters: [] } });
-      const targets = d.to.ships.map((t) => ({
-        toId: t.id,
-        toName: names.get(t.id) ?? null,
-        skus: t.skus.map((s) => ({ ...s, upgradeUsdCents: toUsdCents(s.upgradePrice) })),
-      }));
-      pairs += targets.length;
-      const file = join('upgrades', `${fromId}.json`);
-      const next = { fetchedAt: now, fromId, fromName: names.get(fromId) ?? null, pricing: catalog.app.pricing, targets };
-      // Offer history: SKUs that appeared, disappeared or changed price since the last sync.
-      const eventStart = events.length;
-      const prevFile = await readJson(file, null);
-      if (prevFile) {
-        const before = offerMap(prevFile);
-        const after = offerMap(next);
-        for (const [k, o] of after) {
-          const p = before.get(k);
-          if (!p) events.push({ at: now, event: 'appeared', fromId, ...o, since: prevFile.fetchedAt });
-          else if (p.cash !== o.cash) events.push({ at: now, event: 'repriced', fromId, ...o, prevCash: p.cash });
+    let i = resume - 1;
+    for (const batch of chunks(sources.slice(resume), RSI_MAX_OPS)) {
+      const answers = await client.upgrade(...batch.map((fromId) => ({ operationName: 'filterShips', variables: { fromId, fromFilters: [], toFilters: [] } })));
+      for (const [j, fromId] of batch.entries()) {
+        i++;
+        const d = answers[j];
+        const targets = d.to.ships.map((t) => ({
+          toId: t.id,
+          toName: names.get(t.id) ?? null,
+          skus: t.skus.map((s) => ({ ...s, upgradeUsdCents: toUsdCents(s.upgradePrice) })),
+        }));
+        pairs += targets.length;
+        const file = join('upgrades', `${fromId}.json`);
+        const next = { fetchedAt: now, fromId, fromName: names.get(fromId) ?? null, pricing: catalog.app.pricing, targets };
+        // Offer history: SKUs that appeared, disappeared or changed price since the last sync.
+        const eventStart = events.length;
+        const prevFile = await readJson(file, null);
+        if (prevFile) {
+          const before = offerMap(prevFile);
+          const after = offerMap(next);
+          for (const [k, o] of after) {
+            const p = before.get(k);
+            if (!p) events.push({ at: now, event: 'appeared', fromId, ...o, since: prevFile.fetchedAt });
+            else if (p.cash !== o.cash) events.push({ at: now, event: 'repriced', fromId, ...o, prevCash: p.cash });
+          }
+          for (const [k, p] of before) if (!after.has(k)) events.push({ at: now, event: 'disappeared', fromId, ...p, lastSeen: prevFile.fetchedAt });
         }
-        for (const [k, p] of before) if (!after.has(k)) events.push({ at: now, event: 'disappeared', fromId, ...p, lastSeen: prevFile.fetchedAt });
+        await writeJson(file, next);
+        if (events.length > eventStart) await appendLine('offer-history.jsonl', events.slice(eventStart).map((e) => JSON.stringify(e)).join('\n'));
+        pendingAppeared.push(...events.slice(eventStart).filter((e) => e.event === 'appeared'));
+        await writeJson('sync-state.json', { key, lastFinished: fromId, startedAt, pendingAppeared });
+        await progress({ phase: 'upgrades', done: i + 1, total: sources.length });
+        log(`upgrades ${i + 1}/${sources.length}: ${names.get(fromId) ?? fromId} -> ${targets.length} targets`);
       }
-      await writeJson(file, next);
-      if (events.length > eventStart) await appendLine('offer-history.jsonl', events.slice(eventStart).map((e) => JSON.stringify(e)).join('\n'));
-      pendingAppeared.push(...events.slice(eventStart).filter((e) => e.event === 'appeared'));
-      await writeJson('sync-state.json', { key, lastFinished: fromId, startedAt, pendingAppeared });
-      await progress({ phase: 'upgrades', done: i + 1, total: sources.length });
-      log(`upgrades ${i + 1}/${sources.length}: ${names.get(fromId) ?? fromId} -> ${targets.length} targets`);
     }
     const count = (e) => events.filter((x) => x.event === e).length;
     log(`upgrades: ${sources.length} source ships, ${pairs} pairs · offers appeared ${count('appeared')}, disappeared ${count('disappeared')}, repriced ${count('repriced')}`);
@@ -142,12 +152,17 @@ export async function sync(cmd, io, options = {}) {
     if (!only && opt('limit')) targets = targets.slice(0, Number(opt('limit')));
     const file = join('ship-details.json');
     const store = only ? await readJson(file, { details: {} }) : { details: {} };
-    for (const [i, id] of targets.entries()) {
-      const [d] = await client.upgrade({ operationName: 'getShipDetails', variables: { id, fromShipId: fromFor.get(id) } });
-      store.details[id] = { probedFrom: fromFor.get(id), fetchedAt: new Date().toISOString(), skus: d.ship?.skus ?? [] };
-      await writeJson(file, { fetchedAt: new Date().toISOString(), details: store.details });
-      await progress({ phase: 'details', done: i + 1, total: targets.length });
-      if ((i + 1) % 20 === 0) log(`details ${i + 1}/${targets.length}`);
+    let i = -1;
+    for (const batch of chunks(targets, RSI_MAX_OPS)) {
+      const answers = await client.upgrade(...batch.map((id) => ({ operationName: 'getShipDetails', variables: { id, fromShipId: fromFor.get(id) } })));
+      for (const [j, id] of batch.entries()) {
+        i++;
+        const d = answers[j];
+        store.details[id] = { probedFrom: fromFor.get(id), fetchedAt: new Date().toISOString(), skus: d.ship?.skus ?? [] };
+        await writeJson(file, { fetchedAt: new Date().toISOString(), details: store.details });
+        await progress({ phase: 'details', done: i + 1, total: targets.length });
+        if ((i + 1) % 20 === 0) log(`details ${i + 1}/${targets.length}`);
+      }
     }
     await writeJson(file, { fetchedAt: new Date().toISOString(), details: store.details });
     log(`details: ${targets.length} ship(s) fetched`);

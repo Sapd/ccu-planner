@@ -139,7 +139,9 @@ pub fn validate_request(method: &str, path: &str, body: &Option<Value>) -> Resul
         .map_err(|e| e.to_string())?;
     if method == "POST" && path == GQL {
         if let Some(ops) = body.as_ref().and_then(Value::as_array) {
+            // At most 5 operations: RSI's own per-request limit ("Maximum subquery limit of 5 reached").
             if !ops.is_empty()
+                && ops.len() <= 5
                 && ops.iter().all(|op| {
                     let name = op
                         .get("operationName")
@@ -669,6 +671,12 @@ mod tests {
             )
             .is_ok());
         }
+        // Batches of up to 5 pinned queries (RSI's own limit) are allowed; 6 are refused.
+        let op = json!({"operationName":"filterShips","query":queries["filterShips"],"variables":{"fromId":1}});
+        let batch = |n: usize| Some(Value::Array(vec![op.clone(); n]));
+        assert!(validate_request("POST", GQL, &batch(5)).is_ok());
+        assert!(validate_request("POST", GQL, &batch(6)).is_err());
+        assert!(validate_request("POST", GQL, &batch(0)).is_err());
         assert!(validate_request("GET", PROBE, &None).is_ok());
         assert!(validate_request("POST", CONTEXT, &Some(context_body())).is_ok());
         assert!(validate_request("POST", CONTEXT, &Some(json!({"pledgeId":123}))).is_err());

@@ -20,15 +20,18 @@ function memory(initial = {}, request = async () => '') {
     progress: (e) => events.push(e), log: (l) => logs.push(l),
   };
 }
-function storeRequest(seen, onSource = () => {}) {
+// Answers every query of a (batched) request in order, like RSI; sources = the ship ids filterShips lists.
+function storeRequest(seen, onSource = () => {}, sources = [1, 2, 3], sent = []) {
   return async ({ method, path, body }) => {
     validateRequest(method, path, body);
-    const op = body[0];
-    if (op.operationName === 'initShipUpgrade') return [{ data: { ...fixture.catalog, app: { pricing: { currencyCode: 'USD', taxRate: 0 } } } }];
-    if (op.operationName === 'getShipDetails') return [{ data: { ship: { skus: fixture.details.details[op.variables.id]?.skus ?? [] } } }];
-    if (!op.variables.fromId) return [{ data: { from: { ships: [{ id: 1 }, { id: 2 }, { id: 3 }] } } }];
-    const id = op.variables.fromId; seen.push(id); onSource(id);
-    return [{ data: { to: { ships: [{ id: 3, skus: [{ id: 5002, available: true, upgradePrice: 2000 }] }] } } }];
+    sent.push(body.map((op) => op.operationName));
+    return body.map((op) => {
+      if (op.operationName === 'initShipUpgrade') return { data: { ...fixture.catalog, app: { pricing: { currencyCode: 'USD', taxRate: 0 } } } };
+      if (op.operationName === 'getShipDetails') return { data: { ship: { skus: fixture.details.details[op.variables.id]?.skus ?? [] } } };
+      if (!op.variables.fromId) return { data: { from: { ships: sources.map((id) => ({ id })) } } };
+      const id = op.variables.fromId; seen.push(id); onSource(id);
+      return { data: { to: { ships: [{ id: 3, skus: [{ id: 5002, available: true, upgradePrice: 2000 }] }] } } };
+    });
   };
 }
 
@@ -40,24 +43,59 @@ test('JS transport refuses purchase/melt/gift/apply/redeem/cart and substituted 
     assert.throws(() => validateRequest('POST', '/pledge-store/api/upgrade/v2/graphql', [{ operationName, query: 'mutation { buy }' }]));
   }
   for (const [operationName, query] of Object.entries(QUERIES)) validateRequest('POST', '/pledge-store/api/upgrade/v2/graphql', [{ operationName, query }]);
+  const op = { operationName: 'filterShips', query: QUERIES.filterShips, variables: { fromId: 1 } };
+  validateRequest('POST', '/pledge-store/api/upgrade/v2/graphql', Array(5).fill(op));
+  assert.throws(() => validateRequest('POST', '/pledge-store/api/upgrade/v2/graphql', Array(6).fill(op)), /not allowlisted/);
   assert.throws(() => validateRequest('POST', '/api/ship-upgrades/setContextToken', { pledgeId: 1 }));
 });
 
 test('cancelled store sync resumes after last finished source, persists history, details and Warbond prices', async () => {
+  // Six sources: the cancel during the first batch of five takes effect before the next request.
+  const sources = [1, 2, 3, 4, 5, 6];
   let cancelled = false;
   const seen = [];
-  const io = memory({ 'upgrades/1.json': { fetchedAt: '2026-01-01', fromId: 1, targets: [] } }, storeRequest(seen, () => cancelled = true));
+  const io = memory({ 'upgrades/1.json': { fetchedAt: '2026-01-01', fromId: 1, targets: [] } }, storeRequest(seen, () => cancelled = true, sources));
   await assert.rejects(sync('upgrades', io, { cancelled: () => cancelled }), /cancelled/);
-  assert.deepEqual(seen, [1]);
-  assert.equal(io.files['sync-state.json'].lastFinished, 1);
+  assert.deepEqual(seen, [1, 2, 3, 4, 5]);
+  assert.equal(io.files['sync-state.json'].lastFinished, 5);
   assert.match(io.files['offer-history.jsonl'], /appeared/);
-  io.request = storeRequest(seen);
+  io.request = storeRequest(seen, () => {}, sources);
   await sync('upgrades', io);
-  assert.deepEqual(seen, [1, 2, 3]);
+  assert.deepEqual(seen, sources);
   assert.equal(io.files['sync-state.json'], null);
   assert.equal(io.files['warbond-prices.json'].pairs['1-3'].cash, 2000);
   assert.equal(io.files['offer-history.jsonl'].trim().split('\n').length, 1);
-  assert.ok(io.events.some((e) => e.phase === 'upgrades' && e.done === 3 && e.total === 3));
+  assert.ok(io.events.some((e) => e.phase === 'upgrades' && e.done === 6 && e.total === 6));
+});
+
+test('the store sync asks for 5 ships per request (the RSI limit); a cancel mid-way resumes after the last finished batch', async () => {
+  const sources = Array.from({ length: 12 }, (_, i) => i + 1);
+  const seen = [], sent = [];
+  let cancelled = false;
+  const io = memory({}, storeRequest(seen, (id) => { if (id === 7) cancelled = true; }, sources, sent));
+  await assert.rejects(sync('upgrades', io, { cancelled: () => cancelled }), /cancelled/);
+  const batches = sent.filter((names) => names[0] === 'filterShips').slice(1); // the first one lists the sources
+  assert.deepEqual(batches.map((b) => b.length), [5, 5]);
+  assert.equal(io.files['sync-state.json'].lastFinished, 10, 'the whole second batch was saved before the cancel took effect');
+  assert.deepEqual(io.events.filter((e) => e.phase === 'upgrades').map((e) => e.done), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  cancelled = false; sent.length = 0;
+  io.request = storeRequest(seen, () => {}, sources, sent);
+  await sync('upgrades', io);
+  assert.deepEqual(sent.filter((names) => names[0] === 'filterShips').slice(1).map((b) => b.length), [2]);
+  assert.deepEqual(seen, sources);
+  assert.equal(io.files['upgrades/12.json'].fromId, 12);
+  assert.ok(sent.every((names) => names.length <= 5));
+});
+
+test('a batched answer with a missing result is an error, not a silent gap', async () => {
+  const io = memory({}, async ({ method, path, body }) => {
+    validateRequest(method, path, body);
+    if (body[0].operationName === 'initShipUpgrade') return [{ data: { ...fixture.catalog, app: { pricing: { currencyCode: 'USD', taxRate: 0 } } } }];
+    if (!body[0].variables.fromId) return [{ data: { from: { ships: [{ id: 1 }, { id: 2 }] } } }];
+    return [{ data: { to: { ships: [] } } }]; // one answer for two queries
+  });
+  await assert.rejects(sync('upgrades', io), /answered 1 of 2 queries/);
+  assert.equal(io.files['upgrades/1.json'], undefined);
 });
 
 test('--full ignores resume state; changed source lists safely restart', async () => {
