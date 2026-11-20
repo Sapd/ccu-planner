@@ -8,10 +8,18 @@ test('SECTIONS and ADVANCED are the agreed lists', () => {
 });
 
 test('heroSource prefers the large picture, then the small one, then initials', () => {
-  assert.deepEqual(heroSource({ image: { s: '1-s.webp', l: '1-l.webp' }, manufacturer: 'Aegis Dynamics' }), { kind: 'image', file: '1-l.webp' });
-  assert.deepEqual(heroSource({ image: { s: '1-s.webp' }, manufacturer: 'Aegis Dynamics' }), { kind: 'image', file: '1-s.webp' });
+  assert.deepEqual(heroSource({ image: { s: '1-s.webp', l: '1-l.webp' }, manufacturer: 'Aegis Dynamics' }), { kind: 'image', file: '1-l.webp', files: ['1-l.webp'] });
+  assert.deepEqual(heroSource({ image: { s: '1-s.webp' }, manufacturer: 'Aegis Dynamics' }), { kind: 'image', file: '1-s.webp', files: ['1-s.webp'] });
   assert.deepEqual(heroSource({ image: null, manufacturer: 'Aegis Dynamics' }), { kind: 'initials', text: 'AD' });
   assert.deepEqual(heroSource(null), { kind: 'initials', text: '?' });
+});
+
+test('heroSource uses the feed picture before any picture sync, and after a synced one fails', () => {
+  const feed = { 7: 'feed/ships/7.webp' };
+  assert.deepEqual(heroSource({ id: 7, image: null, manufacturer: 'Anvil Aerospace' }, feed), { kind: 'image', file: 'feed/ships/7.webp', files: ['feed/ships/7.webp'] });
+  assert.deepEqual(heroSource({ id: 7, image: { s: '7-s.webp', l: '7-l.webp' } }, feed).files, ['7-l.webp', 'feed/ships/7.webp']);
+  // Sample data's made-up ships do not get the real ships' feed pictures.
+  assert.deepEqual(heroSource({ id: 7, image: null, manufacturer: 'Anvil Aerospace' }, feed, { sample: true }), { kind: 'initials', text: 'AA' });
 });
 
 test('every section and Advanced page has a title and one plain purpose sentence; every Advanced item has a hint', () => {

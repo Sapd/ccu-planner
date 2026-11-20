@@ -1,5 +1,5 @@
 <script>
-  import { onboardingSteps, ONBOARDING_TITLE } from './view/onboarding.mjs';
+  import { onboardingSteps, syncProgressView, ONBOARDING_TITLE } from './view/onboarding.mjs';
   import { ui, enterSample, goSection } from './state.svelte.js';
   import { login, syncFirstRun } from './sync-actions.svelte.js';
   import CcuGameRow from './CcuGameRow.svelte';
@@ -9,6 +9,8 @@
   let { app = null, welcome = false } = $props();
   const steps = $derived(onboardingSteps({ session: ui.session, app }));
   const busy = $derived(ui.syncBusy || ui.signingIn || ui.switching);
+  // While a sync runs, the goal step waits for it and shows how far it is instead of its button.
+  const progress = $derived(ui.syncBusy ? syncProgressView(ui.syncProgress) : null);
   const act = {
     signin: () => login(),
     sync: () => syncFirstRun(app),
@@ -32,8 +34,14 @@
         <div class="body">
           <p class="title"><b>{step.title}</b>{#if step.note}<span class="note"><span class="sep" aria-hidden="true">·</span>{step.note}</span>{/if}</p>
           {#if step.text}<p class="text">{step.text}</p>{/if}
+          {#if step.key === 'goal' && progress}
+            <div class="progress" role="status" data-sync-progress>
+              <p class="text">Wait: {progress.text}</p>
+              {#if progress.max}<progress value={progress.value} max={progress.max}></progress>{:else}<progress></progress>{/if}
+            </div>
+          {/if}
         </div>
-        {#if hasButton(step)}
+        {#if hasButton(step) && !(step.key === 'goal' && progress)}
           <button type="button" class:primary={step.next} disabled={busy || !ready(step)} onclick={act[step.key]}>{busy && step.key !== 'goal' ? 'Working…' : label[step.key]}</button>
         {/if}
       </li>
@@ -63,6 +71,9 @@
   .note { color: var(--muted); font-size: 13px; }
   .sep { margin: 0 0.5em; }
   .more { display: grid; gap: 12px; }
+  .progress { display: grid; gap: 6px; margin-top: 6px; }
+  .progress .text { margin: 0; color: var(--text, inherit); }
+  progress { width: 100%; height: 8px; accent-color: var(--accent); }
   .sample { margin: 0; }
   .link { background: none; border: 0; padding: 0; color: var(--link); text-decoration: underline; }
   .link:hover:not(:disabled) { background: none; }

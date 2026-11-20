@@ -309,3 +309,19 @@ test('store-catalog: a session answered with the public view is saved as public,
   await assert.rejects(sync('store-catalog', kept, {}), /signed-in sync/);
   assert.deepEqual(kept.files['store-catalog.json'], old);
 });
+
+test('hangar progress counts pages against the pager\u2019s last page', async () => {
+  const { pagerLast } = await import('../src/sync/core.mjs');
+  const pager = '<a href="?page=1&pagesize=10" class="trans-02s active">1</a><a href="?page=2&pagesize=10" class="trans-02s">2</a><a href="?page=2" class="gt btn">&gt;</a><a href="?page=36&pagesize=10" class="raquo btn">&raquo;</a>';
+  assert.equal(pagerLast(pager), 36);
+  assert.equal(pagerLast('<a href="?page=1">1</a><a href="?page=4">4</a>'), 4);
+  assert.equal(pagerLast('<p>no pager</p>'), null);
+  const row = (id) => `<li><input class="js-pledge-id" value="${id}"><input class="js-pledge-name" value="P${id}"></li>`;
+  const page2 = '<a href="?page=2" class="raquo btn">»</a>';
+  const io = memory({}, async (r) => (r.path.includes('page=1&') ? row(1) + page2 : r.path.includes('page=2&') ? row(2) + page2 : ''));
+  await sync('hangar', io, { full: true });
+  const events = io.events;
+  const hangar = events.filter((e) => e.phase === 'hangar');
+  assert.ok(hangar.length >= 2, JSON.stringify(events));
+  assert.deepEqual(hangar.slice(0, 2).map((e) => [e.done, e.total]), [[1, 2], [2, 2]]);
+});

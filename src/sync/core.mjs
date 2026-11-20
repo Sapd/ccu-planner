@@ -14,6 +14,12 @@ import { hasSigninForm, isAccessDenied } from './signin.mjs';
 export const RSI_MAX_OPS = 5;
 const chunks = (list, n) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n));
 
+/** The last page number in RSI's pager (its "»" link, else the highest page link); null without a pager. */
+export function pagerLast(html) {
+  const pages = [...String(html).matchAll(/<a\b[^>]*>/gi)].map((m) => ({ tag: m[0], page: Number(m[0].match(/href="[^"]*[?&]page=(\d+)/)?.[1]) })).filter((l) => l.page > 0);
+  const last = pages.find((l) => /class="[^"]*\braquo\b/.test(l.tag));
+  return last ? last.page : pages.length ? Math.max(...pages.map((l) => l.page)) : null;
+}
 export class SyncCancelled extends Error { constructor() { super('Sync cancelled; progress saved'); } }
 export async function sync(cmd, io, options = {}) {
   const { readJson, writeJson, appendLine, log = () => {}, progress = () => {} } = io;
@@ -228,9 +234,12 @@ export async function sync(cmd, io, options = {}) {
     // RSI may ignore the requested pagesize (it returns 10), so the real page
     // size is whatever page 1 returned.
     let pageSize = null;
+    let pages = null; // from page 1's pager, so progress can say "page 3 of 36"
     for (;;) {
-      const rows = parse(await client.getHtml(urlFor(page, pagesize)));
+      const html = await client.getHtml(urlFor(page, pagesize));
+      const rows = parse(html);
       pageSize ??= rows.length;
+      if (page === 1) pages = pagerLast(html);
       if (rows.length > 0 && rows.every((r) => seen.has(idOf(r)))) { complete = true; break; } // RSI repeats the last page
       let unchangedOnPage = 0;
       for (const r of rows) {
@@ -241,7 +250,7 @@ export async function sync(cmd, io, options = {}) {
         else changed++;
         fresh[id] = { data: r, firstSeen: prev?.firstSeen ?? new Date().toISOString(), lastSeen: new Date().toISOString() };
       }
-      await progress({ phase: name, done: page, total: null });
+      await progress({ phase: name, done: page, total: pages && pages >= page ? pages : null });
       log(`${name} page ${page}: ${rows.length} entries, ${rows.length - unchangedOnPage} new/changed`);
       if (rows.length === 0 || rows.length < pageSize) { complete = true; break; }
       if (!full && rows.length > 0 && unchangedOnPage === rows.length) break; // rest is cached

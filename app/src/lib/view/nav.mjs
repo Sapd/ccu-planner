@@ -1,15 +1,18 @@
 // Pure navigation helpers for the shell.
-import { initials } from './thumb.mjs';
+import { initials, shipPictures, thumbFile } from './thumb.mjs';
 import { whenText } from '../../../../src/logic/describe.mjs';
 
 export const SECTIONS = ['today', 'goals', 'hangar', 'store'];
 export const SECTION_LABEL = { today: 'Today', goals: 'Goals', hangar: 'Hangar', store: 'Store' };
 export const ADVANCED = [['graphs', 'Upgrade map'], ['explorer', 'Compare routes'], ['prices', 'Price assumptions']];
 
-/** What ShipHero draws: the large local picture, else the small one, else the manufacturer initials. */
-export function heroSource(ship) {
-  const file = ship?.image?.l ?? ship?.image?.s ?? null;
-  return file ? { kind: 'image', file } : { kind: 'initials', text: initials(ship?.manufacturer) };
+/**
+ * What ShipHero draws: the pictures to try in order (the picture sync's large one, else its small one, then the signed feed's),
+ * else the manufacturer initials. feedShips/sample as for shipPictures, so the banner has a picture before any picture sync.
+ */
+export function heroSource(ship, feedShips = {}, { sample = false } = {}) {
+  const files = shipPictures(ship, feedShips, { sample }).map((p) => thumbFile(p, 'hero')).filter(Boolean);
+  return files.length ? { kind: 'image', file: files[0], files } : { kind: 'initials', text: initials(ship?.manufacturer) };
 }
 
 /** One plain line under each Advanced menu item, so a newcomer knows what it is for. */

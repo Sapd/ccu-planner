@@ -32,3 +32,21 @@ export const storeIsFresh = (app, now = new Date()) => {
 
 /** What the first-run "Sync store and hangar" runs: the hangar alone when the store data is fresh. */
 export const syncKinds = (app, now = new Date()) => (storeIsFresh(app, now) ? ['hangar'] : ['upgrades', 'hangar']);
+
+const PHASE_TEXT = {
+  hangar: 'Loading your hangar', buyback: 'Loading your buy-back pledges', upgrades: 'Loading the store’s upgrades',
+  details: 'Loading upgrade prices', images: 'Loading ship pictures', 'store catalog': 'Loading the store', 'store catalog pictures': 'Loading store pictures',
+};
+const PAGED = new Set(['hangar', 'buyback']);
+/**
+ * What the first-run steps show while a sync runs: a line of text and a bar (max null = no known end).
+ * @param {{ phase?: string, done?: number, total?: number | null } | null} p ui.syncProgress
+ */
+export function syncProgressView(p) {
+  if (!p) return null;
+  const label = PHASE_TEXT[p.phase] ?? `Syncing ${p.phase ?? ''}`.trim();
+  const done = p.done ?? 0;
+  const max = p.total > 0 ? p.total : null;
+  const count = !done ? '' : PAGED.has(p.phase) ? (max ? `page ${done} of ${max}` : `page ${done}`) : max ? `${done} of ${max}` : `${done}`;
+  return { text: count ? `${label}… ${count}` : `${label}…`, value: max ? Math.min(done, max) : null, max };
+}

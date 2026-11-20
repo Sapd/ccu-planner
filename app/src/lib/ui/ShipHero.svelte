@@ -2,19 +2,22 @@
   import { heroSource } from '../view/nav.mjs';
   import { initials } from '../view/thumb.mjs';
   import { backend } from '../backend.js';
+  import { ui } from '../state.svelte.js';
 
   // ship: { name, image: { s, l } | null, manufacturer } | null; height in px; children render over the picture.
   let { ship = null, height = 220, children } = $props();
-  const hero = $derived(heroSource(ship));
-  const src = $derived(hero.kind === 'image' ? backend.imageSrc(hero.file) : null);
-  let failedSrc = $state(null);
-  const showImage = $derived(!!src && failedSrc !== src);
+  // The picture sync's picture, else the signed feed's (ui.feed.ships), so a new goal shows its ship at once. A picture that fails hands over to the next.
+  const hero = $derived(heroSource(ship, ui.feed.ships, { sample: ui.sample }));
+  let failed = $state([]);
+  const srcs = $derived(hero.kind === 'image' ? hero.files.map((f) => backend.imageSrc(f)).filter(Boolean) : []);
+  const src = $derived(srcs.find((s) => !failed.includes(s)) ?? null);
+  const showImage = $derived(!!src);
   const text = $derived(initials(ship?.manufacturer));
 </script>
 
 <div class="hero" style="min-height: {height}px">
   {#if showImage}
-    <img {src} alt="" decoding="async" onerror={() => { failedSrc = src; }} />
+    <img {src} alt="" decoding="async" onerror={() => { failed = [...failed, src]; }} />
   {:else}
     <span class="ini" aria-hidden="true">{text}</span>
   {/if}

@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { money, usd, setPricing, currencyProblem, normalizePricing } from '../src/logic/format.mjs';
 import { buildPlannerData } from '../src/logic/mapping.mjs';
 import { deriveAppState } from '../app/src/lib/view/derive.mjs';
-import { onboardingSteps } from '../app/src/lib/view/onboarding.mjs';
+import { onboardingSteps, syncProgressView } from '../app/src/lib/view/onboarding.mjs';
 import { createSampleBackend } from '../app/src/lib/view/sample.mjs';
 import { createController } from '../app/src/lib/view/controller.mjs';
 import { buildSample } from '../src/logic/sampleData.mjs';
@@ -333,4 +333,12 @@ test('signing in syncs right away: the first-run sync after a successful sign-in
 test('sync: a pending overwrite question is answered no when the sync ends', () => {
   const src = fs.readFileSync(new URL('../app/src/lib/sync-actions.svelte.js', import.meta.url), 'utf8');
   assert.match(src, /finally \{ answer\(false\)/);
+});
+
+test('onboarding: a running sync shows how far it is', () => {
+  assert.equal(syncProgressView(null), null);
+  assert.deepEqual(syncProgressView({ phase: 'hangar', done: 3, total: 36 }), { text: 'Loading your hangar… page 3 of 36', value: 3, max: 36 });
+  assert.deepEqual(syncProgressView({ phase: 'hangar', done: 2, total: null }), { text: 'Loading your hangar… page 2', value: null, max: null });
+  assert.deepEqual(syncProgressView({ phase: 'upgrades', done: 0, total: null }), { text: 'Loading the store’s upgrades…', value: null, max: null });
+  assert.equal(syncProgressView({ phase: 'details', done: 40, total: 244 }).text, 'Loading upgrade prices… 40 of 244');
 });
