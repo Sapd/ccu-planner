@@ -1,0 +1,4 @@
+{
+  "denied": "<title>[\\x09-\\x0d ]*Access denied",
+  "account": "<title>[\\x09-\\x0d ]*My Hangar|class[\\x09-\\x0d ]*=[\\x09-\\x0d ]*\"(?:[^\"]*[\\x09-\\x0d ])?list-items(?:[\\x09-\\x0d ][^\"]*)?\""
+}

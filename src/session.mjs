@@ -33,7 +33,9 @@ export async function readSessionFrom(context, page) {
     // Apply the shared rule to each <form> opening tag, not to the whole page.
     const formTags = await page.$$eval('form', (fs) => fs.map((f) => f.outerHTML.slice(0, f.outerHTML.indexOf('>') + 1)));
     const loggedIn = /\/account\/pledges/.test(page.url()) && (await page.locator('meta[name="csrf-token"]').count()) > 0
-      && !formTags.some(hasSigninForm);
+      && !formTags.some(hasSigninForm)
+      // Signed out, RSI shows a 200 "Access denied" page at the same address, with a CSRF token.
+      && !/^\s*access denied/i.test(await page.title());
     if (!res || !loggedIn) return null;
     const csrf = await page.locator('meta[name="csrf-token"]').getAttribute('content');
     const ua = (await page.evaluate(() => navigator.userAgent)).replace('HeadlessChrome', 'Chrome');

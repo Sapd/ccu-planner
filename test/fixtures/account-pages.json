@@ -1,0 +1,10 @@
+[
+  ["<html><head><title>My Hangar - Roberts Space Industries</title><meta name=\"csrf-token\" content=\"c\"></head><ul class=\"list-items\"><li class=\"js-pledge-id\"></li></ul>", false, true],
+  ["<title>\n  My Hangar | RSI</title>", false, true],
+  ["<ul class=\"row list-items js-x\"></ul>", false, true],
+  ["<html><head><title>Access denied - Roberts Space Industries</title><meta name=\"csrf-token\" content=\"anon\"></head><body>Access denied</body>", true, false],
+  ["<TITLE>ACCESS DENIED</TITLE>", true, false],
+  ["<meta name=\"csrf-token\" content=\"csrf\"><p>Hangar</p>", false, false],
+  ["<ul class=\"list-items-extra\"></ul>", false, false],
+  ["<p>My Hangar</p>", false, false]
+]

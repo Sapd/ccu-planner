@@ -76,10 +76,14 @@ fn keys_are(o: &serde_json::Map<String, Value>, keys: &[&str]) -> bool {
 /// True only for the exact body shape of src/sync/catalog-query.mjs catalogBody(): the pinned query, a page of 100 (page 1..=100),
 /// RSI's own product ids and at most one of its tag facets, the fixed sort, and no "mutation" anywhere. Mirrors isCatalogBody.
 fn is_catalog_body(body: &Value) -> bool {
-    let Ok(spec) = serde_json::from_str::<Value>(include_str!("../../../src/sync/catalog-query.json")) else {
+    let Ok(spec) =
+        serde_json::from_str::<Value>(include_str!("../../../src/sync/catalog-query.json"))
+    else {
         return false;
     };
-    let Some(b) = body.as_object() else { return false };
+    let Some(b) = body.as_object() else {
+        return false;
+    };
     if !keys_are(b, &["operationName", "query", "variables"])
         || b["operationName"] != CATALOG_OPERATION
         || Some(&b["query"]) != spec.get("query")
@@ -87,28 +91,68 @@ fn is_catalog_body(body: &Value) -> bool {
     {
         return false;
     }
-    let Some(v) = b["variables"].as_object().filter(|v| keys_are(v, &["query"])) else { return false };
-    let Some(q) = v["query"].as_object().filter(|q| keys_are(q, &["limit", "page", "skus", "sort"])) else { return false };
-    if q["limit"].as_u64() != Some(100) || !q["page"].as_u64().is_some_and(|p| (1..=100).contains(&p)) {
+    let Some(v) = b["variables"]
+        .as_object()
+        .filter(|v| keys_are(v, &["query"]))
+    else {
+        return false;
+    };
+    let Some(q) = v["query"]
+        .as_object()
+        .filter(|q| keys_are(q, &["limit", "page", "skus", "sort"]))
+    else {
+        return false;
+    };
+    if q["limit"].as_u64() != Some(100)
+        || !q["page"].as_u64().is_some_and(|p| (1..=100).contains(&p))
+    {
         return false;
     }
-    if !q["sort"].as_object().is_some_and(|s| keys_are(s, &["direction", "field"]) && s["direction"] == "desc" && s["field"] == "weight") {
+    if !q["sort"].as_object().is_some_and(|s| {
+        keys_are(s, &["direction", "field"]) && s["direction"] == "desc" && s["field"] == "weight"
+    }) {
         return false;
     }
-    let Some(skus) = q["skus"].as_object() else { return false };
-    if !skus.keys().all(|k| k == "products" || k == "filtersFromTags") {
+    let Some(skus) = q["skus"].as_object() else {
+        return false;
+    };
+    if !skus
+        .keys()
+        .all(|k| k == "products" || k == "filtersFromTags")
+    {
         return false;
     }
     let allowed = spec["products"].as_array().cloned().unwrap_or_default();
-    let Some(products) = skus.get("products").and_then(Value::as_array) else { return false };
-    if products.is_empty() || products.len() > 8 || !products.iter().all(|p| p.as_u64().is_some() && allowed.contains(p)) {
+    let Some(products) = skus.get("products").and_then(Value::as_array) else {
+        return false;
+    };
+    if products.is_empty()
+        || products.len() > 8
+        || !products
+            .iter()
+            .all(|p| p.as_u64().is_some() && allowed.contains(p))
+    {
         return false;
     }
     if let Some(f) = skus.get("filtersFromTags") {
-        let Some(f) = f.as_object().filter(|f| keys_are(f, &["facetIdentifiers", "tagIdentifiers"])) else { return false };
-        let one = |k: &str| f[k].as_array().filter(|a| a.len() == 1).and_then(|a| a[0].as_str().map(str::to_owned));
-        let (Some(facet), Some(tag)) = (one("facetIdentifiers"), one("tagIdentifiers")) else { return false };
-        if !spec["facets"][&facet].as_array().is_some_and(|tags| tags.iter().any(|t| t == tag.as_str())) {
+        let Some(f) = f
+            .as_object()
+            .filter(|f| keys_are(f, &["facetIdentifiers", "tagIdentifiers"]))
+        else {
+            return false;
+        };
+        let one = |k: &str| {
+            f[k].as_array()
+                .filter(|a| a.len() == 1)
+                .and_then(|a| a[0].as_str().map(str::to_owned))
+        };
+        let (Some(facet), Some(tag)) = (one("facetIdentifiers"), one("tagIdentifiers")) else {
+            return false;
+        };
+        if !spec["facets"][&facet]
+            .as_array()
+            .is_some_and(|tags| tags.iter().any(|t| t == tag.as_str()))
+        {
             return false;
         }
     }
@@ -172,6 +216,39 @@ fn has_signin_form(html: &str) -> bool {
             .expect("portable sign-in regex")
     })
     .is_match(html.as_bytes())
+}
+struct AccountRule {
+    denied: regex::bytes::Regex,
+    account: regex::bytes::Regex,
+}
+fn account_rule() -> &'static AccountRule {
+    static RULE: OnceLock<AccountRule> = OnceLock::new();
+    RULE.get_or_init(|| {
+        let rule: serde_json::Map<String, Value> =
+            serde_json::from_str(include_str!("../../../src/sync/account-rule.json"))
+                .expect("valid shared account-page rule");
+        let build = |key: &str| {
+            regex::bytes::RegexBuilder::new(rule[key].as_str().expect("rule text"))
+                .case_insensitive(true)
+                .unicode(false)
+                .build()
+                .expect("portable account-page regex")
+        };
+        AccountRule {
+            denied: build("denied"),
+            account: build("account"),
+        }
+    })
+}
+/// Signed out, RSI answers its account pages with 200 "Access denied" (a CSRF token, no sign-in form).
+fn is_access_denied(html: &str) -> bool {
+    account_rule().denied.is_match(html.as_bytes())
+}
+/// A positive sign of a signed-in account page: the hangar title or its pledge list.
+fn is_signed_in_page(html: &str) -> bool {
+    !is_access_denied(html)
+        && !has_signin_form(html)
+        && account_rule().account.is_match(html.as_bytes())
 }
 fn csrf_from(html: &str) -> Option<String> {
     html.split("<meta name=\"csrf-token\" content=\"")
@@ -373,7 +450,7 @@ impl Client {
                         );
                         if probe.status().is_success() {
                             if let Ok(html) = probe.text().await {
-                                if !has_signin_form(&html) {
+                                if is_signed_in_page(&html) {
                                     if let Some(csrf) = csrf_from(&html) {
                                         let session = self.session.as_mut().ok_or(EXPIRED)?;
                                         refreshed = session.csrf != csrf;
@@ -428,6 +505,12 @@ impl Client {
                     .await
                     .map_err(|_| "Could not read RSI response".to_string())?
             };
+            if method == "GET" && is_access_denied(&text) {
+                // An anonymous token reaches the account pages only as "Access denied": the session is gone.
+                session.expired = true;
+                self.context = false;
+                return Err(EXPIRED.into());
+            }
             if let Some(csrf) = csrf_from(&text) {
                 session.csrf = csrf;
             }
@@ -559,7 +642,7 @@ pub async fn rsi_login(
             // A token alone can be anonymous: require the authenticated hangar page and CSRF.
             let probe = client.send("GET", PROBE, None).await;
             if let Ok(html) = probe {
-                if csrf_from(&html).is_some() && !has_signin_form(&html) {
+                if csrf_from(&html).is_some() && is_signed_in_page(&html) {
                     client.context = false;
                     let notice = login_notice(client.persist());
                     app.emit("rsi-session", "signed in")
@@ -697,7 +780,10 @@ mod tests {
     #[test]
     fn the_store_catalog_query_is_allowed_only_in_its_pinned_shape() {
         assert!(catalog_ok(catalog_body(json!({"products": [72]}), 1)));
-        assert!(catalog_ok(catalog_body(json!({"products": [9, 45, 46]}), 100)));
+        assert!(catalog_ok(catalog_body(
+            json!({"products": [9, 45, 46]}),
+            100
+        )));
         assert!(catalog_ok(catalog_body(
             json!({"products": [289], "filtersFromTags": {"facetIdentifiers": ["extras-gear"], "tagIdentifiers": ["filters-gear-armor"]}}),
             2
@@ -721,10 +807,16 @@ mod tests {
         b["query"] = json!("mutation { addToCart(id: 1) { id } }");
         assert!(!catalog_ok(b));
         let mut b = ok.clone();
-        b["query"] = json!(format!("{}\nmutation {{ x }}", catalog_spec()["query"].as_str().unwrap()));
+        b["query"] = json!(format!(
+            "{}\nmutation {{ x }}",
+            catalog_spec()["query"].as_str().unwrap()
+        ));
         assert!(!catalog_ok(b));
         let mut b = ok.clone();
-        b["query"] = json!(catalog_spec()["query"].as_str().unwrap().replace("amount", "amount price"));
+        b["query"] = json!(catalog_spec()["query"]
+            .as_str()
+            .unwrap()
+            .replace("amount", "amount price"));
         assert!(!catalog_ok(b));
         let mut b = ok.clone();
         b["operationName"] = json!("addToCart");
@@ -739,15 +831,33 @@ mod tests {
             (json!({"page": 0}), "page 0"),
             (json!({"page": 101}), "page 101"),
             (json!({"page": "1"}), "page text"),
-            (json!({"sort": {"direction": "asc", "field": "weight"}}), "sort"),
+            (
+                json!({"sort": {"direction": "asc", "field": "weight"}}),
+                "sort",
+            ),
             (json!({"skus": {"products": []}}), "no products"),
             (json!({"skus": {"products": ["72"]}}), "text product"),
             (json!({"skus": {"products": [73]}}), "unknown product"),
-            (json!({"skus": {"products": [72, 99999]}}), "unknown product 2"),
-            (json!({"skus": {"products": [72], "extra": 1}}), "extra sku key"),
-            (json!({"skus": {"products": [289], "filtersFromTags": {"facetIdentifiers": ["extras-gear"], "tagIdentifiers": ["filters-paint-premium"]}}}), "tag of another facet"),
-            (json!({"skus": {"products": [289], "filtersFromTags": {"facetIdentifiers": ["unknown"], "tagIdentifiers": ["filters-gear-armor"]}}}), "unknown facet"),
-            (json!({"skus": {"products": [289], "filtersFromTags": {"facetIdentifiers": ["extras-gear", "paints"], "tagIdentifiers": ["filters-gear-armor"]}}}), "two facets"),
+            (
+                json!({"skus": {"products": [72, 99999]}}),
+                "unknown product 2",
+            ),
+            (
+                json!({"skus": {"products": [72], "extra": 1}}),
+                "extra sku key",
+            ),
+            (
+                json!({"skus": {"products": [289], "filtersFromTags": {"facetIdentifiers": ["extras-gear"], "tagIdentifiers": ["filters-paint-premium"]}}}),
+                "tag of another facet",
+            ),
+            (
+                json!({"skus": {"products": [289], "filtersFromTags": {"facetIdentifiers": ["unknown"], "tagIdentifiers": ["filters-gear-armor"]}}}),
+                "unknown facet",
+            ),
+            (
+                json!({"skus": {"products": [289], "filtersFromTags": {"facetIdentifiers": ["extras-gear", "paints"], "tagIdentifiers": ["filters-gear-armor"]}}}),
+                "two facets",
+            ),
         ] {
             let mut b = ok.clone();
             for (k, v) in patch.as_object().unwrap() {
@@ -756,8 +866,19 @@ mod tests {
             assert!(!catalog_ok(b), "{why}");
         }
         // another path, method or no body
-        for (method, path) in [("GET", "/graphql"), ("PUT", "/graphql"), ("POST", "/graphql/"), ("POST", "/api/graphql"), ("POST", "/pledge-store/api/graphql"), ("POST", "/graphql?x=1"), ("POST", "/graphql#x")] {
-            assert!(validate_request(method, path, &Some(ok.clone())).is_err(), "{method} {path}");
+        for (method, path) in [
+            ("GET", "/graphql"),
+            ("PUT", "/graphql"),
+            ("POST", "/graphql/"),
+            ("POST", "/api/graphql"),
+            ("POST", "/pledge-store/api/graphql"),
+            ("POST", "/graphql?x=1"),
+            ("POST", "/graphql#x"),
+        ] {
+            assert!(
+                validate_request(method, path, &Some(ok.clone())).is_err(),
+                "{method} {path}"
+            );
         }
         assert!(validate_request("POST", CATALOG_GQL, &None).is_err());
         // the catalog body is not accepted on the upgrade endpoint
@@ -787,8 +908,16 @@ mod tests {
             assert!(catalog_image_url(bad).is_err(), "{bad}");
         }
         // the ship picture rules did not widen
-        assert!(public_target("https://media.robertsspaceindustries.com/a.jpg", Public::Image).is_err());
-        assert!(public_target("https://media.robertsspaceindustries.com/a.jpg", Public::CatalogImage).is_ok());
+        assert!(public_target(
+            "https://media.robertsspaceindustries.com/a.jpg",
+            Public::Image
+        )
+        .is_err());
+        assert!(public_target(
+            "https://media.robertsspaceindustries.com/a.jpg",
+            Public::CatalogImage
+        )
+        .is_ok());
         assert_eq!(image_ext("image/jpeg"), "jpg");
         assert_eq!(image_ext("image/png"), "png");
     }
@@ -846,6 +975,19 @@ mod tests {
             }),
             ..Client::default()
         }
+    }
+    #[tokio::test]
+    async fn access_denied_account_page_expires_the_session_and_keeps_the_csrf() {
+        let (origin, _server) = mock_server(vec![response(
+            "200 OK",
+            "",
+            "<title>Access denied - Roberts Space Industries</title><meta name=\"csrf-token\" content=\"anon\">",
+        )]);
+        let mut client = test_client(origin);
+        assert_eq!(client.send("GET", PROBE, None).await.unwrap_err(), EXPIRED);
+        let session = client.session.as_ref().unwrap();
+        assert!(session.is_expired());
+        assert_eq!(session.csrf, "initial-csrf");
     }
     #[tokio::test]
     async fn mocked_transport_retries_rotates_tokens_and_never_follows_login() {
@@ -924,7 +1066,11 @@ mod tests {
         for fails_again in [false, true] {
             let mut responses = vec![
                 response("403 Forbidden", "", ""),
-                response("200 OK", "", "<meta name=\"csrf-token\" content=\"fresh\">"),
+                response(
+                    "200 OK",
+                    "",
+                    "<title>My Hangar</title><meta name=\"csrf-token\" content=\"fresh\">",
+                ),
                 response(
                     if fails_again {
                         "403 Forbidden"
@@ -939,7 +1085,7 @@ mod tests {
                 responses.push(response(
                     "200 OK",
                     "",
-                    "<meta name=\"csrf-token\" content=\"even-newer\">",
+                    "<title>My Hangar</title><meta name=\"csrf-token\" content=\"even-newer\">",
                 ));
             }
             let (origin, server) = mock_server(responses);
@@ -970,12 +1116,17 @@ mod tests {
         let mut client = test_client(origin);
         let body = catalog_body(json!({"products": [65]}), 1);
         validate_request("POST", CATALOG_GQL, &Some(body.clone())).unwrap();
-        assert_eq!(client.send("POST", CATALOG_GQL, Some(&body)).await.unwrap(), "{\"data\":{}}");
+        assert_eq!(
+            client.send("POST", CATALOG_GQL, Some(&body)).await.unwrap(),
+            "{\"data\":{}}"
+        );
         let requests = server.join().unwrap();
         assert_eq!(requests.len(), 1);
         assert!(requests[0].starts_with("POST /graphql "));
         assert!(requests[0].contains("x-csrf-token: initial-csrf"));
-        assert!(requests[0].to_lowercase().contains("cookie: rsi-token=initial"));
+        assert!(requests[0]
+            .to_lowercase()
+            .contains("cookie: rsi-token=initial"));
     }
     #[test]
     fn shared_signin_form_fixtures() {
@@ -983,6 +1134,16 @@ mod tests {
             serde_json::from_str(include_str!("../../../test/fixtures/signin-forms.json")).unwrap();
         for (html, expected) in cases {
             assert_eq!(has_signin_form(&html), expected, "{html}");
+        }
+    }
+    #[test]
+    fn shared_account_page_fixtures() {
+        let cases: Vec<(String, bool, bool)> =
+            serde_json::from_str(include_str!("../../../test/fixtures/account-pages.json"))
+                .unwrap();
+        for (html, denied, signed_in) in cases {
+            assert_eq!(is_access_denied(&html), denied, "{html}");
+            assert_eq!(is_signed_in_page(&html), signed_in, "{html}");
         }
     }
     #[test]
@@ -1184,8 +1345,15 @@ fn catalog_image_url(url: &str) -> Result<reqwest::Url, String> {
     let u = reqwest::Url::parse(url).map_err(|_| "Invalid public RSI URL")?;
     let host = u.host_str().unwrap_or("");
     let allowed = host == "media.robertsspaceindustries.com"
-        || (host == "robertsspaceindustries.com" && (u.path().starts_with("/i/") || u.path().starts_with("/media/")));
-    if u.scheme() != "https" || !allowed || u.port().is_some() || !u.username().is_empty() || u.password().is_some() || u.fragment().is_some() {
+        || (host == "robertsspaceindustries.com"
+            && (u.path().starts_with("/i/") || u.path().starts_with("/media/")));
+    if u.scheme() != "https"
+        || !allowed
+        || u.port().is_some()
+        || !u.username().is_empty()
+        || u.password().is_some()
+        || u.fragment().is_some()
+    {
         return Err("Public RSI URL not allowlisted".into());
     }
     Ok(u)
@@ -1205,7 +1373,12 @@ fn public_target(url: &str, kind: Public) -> Result<reqwest::Url, String> {
 }
 impl Client {
     // Public image/page requests deliberately use no cookies or session headers.
-    async fn public_get(&mut self, url: &str, kind: Public, gap: Duration) -> Result<(Vec<u8>, String), String> {
+    async fn public_get(
+        &mut self,
+        url: &str,
+        kind: Public,
+        gap: Duration,
+    ) -> Result<(Vec<u8>, String), String> {
         let image = kind != Public::Page;
         let mut url = public_target(url, kind)?;
         let mut redirects = 0;
@@ -1241,7 +1414,10 @@ impl Client {
                     .get("location")
                     .and_then(|s| s.to_str().ok())
                     .ok_or("Missing redirect location")?;
-                url = public_target(url.join(location).map_err(|_| "Bad redirect")?.as_str(), kind)?;
+                url = public_target(
+                    url.join(location).map_err(|_| "Bad redirect")?.as_str(),
+                    kind,
+                )?;
                 continue;
             }
             if !res.status().is_success() {
@@ -1295,7 +1471,12 @@ pub async fn rsi_public_page(
     url: String,
 ) -> Result<String, String> {
     crate::main_only(&requester)?;
-    let (bytes, _) = state.0.lock().await.public_get(&url, Public::Page, Duration::from_secs(1)).await?;
+    let (bytes, _) = state
+        .0
+        .lock()
+        .await
+        .public_get(&url, Public::Page, Duration::from_secs(1))
+        .await?;
     String::from_utf8(bytes).map_err(|_| "Invalid RSI page".into())
 }
 #[tauri::command]
@@ -1307,7 +1488,12 @@ pub async fn rsi_cache_image(
     url: String,
 ) -> Result<Value, String> {
     crate::main_only(&requester)?;
-    let (bytes, mime) = state.0.lock().await.public_get(&url, Public::Image, Duration::from_secs(1)).await?;
+    let (bytes, mime) = state
+        .0
+        .lock()
+        .await
+        .public_get(&url, Public::Image, Duration::from_secs(1))
+        .await?;
     let s = format!("{id}-original.{}", image_ext(&mime));
     let l = s.clone();
     let dir = crate::resolve_data_dir(&app)?;

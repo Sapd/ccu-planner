@@ -7,7 +7,7 @@ import { QUERIES } from './queries.mjs';
 import { CATALOG_PATH } from './catalog-query.mjs';
 import { fetchItems, assessCatalog, catalogDoc, signedInWarning, shortListings } from './catalog-fetch.mjs';
 import { readCatalog } from '../logic/store-catalog.mjs';
-import { hasSigninForm } from './signin.mjs';
+import { hasSigninForm, isAccessDenied } from './signin.mjs';
 
 // RSI's upgrade GraphQL answers at most 5 operations per request ("Maximum subquery limit of 5 reached").
 // Requests are spaced 1 s apart by the transport, so sending 5 per request makes the long phases about 5x faster.
@@ -30,7 +30,7 @@ export async function sync(cmd, io, options = {}) {
     // An account page that comes back as RSI's sign-in page is a lost session, not an empty hangar: stop before anything is saved.
     getHtml: async (path) => {
       const html = await request({ method: 'GET', path });
-      if (hasSigninForm(html)) throw new Error('RSI session missing or expired: RSI showed its sign-in page instead of your account. Sign in again, then sync.');
+      if (hasSigninForm(html) || isAccessDenied(html)) throw new Error('RSI session missing or expired: RSI showed its sign-in or access-denied page instead of your account. Sign in again, then sync.');
       return html;
     },
     upgrade: async (...ops) => {

@@ -138,6 +138,16 @@ test('a sign-in page instead of the hangar is a lost session: nothing is saved',
   }
 });
 
+test('RSI\u2019s signed-out "Access denied" page is a lost session, not an empty hangar', async () => {
+  const denied = '<html><head><title>Access denied - Roberts Space Industries</title><meta name="csrf-token" content="anon"></head><body>Access denied</body></html>';
+  for (const kind of ['hangar', 'buyback']) {
+    const io = memory({}, async () => denied);
+    await assert.rejects(sync(kind, io, { full: true }), /session missing or expired/);
+    assert.equal(io.files[`${kind}.json`], undefined, kind);
+    assert.ok(!io.logs.some((l) => /no pledges/.test(l)), kind);
+  }
+});
+
 test('a hangar with no pledges is saved but warns', async () => {
   const io = memory({}, async () => '<html><body><ul class="list-items"></ul></body></html>');
   await sync('hangar', io, { full: true });

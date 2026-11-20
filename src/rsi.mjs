@@ -2,7 +2,7 @@
 // Guard rails: only GET on an allowlisted set of pages, and POST only to the
 // upgrade context endpoint and allowlisted GraphQL *queries* (no mutations).
 
-import { hasSigninForm } from './sync/signin.mjs';
+import { isSignedInPage } from './sync/signin.mjs';
 import { loadSession, refreshSession, NeedLoginError, RSI } from './session.mjs';
 
 const UPGRADE_GQL = '/pledge-store/api/upgrade/v2/graphql';
@@ -80,7 +80,7 @@ export class RsiClient {
         if (probe.ok) {
           const html = await probe.text();
           const csrf = html.match(/<meta name="csrf-token" content="([^"]+)"/);
-          if (csrf && !hasSigninForm(html)) {
+          if (csrf && isSignedInPage(html)) {
             this.session.csrf = csrf[1];
             refreshed = this.session.csrf !== previousCsrf;
           }

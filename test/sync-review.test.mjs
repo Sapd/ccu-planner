@@ -143,7 +143,7 @@ for (const failsAgain of [false, true]) {
       requests.push({ url, ...options });
       const n = requests.length;
       if (n === 1 || (n === 3 && failsAgain)) return new Response('', { status: 403 });
-      if (n === 2 || n === 4) return new Response(`<meta name="csrf-token" content="fresh-${n}">`);
+      if (n === 2 || n === 4) return new Response(`<title>My Hangar</title><meta name="csrf-token" content="fresh-${n}">`);
       return new Response('success');
     });
     const client = new RsiClient({ minIntervalMs: 0 }); client.session = { userAgent: 'test', csrf: 'stale' };
@@ -213,10 +213,20 @@ test('shared sign-in-form rule matches the native client fixtures', async () => 
   for (const [html, expected] of cases) assert.equal(hasSigninForm(html), expected, html);
 });
 
+test('shared account-page rule tells RSI\u2019s signed-out "Access denied" page from the hangar', async () => {
+  const { isAccessDenied, isSignedInPage } = await import('../src/sync/signin.mjs');
+  const cases = JSON.parse(fs.readFileSync(new URL('./fixtures/account-pages.json', import.meta.url), 'utf8'));
+  for (const [html, denied, signedIn] of cases) {
+    assert.equal(isAccessDenied(html), denied, html);
+    assert.equal(isSignedInPage(html), signedIn, html);
+  }
+});
+
 test('session probe applies the shared rule per form tag and treats navigation errors as undetermined', async () => {
   const { readSessionFrom } = await import('../src/session.mjs');
-  const page = (forms, { fail = false } = {}) => ({
+  const page = (forms, { fail = false, title = 'My Hangar - Roberts Space Industries' } = {}) => ({
     goto: async () => { if (fail) throw new Error('net::ERR_ABORTED'); return {}; },
+    title: async () => title,
     url: () => 'https://robertsspaceindustries.com/en/account/pledges',
     $$eval: async (_sel, fn) => fn(forms.map((outerHTML) => ({ outerHTML }))),
     locator: () => ({ count: async () => 1, getAttribute: async () => 'csrf' }),
@@ -228,6 +238,7 @@ test('session probe applies the shared rule per form tag and treats navigation e
   assert.equal(await readSessionFrom(context, page(['<form class="js-signin-form" action="/x">'])), null);
   assert.equal(await readSessionFrom(context, page(['<form action="/en/signin">'])), null);
   assert.equal(await readSessionFrom(context, page([], { fail: true })), null);
+  assert.equal(await readSessionFrom(context, page([], { title: 'Access denied - Roberts Space Industries' })), null);
   // Only the cookies the desktop app keeps are stored (the shared list in src/sync/session-cookies.json).
   const many = { cookies: async () => ['Rsi-Token', 'Rsi-Account-Auth', 'cf_clearance', '__cf_bm', '__cflb', '_ga', 'analytics', 'rsi-lower', 'cf_other'].map((name) => ({ name, value: 'v', domain: 'd', path: '/', expires: 1 })) };
   assert.deepEqual((await readSessionFrom(many, page([]))).cookies.map((c) => c.name), ['Rsi-Token', 'Rsi-Account-Auth', 'cf_clearance', '__cf_bm', '__cflb']);
