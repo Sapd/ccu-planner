@@ -9,27 +9,31 @@
   const job = new Job();
   let open = $state(false);
   let copies = $state(1);
+  // A second copy only matters when another goal could use it: with one goal there is nothing to choose.
+  const many = $derived(Object.keys(app.plans?.chains ?? {}).length > 1);
   const uid = $props.id();
 
   // Starts when opened and again when the documents change under it; the worker answers identical questions from its cache.
   $effect(() => {
     if (!open) return;
     const current = app; // read here, not inside untrack: a changed plan or data runs the job again
-    const args = { from, to, kind, cash, maxCopies: 2 };
+    const args = { from, to, kind, cash, maxCopies: many ? 2 : 1 };
     untrack(() => job.start(current, 'buyEffect', args));
   });
   onDestroy(() => job.cancel());
-  const row = $derived(job.status === 'done' ? job.value.rows[copies - 1] : null);
+  const row = $derived(job.status === 'done' ? job.value.rows[(many ? copies : 1) - 1] ?? null : null);
 </script>
 
 <span class="wi">
   <button type="button" class="toggle" aria-expanded={open} aria-controls="wi-{uid}" onclick={() => { open = !open; }}>If I buy this {open ? '▴' : '▾'}</button>
   {#if open}
     <span class="body" id="wi-{uid}">
-      <span class="pick" role="group" aria-label="How many copies">
-        <label><input type="radio" bind:group={copies} value={1} /> 1 copy</label>
-        <label><input type="radio" bind:group={copies} value={2} /> 2 copies</label>
-      </span>
+      {#if many}
+        <span class="pick" role="group" aria-label="How many copies">
+          <label><input type="radio" bind:group={copies} value={1} /> 1 copy</label>
+          <label><input type="radio" bind:group={copies} value={2} /> 2 copies (one for another goal)</label>
+        </span>
+      {/if}
       <JobStatus {job} what="Planning again" />
       {#if row}
         <span class="out" data-whatif>{buyRowText(row)}</span>
