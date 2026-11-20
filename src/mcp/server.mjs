@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { toolsFor, ToolError } from './tools.mjs';
 
 // What a model needs to know before it advises: how CCUs work, what the planner's words mean, and how to use the tools.
-export const INSTRUCTIONS = `CCU planner: answers from the user's own plan (goals, owned CCUs, store prices). Ship names are official names; money is US dollars, and every tool refuses to answer for a store account in another currency (or with tax added on top) instead of showing wrong prices. Tools never buy, melt, gift or apply anything on RSI. sync_* tools only read from RSI.
+export const INSTRUCTIONS = `CCU planner: answers from the user's own plan (goals, owned CCUs, store prices). Ship names are official names; money is US dollars, and every tool refuses to answer for a store account in another currency (or with tax added on top) instead of showing wrong prices. Tools never buy, melt, gift or apply anything on RSI. For current RSI data, sync in the planner app.
 
 How CCUs work (Star Citizen):
 - A CCU (cross-chassis upgrade) turns the ship of one pledge into a more expensive ship. A chain is several CCUs in a row (A → B → C); the cheapest way to a ship often runs through ships the user never wants to fly.
@@ -19,9 +19,9 @@ The planner's words:
 - Virtual CCUs (upgrades the user expects from outside the store) can be managed with set_virtual_ccu and remove_virtual_ccu. Use set_via for a route-through ship and exclude_copy to control whether plans can use a specific owned copy.
 
 How to answer:
-- Data is only as fresh as the last sync. Prices and sales change often: if the user is about to buy, or the data looks old, suggest syncing first (in the app, or with sync_* when they ask).
+- Data is only as fresh as the last sync. Prices and sales change often: if the user is about to buy, or the data looks old, suggest syncing first. ${import.meta.ccuPackaged ? 'Ask the user to sync in the app.' : 'They can sync in the app or request a sync with the stored CLI session.'}
 - Use the tools for every number and route: today for what to buy, goals and goal for costs and reasons, check_offer for a specific offer, what_if for "what if I…" questions, changes_since_sync for "why did my plan change". Never work out routes or prices yourself, and quote amounts as the tools give them.
-- Write tools (available with --allow-writes) change the user's saved plan: use them only when the user asks, and say what changed.
+- Write tools (when enabled by the user) change the user's saved plan: use them only when the user asks, and say what changed.
 - Purchases, melting, gifting and applying a CCU happen only on the RSI website, by the user; no tool can do them. melt_advice only says what is worth melting. Say so instead of pretending a tool did it.`;
 
 /** @param {object} deps see tools.mjs  @param {{ allowWrites?: boolean, version?: string }} options */

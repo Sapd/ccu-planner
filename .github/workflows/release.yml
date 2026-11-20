@@ -156,3 +156,54 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           uploadWorkflowArtifacts: ${{ github.ref_type != 'tag' }}
+
+  build-mcp:
+    name: Build and test MCP packages
+    needs: check-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26.13.1
+          cache: npm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: npm ci
+      - run: npm run build:mcp
+      - run: npm run test:mcp-dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mcp
+          if-no-files-found: error
+          path: |
+            dist/ccu-planner.mcpb
+            dist/ccu-planner-mcp-*
+
+  attach-mcp:
+    name: Attach MCP packages to draft
+    needs: [create-release, build-mcp]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mcp
+          path: mcp
+      - name: Upload to the existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$REPO/releases/$RELEASE_ID" --jq 'select(.draft) | .tag_name')" = "$TAG"
+          gh release upload "$TAG" --repo "$REPO" --clobber mcp/*

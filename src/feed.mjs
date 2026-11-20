@@ -7,12 +7,14 @@
 // Only GET requests to the feed address are made, with nothing in them but the path (no cookies, no ids, no query).
 // Offline is normal: refreshFeed resolves to { status: 'offline' } and the app stays silent.
 
+import keyFile from './feed-public-key.json' with { type: 'json' };
+import floorFile from './feed-floor.json' with { type: 'json' };
+import appPackage from '../app/package.json' with { type: 'json' };
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { FEED_BASE, FEED_FILE, FEED_IMAGE, FEED_MAX_BYTES, FEED_REFRESH_MS, validateManifest, readEvents, feedIsStale } from './logic/feed.mjs';
 
-const keyFile = JSON.parse(fs.readFileSync(new URL('./feed-public-key.json', import.meta.url), 'utf8'));
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 /** A public key object from the 32 raw bytes in base64 (the format of src/feed-public-key.json). */
 export const publicKeyFrom = (base64) => {
@@ -24,7 +26,6 @@ export const FEED_PUBLIC_KEY = publicKeyFrom(keyFile.publicKey);
 
 // The oldest feed this build accepts (src/feed-floor.json, set by `npm run version`): a signed manifest older than the release that
 // shipped it can only be a replay. Not a secret and not a constant of the feed; bumped with every release.
-const floorFile = JSON.parse(fs.readFileSync(new URL('./feed-floor.json', import.meta.url), 'utf8'));
 export const FEED_MIN_GENERATED_AT = floorFile.minGeneratedAt;
 if (!Number.isFinite(Date.parse(FEED_MIN_GENERATED_AT))) throw new Error('src/feed-floor.json has no valid minGeneratedAt');
 
@@ -100,7 +101,7 @@ const floorStamp = (dir, cached, minGeneratedAt) => Math.max(stamp(minGeneratedA
 const recordSeen = (dir, generatedAt) => { if (stamp(generatedAt) > stamp(readSeen(dir))) writeAtomic(seenFile(dir), JSON.stringify({ highestGeneratedAt: generatedAt })); };
 
 // The app's version (app/package.json, kept equal to the desktop app's by scripts/version.mjs): a new version checks the feed at once.
-export const APP_VERSION = (() => { try { return JSON.parse(fs.readFileSync(new URL('../app/package.json', import.meta.url), 'utf8')).version ?? null; } catch { return null; } })();
+export const APP_VERSION = appPackage.version ?? null;
 const readState = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(feedDir(dir), 'state.json'), 'utf8')); } catch { return {}; } };
 const writeState = (dir, state) => writeAtomic(path.join(feedDir(dir), 'state.json'), JSON.stringify(state));
 

@@ -335,7 +335,7 @@ function hangarCcusInto(deps, args) {
 
 // ----- sync tools (they only read RSI) -----
 
-const NO_SESSION = 'No stored RSI session. Sign in once through the planner app (Sync menu) or the CLI (npm run login in the ccu-planner folder), then try again. This server never asks for or accepts a password.';
+const NO_SESSION = import.meta.ccuPackaged ? 'No stored RSI session. Sync in the planner app, then ask again.' : 'No stored RSI session. Sign in once through the planner app (Sync menu) or the CLI (npm run login in the ccu-planner folder), then try again. This server never asks for or accepts a password.';
 let syncing = false;
 const CANCEL_WAIT_MS = 1500;
 

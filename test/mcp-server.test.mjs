@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
+import { fixtureCopy } from './support/mcp-fixture.mjs';
 import path from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { InMemoryTransport as ServerTransport } from '@modelcontextprotocol/server';
@@ -19,21 +19,6 @@ async function connect(deps, options) {
   await client.connect(b);
   return { client, close: async () => { await client.close(); await server.close(); } };
 }
-
-// A data folder written from test/fixtures/raw-small.json (ships Alpha, Beta, ...), never from real data.
-const fixtureCopy = () => {
-  const raw = JSON.parse(fs.readFileSync(new URL('./fixtures/raw-small.json', import.meta.url), 'utf8'));
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccu-mcp-'));
-  const put = (name, value) => { fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true }); fs.writeFileSync(path.join(dir, name), typeof value === 'string' ? value : JSON.stringify(value)); };
-  // The server refuses a catalog that names no currency, so the copy names USD.
-  put('catalog.json', { ...raw.catalog, app: { ...raw.catalog.app, pricing: { currencyCode: 'USD', currencySymbol: '$', exponent: 2 } } });
-  put('ship-details.json', raw.details);
-  raw.upgrades.forEach((u, i) => put(`upgrades/u${i}.json`, u));
-  put('hangar.json', raw.hangar);
-  put('buyback.json', raw.buyback);
-  put('offer-history.jsonl', raw.history);
-  return dir;
-};
 
 test('lists the read-only and sync tools without --allow-writes, and calls today', async () => {
   const w = world({ goals: [{ base: 1, target: 4, mode: 'finish' }], owned: [copy('x', 1, 3)] });

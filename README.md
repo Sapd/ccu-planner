@@ -72,52 +72,21 @@ which requests are made. The planner currently supports store accounts that pay 
 
 ## Ask Claude about your plan (MCP)
 
-The planner comes with an [MCP](https://modelcontextprotocol.io) server, so Claude can answer questions
-from your own plan: "What should I buy today?", "Why does my Liberator chain cost that much?", "Is this
-Warbond in the sale worth it for me?" (paste the offer), or "What if I bought two Prowler to Carrack
-upgrades for $20?". It uses the same data folder and the same planning code as the app, so its answers
-match what the app shows. Sync in the app first; the server reads what the app saved.
+**Claude Desktop.** Download `ccu-planner.mcpb` from the [latest release](https://github.com/Sapd/ccu-planner/releases/latest) and open it. Turn on **Let Claude change my plan** if you want Claude to edit goals or settings. Leave **Data folder** empty to use the planner app’s data.
 
-**What you need:** [Node.js](https://nodejs.org) 22 or newer and a copy of this repository:
+**Claude Code.** Download the executable for your system from the same release and save it somewhere permanent. Choose `macos-arm64` for Apple silicon, `macos-x64` for an Intel Mac, `windows-x64.exe` for Windows, or `linux-x64` for Linux. On macOS and Linux, run `chmod +x <file>` with the path to the download. The executable is unsigned. If macOS blocks your download from the release, run `xattr -d com.apple.quarantine <file>`. Windows SmartScreen may show an unknown-publisher warning.
 
-```bash
-git clone https://github.com/Sapd/ccu-planner.git
+Register it with the full path to your executable. For example, on an Apple silicon Mac:
+
+```sh
+claude mcp add -s user ccu-planner -- "/path/to/ccu-planner-mcp-macos-arm64"
 ```
 
-```bash
-cd ccu-planner && npm install
-```
+Append `--allow-writes` to allow plan changes. By default Claude can read your goals, compare routes and try what-ifs in memory. No tool can buy, melt, gift or apply anything on RSI.
 
-**Claude Code:** register the server once (use the full path to your copy; `-s user` makes it available
-in every project):
+Sync in the planner app first, then ask Claude “What should I buy today?” or “What would this offer save me?” The release packages read the app’s saved data and do not sync from RSI.
 
-```bash
-claude mcp add -s user ccu-planner -- node /full/path/to/ccu-planner/scripts/mcp.mjs
-```
-
-**Claude Desktop:** open Settings → Developer → Edit Config and add this to `claude_desktop_config.json`,
-then restart Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "ccu-planner": {
-      "command": "node",
-      "args": ["/full/path/to/ccu-planner/scripts/mcp.mjs"]
-    }
-  }
-}
-```
-
-On Windows write the path with double backslashes, for example `"C:\\Users\\you\\ccu-planner\\scripts\\mcp.mjs"`.
-
-By default Claude can only read: it can look at your plan and goals and try what-ifs in memory. Syncing
-is easiest in the app. If you want Claude to sync your hangar or the store too (read-only), sign in once
-for the server with `npm run login` in your copy; the app's own sign-in is separate. To let it also change your plan the
-way the app does (goals and their settings, reserved chains, store credit, virtual CCUs, LTI tokens, sale events and the other
-settings), add `--allow-writes` after `mcp.mjs`. Either way it can
-never buy, melt, gift or apply anything on RSI, and it never sees your password. The full list of tools and
-safety rules is in [docs/MCP.md](docs/MCP.md).
+**From source.** With Node.js 22 or newer, clone this repository and run `npm ci` in the checkout. Register it with `claude mcp add -s user ccu-planner -- node /path/to/ccu-planner/scripts/mcp.mjs`. Run `npm run login` there if you want the source server’s read-only RSI sync tools. See the [MCP guide](docs/MCP.md) for all tools and settings.
 
 ## For developers
 

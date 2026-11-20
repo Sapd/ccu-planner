@@ -9,3 +9,4 @@ app/src-tauri/gen/
 
 # Local release output (artifacts and signatures)
 release/
+/dist/

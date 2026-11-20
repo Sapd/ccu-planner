@@ -1,5 +1,6 @@
 // The Node side of the MCP tools: the data folder, the revisioned saves and the read-only RSI sync. Mirrors scripts/sync.mjs
 // (same RsiClient, same shared sync core, same plan snapshots around a sync). Nothing here writes to stdout: stdout is the protocol.
+import ALIASES from '../logic/aliases.json' with { type: 'json' };
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, tmpName, checkLegacyData, loadPlannerData, loadPlans, loadOverrides, loadSaleEvents, loadSnapshots, savePlans, saveOverrides, saveSaleEvents, loadSession, recordSnapshot } from '../data.mjs';
@@ -12,12 +13,10 @@ import { acquireSyncLock } from '../sync/lock.mjs';
 import { currencyProblem } from '../logic/format.mjs';
 import { ToolError } from './tools.mjs';
 
-const ALIASES = JSON.parse(fs.readFileSync(new URL('../logic/aliases.json', import.meta.url), 'utf8'));
-
 export const NO_PLAYWRIGHT = 'Syncing needs the playwright package, which is not installed here (it is a dev dependency of the planner). Run npm install in the planner folder, or sync from the app or the CLI.';
 
 // rsi.mjs and session.mjs import playwright, so they are loaded only when a sync really runs: the read-only tools start without it.
-const defaultLoadRsi = async () => ({ ...(await import('../rsi.mjs')), ...(await import('../session.mjs')) });
+const defaultLoadRsi = import.meta.ccuPackaged ? null : async () => ({ ...(await import('../rsi.mjs')), ...(await import('../session.mjs')) });
 
 /** @param {{ dir?: string, loadRsi?: () => Promise<{ RsiClient: Function, SESSION_FILE: string }>, sessionExists?: (SESSION_FILE: string) => boolean }} options */
 export function createNodeDeps({ dir = DATA_DIR, loadRsi = defaultLoadRsi, sessionExists = (f) => fs.existsSync(f) } = {}) {
@@ -74,6 +73,7 @@ export function createNodeDeps({ dir = DATA_DIR, loadRsi = defaultLoadRsi, sessi
     sync: {
       // Only whether a session file exists is checked; its content (cookies) is never read here or returned.
       async available() {
+        if (!loadRsi) return false;
         const { SESSION_FILE } = await loadRsiOrExplain();
         return sessionExists(SESSION_FILE);
       },

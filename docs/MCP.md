@@ -10,13 +10,21 @@ The server sends the client a short guide with its instructions (`INSTRUCTIONS` 
 lock), and how to answer (sync first before a purchase, take every number from a tool, use write tools only when asked). Claude
 reads it when it connects, so no separate agents file is needed.
 
+## Install
+
+For Claude Desktop, open `ccu-planner.mcpb` from the latest release. Claude Desktop supplies Node. Leave **Data folder** empty to use the app’s own folder, or choose the folder that contains your `catalog.json`. Turn on **Let Claude change my plan** to enable edits.
+
+For Claude Code, download the executable for your platform and register its full path with `claude mcp add -s user ccu-planner -- /path/to/executable`. Append `--allow-writes` to enable edits. The [README](../README.md#ask-claude-about-your-plan-mcp) lists the downloads and first-run steps for macOS, Windows and Linux.
+
+Sync from RSI in the planner app when using either release package. The packages read the saved planner data and skip the checkout’s legacy data, browser profile and session file. Their sync tools report that there is no stored session.
+
 ## Safety
 
 - **No tool buys, melts, gifts or applies anything on RSI.** The server has no such code, and it never touches the cart or buyback.
-- `sync_hangar` and `sync_store` only read from RSI, through the same read-only client and request allowlist as `npm run sync`
-  and the app. They need a stored RSI session (sign in once in the app or with `npm run login`); without one they say so. The
+- `sync_hangar` and `sync_store` in a source checkout only read from RSI, through the same read-only client and request allowlist as `npm run sync`
+  and the app. They need a stored RSI session (sign in once in the checkout with `npm run login`); without one they say so. The
   server never asks for or accepts a password and never returns session or cookie values.
-- Tools that change your plans exist **only** when the server is started with `--allow-writes`. Without the flag they are not
+- Tools that change your plans exist **only** when the server is started with `--allow-writes` or `CCU_MCP_ALLOW_WRITES=true` (the Desktop toggle). Only the exact lowercase value `true` enables the environment setting. By default they are not
   listed and cannot be called. Each one saves through the same revisioned save as the app: if another app or session saved
   first, the tool returns an error and writes nothing.
 - `compare_ccugame` and `import_goals` read only the one file you name: an absolute `.json` path of at most 5 MB. The resolved real path must not be
@@ -46,7 +54,7 @@ Always available, read-only:
 | `melt_advice` | Show the Hangar melt candidates and suggested copies, potential credit and new money before and after. Advice only. |
 | `alternative_routes` | Compare routes for a goal using its start, constraints, objective and share of the fleet resources. |
 
-Always listed, they only read RSI. RSI code (and with it playwright, a dev dependency) is loaded only when a sync runs, so
+The sync tools are always listed. In a source checkout, RSI code (and with it playwright, a dev dependency) is loaded only when a sync runs, so
 the other tools work without it; a sync without playwright says so.
 
 **One sync at a time.** A sync takes `sync.lock` in the data folder (pid and start time, created exclusively; stale after 2 hours
@@ -62,7 +70,7 @@ sends no further requests.
 | `sync_hangar` | Reads your hangar (`full: true` re-reads every pledge) |
 | `sync_store` | Reads the upgrade store and updates prices and offers; sends progress notifications and can take minutes (`full: true` starts over instead of resuming) |
 
-Only with `--allow-writes`:
+With plan changes enabled:
 
 | Tool | What it changes |
 | --- | --- |
@@ -96,7 +104,7 @@ result has readable text and the same data as `structuredContent`, with ship nam
 `what_if` plans the whole account again and can take seconds on a big hangar; it honours request cancellation between its two
 plans and allows at most 5 copies per `buy`.
 
-## Register it in Claude Code
+## Register a source checkout in Claude Code
 
 ```sh
 claude mcp add ccu-planner -- node /absolute/path/to/ccu-planner/scripts/mcp.mjs
@@ -106,11 +114,13 @@ claude mcp add ccu-planner -- node /absolute/path/to/ccu-planner/scripts/mcp.mjs
 claude mcp add ccu-planner -e CCU_DATA=/path/to/data -- node /absolute/path/to/ccu-planner/scripts/mcp.mjs
 ```
 
-(`claude mcp add <name> [options] -- <command> [args...]`; add `-s user` to register it for every project.) Run
-`npm install` in the planner folder first. `npm run mcp` starts the same server by hand.
+(`claude mcp add <name> [options] -- <command> [args...]`; add `-s user` to register it for every project.) With Node.js 22 or newer, run
+`npm ci` in the planner folder first. `npm run mcp` starts the same server by hand.
 
 ## Tests
 
 `test/mcp-tools.test.mjs` calls each handler on in-memory worlds built from the shared test ladder; `test/mcp-server.test.mjs`
 runs a real MCP client over an in-memory transport (tool list with and without `--allow-writes`, `today`, progress
 notifications) and the real data-folder code on a temporary folder written from `test/fixtures/raw-small.json`.
+
+After `npm run build:mcp`, run `npm run test:mcp-dist` to exercise the bundled server and host executable over stdio using temporary fixture data.

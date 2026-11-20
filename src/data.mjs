@@ -2,6 +2,7 @@
 // the Tauri app data folder, or the CCU_DATA environment variable) and hands the raw
 // JSON to the pure logic in src/logic/. Nothing here may be needed by the app.
 
+import ALIASES from './logic/aliases.json' with { type: 'json' };
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -24,7 +25,6 @@ import { loadFeedEvents } from './feed.mjs';
 export { norm, findShip } from './logic/ships.mjs';
 export { expectedMsrp, expectedOffers } from './logic/prices.mjs';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Tauri PathResolver::app_data_dir uses dirs::data_dir()/identifier.
 export function appDataDir(platform = process.platform, env = process.env, home = os.homedir()) {
   const p = platform === 'win32' ? path.win32 : path.posix; // the target platform's separators, whatever runs this
@@ -40,19 +40,18 @@ let migrated = false;
  * Never touches an explicit CCU_DATA folder. Call it before any mkdir of DATA_DIR.
  */
 export function ensureDefaultDataDir() {
-  if (migrated || process.env.CCU_DATA) return;
+  if (import.meta.ccuPackaged || migrated || process.env.CCU_DATA) return;
   migrated = true;
   migrateDefault(path.dirname(DATA_DIR));
 }
 export function checkLegacyData() {
   ensureDefaultDataDir();
-  const old = path.join(REPO_ROOT, '.local', 'data');
+  if (import.meta.ccuPackaged) return; // Release builds have no checkout or legacy folder.
+  const old = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.local', 'data');
   if (!process.env.CCU_DATA && !fs.existsSync(DATA_DIR) && fs.existsSync(old)) {
     throw new Error(`Old planner data found. Move ${old} to ${DATA_DIR} before continuing, or set CCU_DATA to your existing folder. No files were moved.`);
   }
 }
-
-const ALIASES = JSON.parse(fs.readFileSync(new URL('./logic/aliases.json', import.meta.url), 'utf8'));
 
 /** plan-snapshots.json as stored, or null when absent or unreadable: a damaged file only means no history (it is warned about). */
 function readSnapshotsDoc(f) {

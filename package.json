@@ -16,10 +16,13 @@
     "sync-catalog": "node scripts/sync-catalog.mjs",
     "mcp": "node scripts/mcp.mjs",
     "release": "node scripts/release.mjs",
-    "version": "node scripts/version.mjs"
+    "version": "node scripts/version.mjs",
+    "build:mcp": "node scripts/build-mcp.mjs",
+    "test:mcp-dist": "node scripts/test-mcp-dist.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.4.0",
+    "esbuild": "0.28.2",
     "playwright": "^1.65.1"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // MCP server (stdio) for the CCU planner: node scripts/mcp.mjs [--allow-writes]
-// Reads the same data folder as the app (CCU_DATA overrides it). Without --allow-writes no tool changes your plans.
+// Reads the same data folder as the app (CCU_DATA overrides it). Plan changes require --allow-writes or CCU_MCP_ALLOW_WRITES=true.
 // stdout carries the protocol; everything else goes to stderr.
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { createServer } from '../src/mcp/server.mjs';
@@ -17,7 +17,7 @@ if (unknown.length) {
   console.error(`unknown option ${unknown.join(' ')}\nusage: node scripts/mcp.mjs [--allow-writes]`);
   process.exit(2);
 }
-const allowWrites = args.includes('--allow-writes');
+const allowWrites = args.includes('--allow-writes') || process.env.CCU_MCP_ALLOW_WRITES === 'true';
 const server = createServer(createNodeDeps(), { allowWrites });
 await server.connect(new StdioServerTransport());
 // The signed feed (sale events): one background check at start, at most every 6 hours; offline or refused changes nothing and prints nothing.

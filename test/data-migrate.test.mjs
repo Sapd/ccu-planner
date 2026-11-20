@@ -85,6 +85,8 @@ test('default folder: migrated before the first write; an explicit CCU_DATA is n
   assert.ok(fs.existsSync(path.join(a.newDir, 'data/hangar.json')), 'old data moved before the write');
   assert.ok(fs.existsSync(path.join(a.newDir, 'data/price-overrides.json')));
   assert.ok(!fs.existsSync(a.oldDir));
+  const empty = run(() => ({ CCU_DATA: '' }));
+  assert.ok(fs.existsSync(path.join(empty.newDir, 'data/price-overrides.json')));
   const b = run((home) => ({ CCU_DATA: path.join(home, 'explicit') }));
   assert.ok(fs.existsSync(path.join(b.oldDir, 'data/hangar.json')), 'old folder untouched');
   assert.ok(!fs.existsSync(b.newDir), 'new folder not created');

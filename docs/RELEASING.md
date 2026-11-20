@@ -3,6 +3,12 @@
 Releases are built by GitHub Actions and served from GitHub Releases. Updates reach installed apps
 through `https://github.com/Sapd/ccu-planner/releases/latest/download/latest.json`.
 
+## MCP release files
+
+Every release also carries `ccu-planner.mcpb` for Claude Desktop and four standalone executables for Claude Code. The read-only Ubuntu build job compiles all four, validates the bundle, and smoke-tests the Node entry point and Linux executable. The workflow artifact is named `mcp`. On tag runs a separate job attaches its files to the existing draft using the workflow token. Neither step needs a signing key.
+
+To build locally, install Bun 1.4.2, then run `npm ci`, `npm run build:mcp` and `npm run test:mcp-dist` from the repository root. Cross-compilation downloads Bun runtimes on the first build. For a manual release, attach `dist/ccu-planner.mcpb` and all four `dist/ccu-planner-mcp-*` files to the draft.
+
 ## The release flow (GitHub)
 
 1. **Bump the version** in all files at once: `npm run version -- 0.2.0` (sets `tauri.conf.json`,
@@ -28,7 +34,7 @@ through `https://github.com/Sapd/ccu-planner/releases/latest/download/latest.jso
    builds both platforms without a key and without update artifacts and uploads the bundles as workflow
    artifacts only; no release is created and nothing needs approval.
 5. **Check the draft's assets**: `latest.json`; the macOS `.app.tar.gz` and its `.sig`; the `.dmg`;
-   the Windows `-setup.exe` and its `.sig`. Open `latest.json`: `version` is right and `platforms` lists
+   the Windows `-setup.exe` and its `.sig`. Also check for the MCP bundle and the Windows x64, macOS arm64, macOS x64 and Linux x64 MCP executables. Open `latest.json`: `version` is right and `platforms` lists
    `darwin-aarch64`, `darwin-x86_64` and `windows-x86_64`. Edit the release notes if you like.
 6. **Publish the draft.** This is the point of no return: the moment it is published (and not marked
    pre-release) it is the "latest" release, and every installed app picks it up within hours (10 seconds
