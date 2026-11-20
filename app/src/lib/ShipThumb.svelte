@@ -1,13 +1,15 @@
 <script>
-  import { thumbSize, thumbFile } from './view/thumb.mjs';
+  import { thumbSize, thumbFile, shipPicture } from './view/thumb.mjs';
   import { backend } from './backend.js';
+  import { ui } from './state.svelte.js';
 
-  // ship: a planner ship ({ name, image: { s, l } | null, manufacturer }) or null for an unknown one.
+  // ship: a planner ship ({ id, name, image: { s, l } | null, manufacturer }) or null for an unknown one.
   // label: alt text for the rare placement with no ship name beside it; empty (decorative) otherwise.
   let { ship = null, size = 'xs', label = '' } = $props();
   const sz = $derived(thumbSize(size));
-  // The local file ({ s, l } names under images/): the small one for xs/s/m, the large one for card and hero.
-  const src = $derived(backend.imageSrc(thumbFile(ship?.image, sz)));
+  // The local file ({ s, l } names under images/): the small one for xs/s/m, the large one for card and hero. A ship the picture sync has not
+  // reached shows the signed feed's picture (ui.feed.ships, filled as the feed's pictures arrive), so pictures are there before any sync.
+  const src = $derived(backend.imageSrc(thumbFile(shipPicture(ship, ui.feed.ships), sz)));
   // The src that failed to load; a different picture gets a fresh chance.
   let failedSrc = $state(null);
   const showImage = $derived(!!src && failedSrc !== src);

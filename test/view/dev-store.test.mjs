@@ -237,3 +237,16 @@ test('feed pictures are served from feed/images/catalog (feed/catalog/<id>.webp,
   fs.symlinkSync(path.join(other, 'secret'), path.join(linked, 'feed', 'images'), 'dir');
   assert.equal(readImage(linked, 'feed/catalog/5.webp'), null);
 });
+
+test('feed ship pictures are served from feed/images/ships (feed/ships/<id>.webp, webp only) and never through a symlinked folder', () => {
+  const dir = tmp();
+  write(dir, 'feed/images/ships/7.webp', 'shippic');
+  assert.equal(readImage(dir, 'feed/ships/7.webp').toString(), 'shippic');
+  for (const bad of ['feed/ships/7.png', 'feed/ships/x.webp', 'feed/ships/../manifest.json', 'feed/ships/8.webp', 'feed/ships//7.webp', 'feed/ships/7/8.webp', 'ships/7.webp', 'feed/other/7.webp']) assert.equal(readImage(dir, bad), null, bad);
+  const other = tmp();
+  write(other, 'secret/7.webp', 'secret');
+  const linked = tmp();
+  fs.mkdirSync(path.join(linked, 'feed', 'images'), { recursive: true });
+  fs.symlinkSync(path.join(other, 'secret'), path.join(linked, 'feed', 'images', 'ships'), 'dir');
+  assert.equal(readImage(linked, 'feed/ships/7.webp'), null);
+});

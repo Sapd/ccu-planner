@@ -6,7 +6,7 @@ import { isRsiUrl } from '../../../src/logic/links.mjs';
 
 // The Tauri data dir, filled by load() so imageSrc can stay synchronous.
 let cachedDataDir = null;
-const IMAGE_FILE = /^(?:\d+-(s|l)\.webp|\d+-original\.(webp|png|jpe?g|avif|gif)|catalog\/\d+\.(webp|png|jpe?g|avif|gif)|feed\/catalog\/\d+\.webp)$/;
+const IMAGE_FILE = /^(?:\d+-(s|l)\.webp|\d+-original\.(webp|png|jpe?g|avif|gif)|catalog\/\d+\.(webp|png|jpe?g|avif|gif)|feed\/(?:catalog|ships)\/\d+\.webp)$/;
 
 const inTauri = () => typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__;
 
@@ -75,12 +75,12 @@ export const backend = {
    * The signed data feed (sale events, the public store catalog), checked and cached under <data dir>/feed/: by Rust in the desktop app
    * (src-tauri/src/feed.rs), by the dev server's Node code in a browser. Nothing here fetches the feed from the webview.
    *   refresh(force)  one check, at most every 6 hours unless forced -> { status: 'updated'|'unchanged'|'skipped'|'offline'|'rejected', generatedAt, stale, error? } (stale: the held feed is over 30 days old)
-   *   images(limit)   downloads up to `limit` missing catalog pictures -> { downloaded, remaining, failed }
-   *   read()          the verified cache -> { generatedAt, eventsDoc, catalog, images: ['catalog/12.webp', ...] } or null
+   *   images(limit, scope)  downloads up to `limit` missing pictures, ship pictures first -> { downloaded, remaining, failed }; scope 'ships' leaves the catalog pictures
+   *   read()          the verified cache -> { generatedAt, eventsDoc, catalog, images: ['catalog/12.webp', 'ships/7.webp', ...] } or null
    */
   feed: {
     refresh: (force = false) => (inTauri() ? viaTauri('feed_refresh', { force }) : viaHttp('feed-refresh', { force })),
-    images: (limit = 200) => (inTauri() ? viaTauri('feed_images', { limit }) : viaHttp('feed-images', { limit })),
+    images: (limit = 200, scope = 'all') => (inTauri() ? viaTauri('feed_images', { limit, scope }) : viaHttp('feed-images', { limit, scope })),
     read: () => (inTauri() ? viaTauri('feed_read') : viaHttp('feed')),
   },
   dataDir: async () => (inTauri() ? (cachedDataDir ??= await viaTauri('data_dir')) : viaHttp('dir')),

@@ -17,6 +17,8 @@
 // and whose files exist is skipped; missing files are filled in without a page
 // fetch. --refresh downloads everything again. After an import, an existing
 // (older) image file is kept as it is until --refresh.
+// Ships whose picture the signed data feed already holds (<data dir>/feed/, see scripts/feed.mjs) are skipped, since the app shows that one until
+// this sync has its own; --refresh does not skip them. A ship that already has its own entry is handled as above.
 // --dry-run prints the URLs it would fetch and makes no request.
 
 import crypto from 'node:crypto';
@@ -25,6 +27,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, checkLegacyData } from '../src/data.mjs';
 import { shipPageUrl } from '../src/logic/images.mjs';
+import { feedShipFiles } from '../src/logic/feed.mjs';
+import { readFeed } from '../src/feed.mjs';
 import { syncImages, shipWork } from '../src/image-sync.mjs';
 
 const USAGE = 'usage: node scripts/sync-images.mjs [--limit N] [--refresh] [--dry-run] [--data DIR] [--interval MS]';
@@ -66,7 +70,9 @@ const catalog = readJson(path.join(dir, 'catalog.json'), null);
 if (!catalog) { console.error(`no catalog.json in ${dir}`); process.exit(1); }
 const store = readJson(outFile, { fetchedAt: null, images: {} });
 store.images ??= {};
-const ships = catalog.ships.map((s) => ({ id: s.id, name: s.name, page: shipPageUrl(s.link) }));
+const fromFeed = flag('refresh') ? {} : feedShipFiles(readFeed(dir)?.images);
+const ships = catalog.ships.filter((s) => store.images[s.id]?.thumbs || !fromFeed[s.id]).map((s) => ({ id: s.id, name: s.name, page: shipPageUrl(s.link) }));
+if (catalog.ships.length !== ships.length) console.log(`${catalog.ships.length - ships.length} ship(s) are skipped: the data feed already has their picture`);
 
 if (flag('dry-run')) {
   let todo = ships.filter((s) => { const w = shipWork(store, s, { refresh: flag('refresh'), exists }); return w.page || w.image; });

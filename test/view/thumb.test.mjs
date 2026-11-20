@@ -31,3 +31,15 @@ test('thumbFile: card uses the large picture, falling back to the small one', ()
   assert.equal(thumbFile({ s: 'a-s.webp' }, 'card'), 'a-s.webp');
   assert.equal(thumbFile(null, 'card'), null);
 });
+
+test('shipPicture: the picture sync wins, the feed fills in, a ship without either has none', async () => {
+  const { shipPicture } = await import('../../app/src/lib/view/thumb.mjs');
+  const feed = { 7: 'feed/ships/7.webp' };
+  assert.deepEqual(shipPicture({ id: 7, image: { s: '7-s.webp', l: '7-l.webp' } }, feed), { s: '7-s.webp', l: '7-l.webp' });
+  assert.deepEqual(shipPicture({ id: 7, image: null }, feed), { s: 'feed/ships/7.webp', l: 'feed/ships/7.webp' });
+  assert.equal(shipPicture({ id: 8, image: null }, feed), null);
+  assert.equal(shipPicture({ name: 'no id', image: null }, feed), null);
+  assert.equal(shipPicture(null, feed), null);
+  assert.equal(shipPicture({ id: 7, image: null }), null);
+  assert.equal(thumbFile(shipPicture({ id: 7, image: null }, feed), 'hero'), 'feed/ships/7.webp');
+});

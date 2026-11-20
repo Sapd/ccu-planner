@@ -9,7 +9,7 @@ import { withWriteLock } from '../src/sync/write-lock.mjs';
 import { readFeed, refreshFeed, fetchFeedImages, feedBase } from '../src/feed.mjs';
 
 const LEGACY_FILES = ['catalog.json', 'ship-details.json', 'hangar.json', 'buyback.json', 'plans.json', 'price-overrides.json', 'ship-images.json', 'offer-history.jsonl', 'sale-history.json', 'sale-events.json', 'warbond-prices.json', 'plan-snapshots.json'];
-const IMAGE_FILE = /^(?:\d+-(s|l)\.webp|\d+-original\.(webp|png|jpe?g|avif|gif)|catalog\/\d+\.(webp|png|jpe?g|avif|gif)|feed\/catalog\/\d+\.webp)$/;
+const IMAGE_FILE = /^(?:\d+-(s|l)\.webp|\d+-original\.(webp|png|jpe?g|avif|gif)|catalog\/\d+\.(webp|png|jpe?g|avif|gif)|feed\/(?:catalog|ships)\/\d+\.webp)$/;
 const DOCS = { plans: 'plans.json', overrides: 'price-overrides.json', 'sale-events': 'sale-events.json' };
 // plan-snapshots.json is not a revisioned document and never in DOCS: scripts/sync.mjs, the MCP sync and the desktop app's own sync (through sync_write) write it; the app only reads it through readRaw.
 // Documents the user edits in the app: an import never replaces an existing one.
@@ -40,12 +40,13 @@ function imageFiles(dir) {
 export function readImage(dir, name) {
   if (typeof name !== 'string' || !IMAGE_FILE.test(name)) return null;
   if (!name.startsWith('feed/')) { try { if (!fs.lstatSync(path.join(dir, 'images')).isDirectory()) return null; } catch { return null; } }
-  // A store catalog picture sits in images/catalog/, which must be a real folder too. The feed's pictures live in feed/images/catalog/ (name "feed/catalog/<id>.webp").
+  // A store catalog picture sits in images/catalog/, which must be a real folder too. The feed's pictures live in feed/images/catalog/ and feed/images/ships/ (names "feed/catalog/<id>.webp", "feed/ships/<id>.webp").
   const inFeed = name.startsWith('feed/');
   const base = inFeed ? path.join(dir, 'feed', 'images') : path.join(dir, 'images');
   const rel = inFeed ? name.slice('feed/'.length) : name;
   if (inFeed) { try { if (!fs.lstatSync(path.join(dir, 'feed')).isDirectory() || !fs.lstatSync(base).isDirectory()) return null; } catch { return null; } }
-  if (rel.startsWith('catalog/')) { try { if (!fs.lstatSync(path.join(base, 'catalog')).isDirectory()) return null; } catch { return null; } }
+  const folder = /^(catalog|ships)\//.exec(rel)?.[1];
+  if (folder) { try { if (!fs.lstatSync(path.join(base, folder)).isDirectory()) return null; } catch { return null; } }
   const file = path.join(base, rel);
   return isFile(file) ? fs.readFileSync(file) : null;
 }
@@ -182,7 +183,7 @@ export default function devData() {
           if (req.method !== 'POST') return send(405, { error: 'POST required' });
           const body = await readBody(req);
           if (op === '/feed-refresh') return send(200, await refreshFeed({ dir: path.resolve(dir), force: body.force === true, base: feedBase(process.env, { dev: true }) }));
-          if (op === '/feed-images') return send(200, await fetchFeedImages({ dir: path.resolve(dir), limit: Math.min(500, Math.max(1, Number(body.limit) || 200)), base: feedBase(process.env, { dev: true }) }));
+          if (op === '/feed-images') return send(200, await fetchFeedImages({ dir: path.resolve(dir), limit: Math.min(500, Math.max(1, Number(body.limit) || 200)), scope: body.scope === 'ships' ? 'ships' : 'all', base: feedBase(process.env, { dev: true }) }));
           if (op === '/sync-start') return send(200, syncRunner().start(body.kind, { force: body.force === true }));
           if (op === '/sync-confirm') { syncRunner().confirm(body.id, body.accept); return send(200, null); }
           if (op === '/sync-cancel') { syncRunner().cancel(); return send(200, null); }

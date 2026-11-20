@@ -1,5 +1,6 @@
 // Desktop runs the shared core in the webview; the dev server runs the Node host.
 import { parseOgImage, shipPageUrl } from '../../../src/logic/images.mjs';
+import { feedShipFiles } from '../../../src/logic/feed.mjs';
 import { snapshotQuietly } from './plan-snapshot.js';
 let running = false;
 let cancelled = false;
@@ -60,8 +61,11 @@ export function syncBackend(inTauri, invoke, http, listenOverride = null) {
           if (!catalog) throw new Error('Sync Store first');
           const store = await readJson('ship-images.json', { images: {} });
           const existing = new Set(await readJson('images', []));
+          // Ships the signed data feed already has a picture for are not fetched from RSI (the app shows the feed's until there is one of its own).
+          const fromFeed = feedShipFiles((await invoke('feed_read').catch(() => null))?.images);
           for (const [i, ship] of catalog.ships.entries()) {
             if (cancelled) throw new Error('Sync cancelled; progress saved');
+            if (fromFeed[ship.id] && !store.images[ship.id]?.thumbs) { await progress({ phase: 'images', done: i + 1, total: catalog.ships.length }); continue; }
             if (!store.images[ship.id]?.thumbs || !existing.has(store.images[ship.id].thumbs.s) || !existing.has(store.images[ship.id].thumbs.l)) {
               const page = shipPageUrl(ship.link);
               if (!page) continue;

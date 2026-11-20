@@ -7,7 +7,7 @@ import { createController } from './view/controller.mjs';
 import { clearJobCache } from './jobs.svelte.js';
 import aliases from '../../../src/logic/aliases.json';
 import { readCatalog } from '../../../src/logic/store-catalog.mjs';
-import { readEvents, feedCatalog, chooseCatalog, FEED_REFRESH_MS } from '../../../src/logic/feed.mjs';
+import { readEvents, feedCatalog, chooseCatalog, feedShipFiles, FEED_REFRESH_MS } from '../../../src/logic/feed.mjs';
 import { freshBrowse } from './view/storeBrowser.mjs';
 
 const freshStore = () => ({ query: '', scope: 'all', hours: 24, onlyMine: false, open: {}, checkOpen: false, checks: {} });
@@ -67,8 +67,9 @@ class Ui {
   // The app's own catalog file alone (read by loadCatalog); the sync menu's "Last synced" is about this one.
   ownCatalog = $state.raw(null);
   ownLoaded = $state(false);
-  // The signed data feed's saved copy: { events: [{ id, name, from, to, note }], generatedAt, catalog: doc | null, status }.
-  feed = $state.raw({ events: [], generatedAt: null, catalog: null, status: null });
+  // The signed data feed's saved copy: { events: [{ id, name, from, to, note }], generatedAt, catalog: doc | null, status, ships }.
+  // ships: { "<ship id>": "feed/ships/<id>.webp" } for the feed's ship pictures on disk (ShipThumb's fallback).
+  feed = $state.raw({ events: [], generatedAt: null, catalog: null, status: null, ships: {} });
   // chip: the open view ('ships' | 'ccu' | 'others'); sel: the ticked filters per view; sort: the Upgrades table's sort; picked: the user chose a view (else the first non-empty one opens).
   hangar = $state(freshHangar());
   // The open tab at the bottom of a goal's view (kept while moving between goals).
@@ -117,14 +118,24 @@ const readFeedCache = async () => {
     ...ui.feed, generatedAt: cache?.generatedAt ?? null,
     events: readEvents(cache?.eventsDoc),
     catalog: cache?.catalog ? feedCatalog(cache.catalog, (name) => have.has(name)) : null,
+    ships: feedShipFiles(cache?.images),
   };
   chooseShownCatalog(ui.catalog.error);
   await controller.refeed();
 };
+/** Only the list of the feed's ship pictures on disk, for ShipThumb (cheaper than a whole readFeedCache: nothing is derived again). */
+const readFeedShips = async () => {
+  let cache = null;
+  try { cache = await realBackend.feed.read(); } catch { return; }
+  ui.feed = { ...ui.feed, ships: feedShipFiles(cache?.images) };
+};
 let feedRunning = false;
+/** How many ship pictures one download round fetches; the list is re-read after each round. */
+const SHIP_ROUND = 60;
 /**
- * One feed round: show what is saved, ask for a newer one (the backend asks at most every 6 hours), show that, then fetch the catalog
- * pictures while the feed's catalog is the one shown. Offline, refused or unavailable is silent; the saved copy stays.
+ * One feed round: show what is saved, ask for a newer one (the backend asks at most every 6 hours), show that, then fetch the ship
+ * pictures (whatever catalog is shown: every ship thumbnail uses them until the picture sync has its own), then the catalog pictures
+ * while the feed's catalog is the one shown. Offline, refused or unavailable is silent; the saved copy stays.
  */
 export const refreshFeed = async ({ force = false } = {}) => {
   if (feedRunning || ui.sample) return;
@@ -136,6 +147,14 @@ export const refreshFeed = async ({ force = false } = {}) => {
     try { status = (await realBackend.feed.refresh(force))?.status ?? null; } catch { status = 'offline'; }
     ui.feed = { ...ui.feed, status };
     if (status === 'updated') await readFeedCache();
+    // Ship pictures first, in small rounds so the first ones show at once.
+    for (let round = 0; round < 100; round++) {
+      let r = null;
+      try { r = await realBackend.feed.images(SHIP_ROUND, 'ships'); } catch { break; }
+      if (!r?.downloaded) break;
+      await readFeedShips();
+      if (!r.remaining) break;
+    }
     for (let round = 0; round < 100 && ui.catalog.source === 'feed' && ui.feed.catalog; round++) {
       let r = null;
       try { r = await realBackend.feed.images(200); } catch { break; }
