@@ -78,7 +78,7 @@ function cachedFile(dir, manifest, name) {
 
 /**
  * What the cache holds, in the shape the desktop's feed_read gives the webview: { generatedAt, eventsDoc, catalog, images }
- * (the two raw JSON documents, or null when missing or damaged; images: ["catalog/12.webp", ...] present on disk), or null when there is
+ * (the two raw JSON documents, or null when missing or damaged; images: ["catalog/12.webp", "ships/7.webp", ...] present on disk), or null when there is
  * no verified manifest. The signature and the two JSON files' hashes are checked again on every read.
  */
 export function readFeed(dir, { publicKey = FEED_PUBLIC_KEY } = {}) {
@@ -184,16 +184,21 @@ export async function refreshFeed({ dir, force = false, fetch: fetchFn = fetch, 
   }
 }
 
+const SHIP_IMAGE = /^images\/ships\//;
+
 /**
- * Downloads up to `limit` catalog pictures the manifest lists and the cache lacks (each checked against its sha256), then removes saved
- * pictures the manifest no longer lists once nothing is left to fetch. Never throws.
+ * Downloads up to `limit` pictures the manifest lists and the cache lacks, ship pictures first (each checked against its sha256), then removes
+ * saved pictures the manifest no longer lists once nothing is left to fetch. Never throws.
+ * `scope`: 'all' (ship and catalog pictures) or 'ships' (ship pictures only: the app wants those whatever catalog it shows).
  * @returns {Promise<{ downloaded: number, remaining: number, failed: number }>}
  */
-export async function fetchFeedImages({ dir, limit = 200, fetch: fetchFn = fetch, base = feedBase(), publicKey = FEED_PUBLIC_KEY, timeoutMs = 20000, concurrency = 4 }) {
+export async function fetchFeedImages({ dir, limit = 200, scope = 'all', fetch: fetchFn = fetch, base = feedBase(), publicKey = FEED_PUBLIC_KEY, timeoutMs = 20000, concurrency = 4 }) {
   const cached = cachedManifest(dir, publicKey);
   if (!cached) return { downloaded: 0, remaining: 0, failed: 0 };
   const { manifest } = cached;
-  const missing = Object.keys(manifest.files).filter(imageName).filter((n) => fileSize(path.join(feedDir(dir), n)) !== manifest.files[n].size);
+  const missing = Object.keys(manifest.files).filter(imageName).filter((n) => scope !== 'ships' || SHIP_IMAGE.test(n))
+    .filter((n) => fileSize(path.join(feedDir(dir), n)) !== manifest.files[n].size)
+    .sort((a, b) => Number(SHIP_IMAGE.test(b)) - Number(SHIP_IMAGE.test(a)));
   const batch = missing.slice(0, limit);
   let downloaded = 0, failed = 0, offline = false;
   const queue = [...batch];
@@ -211,8 +216,10 @@ export async function fetchFeedImages({ dir, limit = 200, fetch: fetchFn = fetch
   await Promise.all(Array.from({ length: concurrency }, worker));
   const remaining = missing.length - downloaded;
   if (!remaining) {
-    const folder = path.join(feedDir(dir), 'images', 'catalog');
-    try { for (const f of fs.readdirSync(folder)) if (!manifest.files[`images/catalog/${f}`] && FEED_FILE.test(`images/catalog/${f}`)) fs.rmSync(path.join(folder, f), { force: true }); } catch { /* no folder yet */ }
+    for (const kind of scope === 'ships' ? ['ships'] : ['ships', 'catalog']) {
+      const folder = path.join(feedDir(dir), 'images', kind);
+      try { for (const f of fs.readdirSync(folder)) if (!manifest.files[`images/${kind}/${f}`] && FEED_FILE.test(`images/${kind}/${f}`)) fs.rmSync(path.join(folder, f), { force: true }); } catch { /* no folder yet */ }
+    }
   }
   return { downloaded, remaining, failed };
 }

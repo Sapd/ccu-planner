@@ -341,14 +341,16 @@ app; reloaded. Do it again."
 **Signed data feed.** `.github/workflows/feed.yml` runs hourly (`17 * * * *`, also by hand) and publishes
 `https://sapd.github.io/ccu-planner/feed/` with `actions/deploy-pages` (an artifact deployment: nothing is committed). The Pages
 site is a project site with build type "workflow" (`gh api -X POST repos/Sapd/ccu-planner/pages -f build_type=workflow`).
-`node scripts/build-feed.mjs --out DIR --key PEM [--cache DIR] [--events FILE] [--no-catalog] [--no-images]` builds it (src/feed-build.mjs):
+`node scripts/build-feed.mjs --out DIR --key PEM [--cache DIR] [--events FILE] [--no-catalog] [--no-images] [--no-ships]` builds it (src/feed-build.mjs):
 `feed/events.json` from `feed-src/events.json` (the hand-maintained sale events: edit that file and push; dates are YYYY-MM-DD,
 validated strictly), `feed/store-catalog.json` from the anonymous catalog sync (the same code as `sync-catalog`, only new pictures
 downloaded because `--cache` keeps the last run's catalog and `images/catalog/*.webp`; the workflow keeps that folder with
-`actions/cache`), `feed/images/catalog/<id>.webp`, and `feed/manifest.json` (schema, generatedAt, sha256 and size of every file) with
+`actions/cache`), `feed/images/catalog/<id>.webp`, `feed/images/ships/<ship id>.webp` (src/ship-pictures.mjs: the upgrade tool's anonymous ship list,
+each new ship's store page og:image one second apart, resized to one WebP of at most 640 px; the cache keeps them with `ship-sources.json`, only new
+ships are fetched, a few known pages are re-read per run, and when RSI fails the cached pictures are published again), and `feed/manifest.json` (schema, generatedAt, sha256 and size of every file) with
 `manifest.json.sig` = base64 ed25519 over the exact manifest bytes. If RSI fails or answers much smaller, the previous catalog is
 published again; without one the feed just has no catalog that hour. The cache is untrusted (it is restored from `actions/cache`, and what
-is in it gets signed): `src/feed-cache.mjs` deletes everything that is not a decodable WebP of at most 480 px or a valid public catalog
+is in it gets signed): `src/feed-cache.mjs` deletes everything that is not a decodable WebP of at most 480 px (catalog) or 640 px (ships), a valid public catalog or valid ship source notes
 whose picture names are `catalog/<its id>.webp`, `src/feed-build.mjs` checks every picture again before signing, and the cache key carries
 a hash of the workflow and of that code. The private key is the secret `FEED_SIGNING_KEY` of the GitHub environment `feed` (deployments
 from `main` only), in the env of the one build step; it is PEM, not the updater key, and the build refuses a key that does not match

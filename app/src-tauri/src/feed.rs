@@ -61,14 +61,25 @@ pub fn public_key() -> Result<Vec<u8>, String> {
     Ok(raw)
 }
 
-/// The only names a manifest may list: events.json, store-catalog.json and images/catalog/<digits>.webp.
+/// The picture folders of the feed: store catalog items and ships (images/<folder>/<digits>.webp).
+const PICTURE_FOLDERS: [&str; 2] = ["catalog", "ships"];
+
+/// The only names a manifest may list: events.json, store-catalog.json, images/catalog/<digits>.webp and images/ships/<digits>.webp.
 pub fn allowed_name(name: &str) -> bool {
     if name == "events.json" || name == "store-catalog.json" {
         return true;
     }
-    name.strip_prefix("images/catalog/")
-        .and_then(|n| n.strip_suffix(".webp"))
-        .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+    PICTURE_FOLDERS.iter().any(|folder| {
+        name.strip_prefix("images/")
+            .and_then(|n| n.strip_prefix(folder))
+            .and_then(|n| n.strip_prefix('/'))
+            .and_then(|n| n.strip_suffix(".webp"))
+            .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+    })
+}
+
+fn is_ship_image(name: &str) -> bool {
+    name.starts_with("images/ships/")
 }
 
 fn is_image(name: &str) -> bool {
@@ -297,7 +308,7 @@ fn image_present(data: &Path, manifest: &Manifest, name: &str) -> bool {
     fs::symlink_metadata(feed_dir(data).join(name)).is_ok_and(|m| m.file_type().is_file() && m.len() == *size)
 }
 
-/// What the cache holds, for the webview: `{ generatedAt, eventsDoc, catalog, images: ["catalog/12.webp", ...] }`, or null without a verified manifest.
+/// What the cache holds, for the webview: `{ generatedAt, eventsDoc, catalog, images: ["catalog/12.webp", "ships/7.webp", ...] }`, or null without a verified manifest.
 /// The signature and the two JSON files' hashes are checked again here.
 pub fn read_feed(data: &Path, key: &[u8]) -> Option<Value> {
     let (manifest, _) = cached_manifest(data, key)?;
@@ -360,19 +371,28 @@ fn commit(data: &Path, manifest_bytes: &[u8], sig_text: &str, now: u64) -> Resul
     write_atomic(&feed_dir(data).join("state.json"), json!({ "checkedAt": now }).to_string().as_bytes())
 }
 
-fn missing_images(data: &Path, manifest: &Manifest) -> Vec<String> {
-    manifest.files.keys().filter(|n| is_image(n) && !image_present(data, manifest, n)).cloned().collect()
+/// The pictures the manifest lists and the cache lacks, ship pictures first (`ships_only`: no catalog pictures at all).
+fn missing_images(data: &Path, manifest: &Manifest, ships_only: bool) -> Vec<String> {
+    let mut missing: Vec<String> = manifest
+        .files
+        .keys()
+        .filter(|n| is_image(n) && (!ships_only || is_ship_image(n)) && !image_present(data, manifest, n))
+        .cloned()
+        .collect();
+    missing.sort_by_key(|n| !is_ship_image(n)); // stable: the order inside each group stays by name
+    missing
 }
 
-/// Removes saved pictures the manifest no longer lists.
-fn prune_images(data: &Path, manifest: &Manifest) {
-    let folder = feed_dir(data).join("images").join("catalog");
-    let Ok(entries) = fs::read_dir(&folder) else { return };
-    for entry in entries.flatten() {
-        if let Some(n) = entry.file_name().to_str() {
-            let name = format!("images/catalog/{n}");
-            if allowed_name(&name) && !manifest.files.contains_key(&name) {
-                let _ = fs::remove_file(entry.path());
+/// Removes saved pictures the manifest no longer lists (ships only: just the ship pictures).
+fn prune_images(data: &Path, manifest: &Manifest, ships_only: bool) {
+    for kind in PICTURE_FOLDERS.iter().filter(|k| !ships_only || **k == "ships") {
+        let Ok(entries) = fs::read_dir(feed_dir(data).join("images").join(kind)) else { continue };
+        for entry in entries.flatten() {
+            if let Some(n) = entry.file_name().to_str() {
+                let name = format!("images/{kind}/{n}");
+                if allowed_name(&name) && !manifest.files.contains_key(&name) {
+                    let _ = fs::remove_file(entry.path());
+                }
             }
         }
     }
@@ -481,35 +501,51 @@ pub async fn refresh(data: &Path, force: bool) -> Value {
     }
 }
 
-/// Downloads up to `limit` catalog pictures the manifest lists and the cache lacks, then prunes unlisted ones once none are left.
+/// How many pictures are fetched at the same time.
+const PICTURE_CONCURRENCY: usize = 4;
+
+/// Downloads up to `limit` pictures the manifest lists and the cache lacks (ship pictures first, four at a time, each checked against its sha256),
+/// then prunes unlisted ones once none are left. `ships_only` leaves the catalog pictures alone.
 /// Resolves to `{ downloaded, remaining, failed }`.
-pub async fn fetch_images(data: &Path, limit: usize) -> Value {
+pub async fn fetch_images(data: &Path, limit: usize, ships_only: bool) -> Value {
+    match (public_key(), base_url()) {
+        (Ok(key), Ok(base)) => fetch_images_from(data, &key, &base, limit, ships_only).await,
+        _ => json!({ "downloaded": 0, "remaining": 0, "failed": 0 }),
+    }
+}
+
+/// `fetch_images` with the key and the address given (the tests point it at a local server).
+async fn fetch_images_from(data: &Path, key: &[u8], base: &reqwest::Url, limit: usize, ships_only: bool) -> Value {
     let done = |downloaded: usize, remaining: usize, failed: usize| json!({ "downloaded": downloaded, "remaining": remaining, "failed": failed });
-    let Ok(key) = public_key() else { return done(0, 0, 0) };
-    let Some((manifest, _)) = cached_manifest(data, &key) else { return done(0, 0, 0) };
-    let Ok(base) = base_url() else { return done(0, 0, 0) };
+    let Some((manifest, _)) = cached_manifest(data, key) else { return done(0, 0, 0) };
     let Ok(http) = client() else { return done(0, 0, 0) };
-    let missing = missing_images(data, &manifest);
-    let (mut downloaded, mut failed) = (0, 0);
-    for name in missing.iter().take(limit) {
-        let result = async {
-            let body = get(&http, file_url(&base, name)?, MAX_IMAGE).await?;
-            store_file(data, &manifest, name, &body)?;
-            Ok::<(), Fail>(())
+    let missing = missing_images(data, &manifest, ships_only);
+    let (mut downloaded, mut failed, mut offline) = (0, 0, false);
+    let mut queue = missing.iter().take(limit).cloned();
+    let mut running = tokio::task::JoinSet::new();
+    loop {
+        while !offline && running.len() < PICTURE_CONCURRENCY {
+            let Some(name) = queue.next() else { break };
+            let (http, base, manifest, data) = (http.clone(), base.clone(), manifest.clone(), data.to_path_buf());
+            running.spawn(async move {
+                let body = get(&http, file_url(&base, &name)?, MAX_IMAGE).await?;
+                store_file(&data, &manifest, &name, &body)?;
+                Ok::<(), Fail>(())
+            });
         }
-        .await;
-        match result {
-            Ok(()) => downloaded += 1,
-            Err(Fail::Offline(_)) => {
+        match running.join_next().await {
+            None => break,
+            Some(Ok(Ok(()))) => downloaded += 1,
+            Some(Ok(Err(Fail::Offline(_)))) => {
                 failed += 1;
-                break;
+                offline = true;
             }
-            Err(Fail::Rejected(_)) => failed += 1,
+            Some(_) => failed += 1,
         }
     }
     let remaining = missing.len() - downloaded;
     if remaining == 0 {
-        prune_images(data, &manifest);
+        prune_images(data, &manifest, ships_only);
     }
     done(downloaded, remaining, failed)
 }
@@ -535,11 +571,12 @@ pub async fn feed_images(
     app: tauri::AppHandle,
     state: tauri::State<'_, FeedState>,
     limit: u32,
+    scope: Option<String>,
 ) -> Result<Value, String> {
     crate::main_only(&requester)?;
     let data = crate::resolve_data_dir(&app)?;
     let _one = state.0.lock().await;
-    Ok(fetch_images(&data, limit.clamp(1, 500) as usize).await)
+    Ok(fetch_images(&data, limit.clamp(1, 500) as usize, scope.as_deref() == Some("ships")).await)
 }
 
 #[tauri::command]
@@ -630,9 +667,12 @@ mod tests {
         let base = reqwest::Url::parse(FEED_BASE).unwrap();
         assert_eq!(file_url(&base, "manifest.json").unwrap().as_str(), "https://sapd.github.io/ccu-planner/feed/manifest.json");
         assert_eq!(file_url(&base, "images/catalog/7.webp").unwrap().as_str(), "https://sapd.github.io/ccu-planner/feed/images/catalog/7.webp");
+        assert_eq!(file_url(&base, "images/ships/12.webp").unwrap().as_str(), "https://sapd.github.io/ccu-planner/feed/images/ships/12.webp");
         for bad in [
             "../x", "/etc/passwd", "//evil.test/x", "images/catalog/../../x.webp", "images/catalog/%2e%2e/7.webp", "%2e%2e/events.json", "images/catalog/7.png",
             "https://evil.test/x", "events.json?x=1", "images/catalog/.webp", "state.json", "feed-seen.json", "images\\catalog\\7.webp",
+            "images/ships/../../x.webp", "images/ships/%2e%2e/7.webp", "images/ships/7.png", "images/ships/.webp", "images/ships/a.webp", "images/ships/7/8.webp",
+            "images/shipsx/7.webp", "images/ships7.webp", "images//ships/7.webp", "images/other/7.webp", "images/ships/7.webp?x=1", "images\\ships\\7.webp",
         ] {
             assert!(file_url(&base, bad).is_err(), "{bad}");
         }
@@ -673,7 +713,7 @@ mod tests {
         assert!(store_file(dir.path(), &m, "images/catalog/5.webp", b"pix").is_err());
         assert_eq!(fs::read(dir.path().join("feed/events.json")).unwrap(), br#"{"events":[]}"#);
         store_file(dir.path(), &m, "images/catalog/5.webp", b"pic").unwrap();
-        assert!(missing_images(dir.path(), &m).is_empty());
+        assert!(missing_images(dir.path(), &m, false).is_empty());
     }
 
     #[test]
@@ -806,7 +846,111 @@ mod tests {
         let folder = dir.path().join("feed/images/catalog");
         fs::write(folder.join("9.webp"), b"old").unwrap();
         fs::write(folder.join("notes.txt"), b"keep").unwrap();
-        prune_images(dir.path(), &m);
+        prune_images(dir.path(), &m, false);
         assert!(folder.join("5.webp").exists() && !folder.join("9.webp").exists() && folder.join("notes.txt").exists());
+    }
+
+    #[test]
+    fn ship_pictures_come_first_and_ships_only_leaves_the_catalog_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = pair(9);
+        let bytes = manifest_json(
+            "2026-11-20T10:00:00Z",
+            &[("events.json", b"{}"), ("images/catalog/1.webp", b"c1"), ("images/ships/2.webp", b"s2"), ("images/ships/10.webp", b"s10")],
+        );
+        let sig = sign(&k, &bytes);
+        let m = verify_manifest(&bytes, &sig, k.public_key().as_ref()).unwrap();
+        assert_eq!(missing_images(dir.path(), &m, false), ["images/ships/10.webp", "images/ships/2.webp", "images/catalog/1.webp"]);
+        assert_eq!(missing_images(dir.path(), &m, true), ["images/ships/10.webp", "images/ships/2.webp"]);
+        store_file(dir.path(), &m, "images/ships/2.webp", b"s2").unwrap();
+        assert_eq!(missing_images(dir.path(), &m, true), ["images/ships/10.webp"]);
+        assert!(store_file(dir.path(), &m, "images/ships/10.webp", b"s2").is_err(), "a ship picture must match its own hash");
+    }
+
+    #[test]
+    fn ship_pictures_the_manifest_dropped_are_pruned_and_ships_only_keeps_the_catalog_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = pair(10);
+        let bytes = manifest_json("2026-11-20T10:00:00Z", &[("images/ships/2.webp", b"s2")]);
+        let m = verify_manifest(&bytes, &sign(&k, &bytes), k.public_key().as_ref()).unwrap();
+        store_file(dir.path(), &m, "images/ships/2.webp", b"s2").unwrap();
+        let ships = dir.path().join("feed/images/ships");
+        let catalog = dir.path().join("feed/images/catalog");
+        fs::create_dir_all(&catalog).unwrap();
+        fs::write(ships.join("9.webp"), b"old").unwrap();
+        fs::write(ships.join("notes.txt"), b"keep").unwrap();
+        fs::write(catalog.join("9.webp"), b"old").unwrap();
+        prune_images(dir.path(), &m, true);
+        assert!(ships.join("2.webp").exists() && !ships.join("9.webp").exists() && ships.join("notes.txt").exists());
+        assert!(catalog.join("9.webp").exists(), "ships only does not touch the catalog pictures");
+        prune_images(dir.path(), &m, false);
+        assert!(!catalog.join("9.webp").exists());
+    }
+
+    /// A tiny HTTP server over a map of path -> body; resolves to its base address and the paths asked for, in order.
+    fn serve(files: BTreeMap<String, Vec<u8>>) -> (reqwest::Url, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use std::io::{BufRead, BufReader};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = reqwest::Url::parse(&format!("http://127.0.0.1:{}/feed/", listener.local_addr().unwrap().port())).unwrap();
+        let log = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = log.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let (files, seen) = (files.clone(), seen.clone());
+                std::thread::spawn(move || {
+                    let mut line = String::new();
+                    let mut reader = BufReader::new(&stream);
+                    reader.read_line(&mut line).unwrap();
+                    let path = line.split_whitespace().nth(1).unwrap_or("").trim_start_matches("/feed/").to_owned();
+                    seen.lock().unwrap().push(path.clone());
+                    let mut out = &stream;
+                    match files.get(&path) {
+                        Some(body) => {
+                            let _ = write!(out, "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n", body.len());
+                            let _ = out.write_all(body);
+                        }
+                        None => {
+                            let _ = write!(out, "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+                        }
+                    }
+                });
+            }
+        });
+        (base, log)
+    }
+
+    #[tokio::test]
+    async fn ship_pictures_are_fetched_concurrently_and_first_and_a_wrong_body_is_never_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = pair(11);
+        let ships: Vec<(String, Vec<u8>)> = (1..=9).map(|i| (format!("images/ships/{i}.webp"), format!("ship-{i}").into_bytes())).collect();
+        let mut listed: Vec<(&str, &[u8])> = ships.iter().map(|(n, b)| (n.as_str(), b.as_slice())).collect();
+        listed.push(("images/catalog/1.webp", b"cat-1"));
+        let bytes = manifest_json("2026-11-20T10:00:00Z", &listed);
+        let (sig_ok, key) = (sign(&k, &bytes), k.public_key().as_ref().to_vec());
+        let manifest = verify_manifest(&bytes, &sig_ok, &key).unwrap();
+        fs::create_dir_all(feed_dir(dir.path())).unwrap();
+        fs::write(feed_dir(dir.path()).join("manifest.json"), &bytes).unwrap();
+        fs::write(feed_dir(dir.path()).join("manifest.json.sig"), sig_ok.as_bytes()).unwrap();
+        let mut served: BTreeMap<String, Vec<u8>> = listed.iter().map(|(n, b)| (n.to_string(), b.to_vec())).collect();
+        served.insert("images/ships/9.webp".into(), b"tampered".to_vec()); // does not match the signed hash
+        let (base, log) = serve(served);
+
+        // Ships only, in rounds of four: the catalog picture is not asked for, and the tampered one is refused and left out.
+        let first = fetch_images_from(dir.path(), &key, &base, 4, true).await;
+        assert_eq!(first, json!({ "downloaded": 4, "remaining": 5, "failed": 0 }));
+        let second = fetch_images_from(dir.path(), &key, &base, 100, true).await;
+        assert_eq!(second, json!({ "downloaded": 4, "remaining": 1, "failed": 1 }));
+        assert!(!image_present(dir.path(), &manifest, "images/ships/9.webp"));
+        assert!(!log.lock().unwrap().iter().any(|p| p.contains("catalog")), "ships only never asks for a catalog picture");
+        for i in 1..=8 {
+            assert_eq!(fs::read(feed_dir(dir.path()).join(format!("images/ships/{i}.webp"))).unwrap(), format!("ship-{i}").into_bytes());
+        }
+        // Everything: the catalog picture comes after the ship pictures still missing.
+        log.lock().unwrap().clear();
+        let rest = fetch_images_from(dir.path(), &key, &base, 100, false).await;
+        assert_eq!(rest, json!({ "downloaded": 1, "remaining": 1, "failed": 1 }));
+        assert_eq!(log.lock().unwrap().first().map(String::as_str), Some("images/ships/9.webp"));
+        assert!(image_present(dir.path(), &manifest, "images/catalog/1.webp"));
     }
 }

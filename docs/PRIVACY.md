@@ -70,14 +70,15 @@ carries, such as your IP address and a generic client name. No account, no cooki
 data. If a newer signed version exists, the app downloads it from GitHub Releases. The browser version and the
 command-line tools never do this.
 
-### The data feed (sale events and a store catalog snapshot)
+### The data feed (sale events, a store catalog snapshot and ship pictures)
 
 The desktop app, the dev server and the MCP server also fetch a small public data feed from
 `https://sapd.github.io/ccu-planner/feed/` (GitHub Pages of this project, rebuilt hourly by
 `.github/workflows/feed.yml`): `manifest.json` and `manifest.json.sig`, then the files the manifest lists
 (`events.json`: sale events such as IAE with their dates; `store-catalog.json`: a snapshot of RSI's public store
-catalog; and its pictures under `images/catalog/`, copies of RSI's own store pictures, fetched only while the app
-shows the feed's catalog). The app checks on start and then at most every 6 hours; offline it just keeps what it
+catalog; its pictures under `images/catalog/`, copies of RSI's own store pictures, fetched only while the app
+shows the feed's catalog; and one picture per ship under `images/ships/`, a copy of the ship's public RSI store
+picture, so ship thumbnails are there before your own RSI picture sync has run). The app checks on start and then at most every 6 hours; offline it just keeps what it
 has and says nothing. Only plain GET requests are made, and only to that exact address (the desktop app's Rust code
 refuses every other address, and the web view itself is not allowed to connect anywhere). A request carries
 nothing but the file path: no cookies, no account, no version, no ids and none of your planner data; the host sees

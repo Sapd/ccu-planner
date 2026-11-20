@@ -77,3 +77,11 @@ test('chooseCatalog: nothing; only one; a signed-in own catalog always wins; a p
   assert.equal(chooseCatalog(doc('2026-11-01T10:00:00Z'), doc(null)).source, 'own', 'a feed of unknown age is never preferred');
   assert.equal(chooseCatalog(doc('2026-11-01T10:00:00Z'), doc('2026-11-20T10:00:00Z', false, 0)).source, 'own', 'an empty feed catalog is no catalog');
 });
+
+test('feedShipFiles names the ship pictures on disk for ShipThumb and ignores everything else', async () => {
+  const { feedShipFiles, FEED_FILE, FEED_SHIP_IMAGE } = await import('../src/logic/feed.mjs');
+  assert.deepEqual(feedShipFiles(['catalog/5.webp', 'ships/7.webp', 'ships/120.webp', 'ships/0.webp', 'ships/07.webp', 'ships/a.webp', 'ships/7.png', '../ships/9.webp', 12, null]), { 7: 'feed/ships/7.webp', 120: 'feed/ships/120.webp' });
+  assert.deepEqual(feedShipFiles(undefined), {});
+  assert.ok(FEED_FILE.test('images/ships/7.webp') && FEED_SHIP_IMAGE.test('images/ships/7.webp'));
+  assert.ok(!FEED_FILE.test('images/ships/7.png') && !FEED_FILE.test('images/ships/../7.webp') && !FEED_FILE.test('images/ships/7.webp\n'));
+});

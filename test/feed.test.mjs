@@ -403,3 +403,93 @@ test('a cached catalog that is signed in, has a crossed or foreign thumb name or
   assert.equal(r.catalog, null);
   assert.equal(fs.existsSync(path.join(cache, 'store-catalog.json')), false);
 });
+
+// ----- ship pictures -----
+
+test('buildFeed signs ship pictures only for the named ids and only when they are WebP containers', () => {
+  const images = tmp();
+  fs.mkdirSync(path.join(images, 'ships'), { recursive: true });
+  fs.writeFileSync(path.join(images, 'ships', '7.webp'), webp('ship seven'));
+  fs.writeFileSync(path.join(images, 'ships', '8.webp'), Buffer.from('<script>alert(1)</script>'));
+  fs.writeFileSync(path.join(images, 'ships', '9.webp'), webp('not asked for'));
+  const base = { outDir: path.join(tmp(), 'o'), privateKey: KEY.priv, publicKey: KEY.pub, events: { events: [] }, imagesDir: images };
+  const r = buildFeed({ ...base, shipIds: [7, 8, 10, 7, -1, 1.5, '9'] });
+  assert.equal(r.ships, 1);
+  assert.deepEqual(r.rejectedImages, ['ships/8.webp']);
+  const m = verifyManifest(fs.readFileSync(path.join(base.outDir, 'feed', 'manifest.json')), fs.readFileSync(path.join(base.outDir, 'feed', 'manifest.json.sig'), 'utf8'), KEY.pub);
+  assert.deepEqual(Object.keys(m.files), ['events.json', 'images/ships/7.webp']);
+  assert.equal(buildFeed({ ...base }).ships, 0, 'no ships named, no ship pictures');
+});
+
+test('a manifest may list ship pictures and only digit names under images/ships/', () => {
+  const f = (name) => ({ schema: 1, generatedAt: '2026-11-20T10:00:00Z', files: { [name]: { sha256: 'a'.repeat(64), size: 1 } } });
+  assert.ok(validateManifest(f('images/ships/12.webp')));
+  for (const bad of ['images/ships/../12.webp', 'images/ships/a.webp', 'images/ships/12.png', 'images/ships/.webp', 'images/ships/1/2.webp', 'images/boats/1.webp', 'images/ships/12.webp/', '/images/ships/1.webp'])
+    assert.throws(() => validateManifest(f(bad)), /not allowed/, bad);
+});
+
+test('ship pictures are downloaded before catalog pictures, scope "ships" leaves the catalog alone, and every picture is hash-checked', async () => {
+  const dir = tmp();
+  const files = site({ pics: { 5: 'pic5', 6: 'pic6' } });
+  // Add two ship pictures to the served feed and re-sign it.
+  const withShips = new Map(files);
+  withShips.set('images/ships/7.webp', Buffer.from('ship7'));
+  withShips.set('images/ships/20.webp', Buffer.from('ship20'));
+  const manifest = JSON.parse(files.get('manifest.json'));
+  for (const n of ['images/ships/7.webp', 'images/ships/20.webp']) manifest.files[n] = { sha256: sha256(withShips.get(n)), size: withShips.get(n).length };
+  manifest.files = Object.fromEntries(Object.entries(manifest.files).sort(([a], [b]) => (a < b ? -1 : 1)));
+  const bytes = json(manifest);
+  withShips.set('manifest.json', bytes);
+  withShips.set('manifest.json.sig', Buffer.from(`${signManifest(bytes, KEY.priv)}\n`));
+  await refreshFeed({ ...opts(dir, withShips), now: () => 1 });
+  const log = [];
+  const onlyShips = await fetchFeedImages({ ...opts(dir, withShips, { log }), scope: 'ships', concurrency: 1 });
+  assert.deepEqual(onlyShips, { downloaded: 2, remaining: 0, failed: 0 });
+  assert.deepEqual(log.filter((p) => p.startsWith('images/')), ['images/ships/20.webp', 'images/ships/7.webp'].sort((a, b) => (a < b ? -1 : 1)));
+  assert.deepEqual(readFeed(dir, { publicKey: KEY.pub }).images.sort(), ['ships/20.webp', 'ships/7.webp']);
+  log.length = 0;
+  const rest = await fetchFeedImages({ ...opts(dir, withShips, { log }), limit: 10 });
+  assert.deepEqual(rest, { downloaded: 2, remaining: 0, failed: 0 });
+  assert.deepEqual(log, ['images/catalog/5.webp', 'images/catalog/6.webp']);
+  // Ship pictures come first when everything is missing.
+  const dir2 = tmp();
+  await refreshFeed({ ...opts(dir2, withShips), now: () => 1 });
+  const order = [];
+  await fetchFeedImages({ ...opts(dir2, withShips, { log: order }), concurrency: 1 });
+  assert.deepEqual(order.map((p) => p.split('/')[1]), ['ships', 'ships', 'catalog', 'catalog']);
+  // A ship picture whose bytes differ from the signed hash is never saved; one the manifest dropped is removed at the end.
+  fs.rmSync(path.join(dir2, 'feed', 'images', 'ships', '7.webp'));
+  fs.writeFileSync(path.join(dir2, 'feed', 'images', 'ships', '99.webp'), 'old');
+  const bad = new Map(withShips); bad.set('images/ships/7.webp', Buffer.from('evil!'));
+  const r = await fetchFeedImages({ ...opts(dir2, bad), scope: 'ships' });
+  assert.deepEqual([r.downloaded, r.remaining, r.failed], [0, 1, 1]);
+  assert.equal(fs.existsSync(path.join(dir2, 'feed', 'images', 'ships', '7.webp')), false);
+  assert.equal(fs.existsSync(path.join(dir2, 'feed', 'images', 'ships', '99.webp')), true, 'nothing is pruned while a picture is still missing');
+  const ok = await fetchFeedImages({ ...opts(dir2, withShips), scope: 'ships' });
+  assert.deepEqual(ok, { downloaded: 1, remaining: 0, failed: 0 });
+  assert.equal(fs.existsSync(path.join(dir2, 'feed', 'images', 'ships', '99.webp')), false);
+});
+
+test('the restored cache keeps ship pictures up to 640 px and ship notes that name RSI addresses only', async () => {
+  const { default: sharp } = await import('sharp');
+  const cache = tmp();
+  const folder = path.join(cache, 'images', 'ships');
+  fs.mkdirSync(folder, { recursive: true });
+  const webpOf = (w, h) => sharp({ create: { width: w, height: h, channels: 3, background: '#123456' } }).webp().toBuffer();
+  fs.writeFileSync(path.join(folder, '1.webp'), await webpOf(640, 360));
+  fs.writeFileSync(path.join(folder, '2.webp'), await webpOf(641, 360));
+  fs.writeFileSync(path.join(folder, '3.webp'), Buffer.from('<html></html>'));
+  fs.writeFileSync(path.join(folder, 'x.webp'), await webpOf(8, 8));
+  const good = { ships: { 1: { page: 'https://robertsspaceindustries.com/en/pledge/ships/a/B', url: 'https://robertsspaceindustries.com/media/abc/source.jpg', checkedAt: 'T' } } };
+  fs.writeFileSync(path.join(cache, 'ship-sources.json'), JSON.stringify(good));
+  const r = await sanitizeFeedCache({ cacheDir: cache, sharp });
+  assert.deepEqual(r.removed.map((n) => path.basename(n)).sort(), ['2.webp', '3.webp', 'x.webp']);
+  assert.deepEqual(fs.readdirSync(folder), ['1.webp']);
+  assert.deepEqual(r.shipSources, good);
+  for (const bad of [{ ships: { 1: { url: 'https://evil.test/a.jpg' } } }, { ships: { 1: { page: 'https://evil.test/en/pledge/ships/a/B' } } }, { ships: { abc: {} } }, { ships: [] }, [], { ships: { 1: { page: 'not a url' } } }]) {
+    fs.writeFileSync(path.join(cache, 'ship-sources.json'), JSON.stringify(bad));
+    const again = await sanitizeFeedCache({ cacheDir: cache, sharp });
+    assert.equal(again.shipSources, null, JSON.stringify(bad));
+    assert.equal(fs.existsSync(path.join(cache, 'ship-sources.json')), false);
+  }
+});

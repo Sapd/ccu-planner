@@ -8,6 +8,7 @@
 //   events.json        { schema, events: [{ id, name, from, to, note? }] }      sale events, hand-maintained in feed-src/events.json
 //   store-catalog.json the public RSI store catalog (same document the catalog sync writes, signedIn false)
 //   images/catalog/<id>.webp  the pictures of that catalog
+//   images/ships/<id>.webp    one picture per ship (id = the upgrade tool's ship id), about 640 px wide
 
 import { isDay } from './availability.mjs';
 import { readCatalog } from './store-catalog.mjs';
@@ -18,8 +19,9 @@ export const FEED_SCHEMA = 1;
 export const FEED_REFRESH_MS = 6 * 60 * 60 * 1000;
 export const FEED_MAX_FILES = 20000;
 /** The only names a manifest may list (and so the only paths the clients ever request). */
-export const FEED_FILE = /^(?:events\.json|store-catalog\.json|images\/catalog\/\d+\.webp)$/;
-export const FEED_IMAGE = /^images\/catalog\/(\d+)\.webp$/;
+export const FEED_FILE = /^(?:events\.json|store-catalog\.json|images\/(?:catalog|ships)\/\d+\.webp)$/;
+export const FEED_IMAGE = /^images\/(?:catalog|ships)\/\d+\.webp$/;
+export const FEED_SHIP_IMAGE = /^images\/ships\/([1-9]\d*)\.webp$/;
 export const FEED_MAX_BYTES = { json: 16 * 1024 * 1024, image: 4 * 1024 * 1024, manifest: 4 * 1024 * 1024 };
 /** The sum of all file sizes a manifest may announce (the cache on a user's disk can never grow past this). */
 export const FEED_MAX_TOTAL_BYTES = 512 * 1024 * 1024;
@@ -132,6 +134,21 @@ export const eventSource = (ev) => (ev?.source === FEED_SOURCE ? 'feed' : 'you')
 
 /** The first event of the feed that covers `today` (YYYY-MM-DD), or null. */
 export const runningFeedEvent = (doc, today) => (Array.isArray(doc?.events) ? doc.events : []).find((e) => e?.source === FEED_SOURCE && e.from <= today && today <= e.to) ?? null;
+
+// ----- the ship pictures -----
+
+/**
+ * The feed's ship pictures that are on disk, as { "<ship id>": "feed/ships/<id>.webp" } (the name ShipThumb hands to backend.imageSrc).
+ * @param {string[]} images the names feed_read gives ("ships/12.webp", "catalog/5.webp", ...)
+ */
+export function feedShipFiles(images) {
+  const out = {};
+  for (const n of Array.isArray(images) ? images : []) {
+    const m = typeof n === 'string' ? /^ships\/([1-9]\d*)\.webp$/.exec(n) : null;
+    if (m) out[m[1]] = `feed/${n}`;
+  }
+  return out;
+}
 
 // ----- the store catalog -----
 

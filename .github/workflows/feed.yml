@@ -1,6 +1,6 @@
 name: Data feed
 
-# Builds the signed data feed (sale events and the public RSI store catalog with its pictures) and publishes it to GitHub Pages at
+# Builds the signed data feed (sale events, the public RSI store catalog with its pictures and the ship pictures) and publishes it to GitHub Pages at
 # https://sapd.github.io/ccu-planner/feed/ every hour. It is an artifact deployment: nothing is committed to the repository.
 # The manifest is signed with the FEED_SIGNING_KEY secret (a key of its own, not the updater key); the app embeds the public half.
 # That secret is an environment secret of the environment "feed" (deployments only from main), present in one step only. The cache the build
@@ -44,9 +44,9 @@ jobs:
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .feed-cache
-          key: feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/logic/*.mjs') }}-${{ github.run_id }}
+          key: feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/ship-pictures.mjs', 'src/image-sync.mjs', 'src/logic/*.mjs') }}-${{ github.run_id }}
           restore-keys: |
-            feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/logic/*.mjs') }}-
+            feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/ship-pictures.mjs', 'src/image-sync.mjs', 'src/logic/*.mjs') }}-
       - name: Build and sign the feed
         id: build
         env:
@@ -57,7 +57,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .feed-cache
-          key: feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/logic/*.mjs') }}-${{ github.run_id }}
+          key: feed-cache-${{ hashFiles('.github/workflows/feed.yml', 'scripts/build-feed.mjs', 'src/feed-build.mjs', 'src/feed-cache.mjs', 'src/catalog-sync.mjs', 'src/ship-pictures.mjs', 'src/image-sync.mjs', 'src/logic/*.mjs') }}-${{ github.run_id }}
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
