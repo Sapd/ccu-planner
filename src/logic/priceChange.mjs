@@ -1,6 +1,6 @@
 // Price-change alerts for a route and what waiting costs. Pure.
 
-import { searchRoutes, edgeKey, buildGraph, withEdge } from './planner.mjs';
+import { searchRoutes, edgeKey, buildGraph, withEdge, keepVirtual } from './planner.mjs';
 import { shipAvailability } from './availability.mjs';
 import { goalStarts } from './sharedPlan.mjs';
 import { warbondCanFit } from './warbondFit.mjs';
@@ -11,7 +11,7 @@ function expectedGraph(graph, expected) {
   const owned = [];
   for (const edges of graph.edges.values()) for (const e of edges) if (e.kind === 'owned') for (const c of e.copies) owned.push({ ...c, from: e.from, to: e.to });
   const g = buildGraph({ offers: expected, owned, lti: graph.lti });
-  return { ...g, concept: graph.concept };
+  return keepVirtual(graph, { ...g, concept: graph.concept });
 }
 
 // `graph` plus one Standard edge from -> to at `cash` (replacing that pair's Standard edge).
@@ -48,7 +48,7 @@ function waitingPenalty({ session, chainId }, expected, affected) {
   if (starts.length) {
     const objective = chain.objective ?? 'cash';
     const metric = (r) => (objective === 'allin' ? r.allIn : r.cash);
-    const opts = { starts, target: chain.target, credit: plan.credit, maxSteps, excludeCopies: new Set(plan.exclude), objective, maxResults: 1 };
+    const opts = { starts, target: chain.target, credit: plan.credit, maxSteps, excludeCopies: new Set(plan.exclude), objective, maxResults: 1, via: chain.via ?? null };
     memo.eg ??= expectedGraph(graph, expected);
     if (!memo.after.has(chainId)) memo.after.set(chainId, searchRoutes(memo.eg, opts)[0] ?? null);
     const after = memo.after.get(chainId);

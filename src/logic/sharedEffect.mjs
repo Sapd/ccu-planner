@@ -22,7 +22,7 @@ export function aloneRoute(session, chainId) {
   if (!starts.length) return null;
   const [route] = searchRoutes(graph, {
     starts, target: chain.target, credit: plans.profile?.credit ?? 0, maxSteps,
-    excludeCopies: excluded, maxResults: 1, objective: chain.objective ?? 'cash',
+    excludeCopies: excluded, maxResults: 1, objective: chain.objective ?? 'cash', via: chain.via ?? null,
   });
   return route ?? null;
 }

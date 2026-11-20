@@ -107,7 +107,7 @@ export function wantedWarbonds(state, chainId, graph, ships, { slack = 1000, che
   const sources = isToken ? starts.map((x) => x.ship) : [startShip(chain, shared.route)].filter((x) => x != null);
   if (!sources.length) return { chainId, objective, best: null, bestCost: null, wanted: [], holding: [], checked: 0, candidates: 0 };
   const startOpt = isToken ? { starts } : { base: sources[0] };
-  const opts = { ...startOpt, target: chain.target, credit, maxSteps, excludeCopies: new Set(taken), objective };
+  const opts = { ...startOpt, target: chain.target, credit, maxSteps, excludeCopies: new Set(taken), objective, via: chain.via ?? null };
   const metric = (r) => (objective === 'allin' ? r.allIn : r.cash);
   // Only the cheapest route is needed; planRoutes also searches alternatives
   // before returning k=1, multiplying the work for every hypothetical probe.
@@ -128,7 +128,7 @@ export function wantedWarbonds(state, chainId, graph, ships, { slack = 1000, che
       if (!rev.has(e.to)) rev.set(e.to, []);
       rev.get(e.to).push([from, w]);
       if (e.kind !== 'owned') targets.add(e.to);
-      if (e.kind === 'warbond') warbondNow.set(`${e.from}-${e.to}`, e);
+      if (e.kind === 'warbond' && !e.virtual) warbondNow.set(`${e.from}-${e.to}`, e);
     }
   }
   // The chain's own target counts even when RSI sells no upgrade into it today

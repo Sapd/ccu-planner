@@ -5,7 +5,7 @@ import { newState } from '../../../../src/logic/chains.mjs';
 import { emptyOverrides, expectedOffers } from '../../../../src/logic/prices.mjs';
 import { emptySaleEvents } from '../../../../src/logic/availability.mjs';
 import { setPricing } from '../../../../src/logic/format.mjs';
-import { createSession } from '../../../../src/logic/session.mjs';
+import { createSession, planningGraph } from '../../../../src/logic/session.mjs';
 import { mergeSaleEvents, userSaleEvents, feedEventsOf } from '../../../../src/logic/feed.mjs';
 
 /** @returns {null | { data, graph, plans, overrides, saleEvents, expected }} null when there is no data yet */
@@ -32,8 +32,10 @@ export function withDocs(app, plans, overrides, saleEvents = userSaleEvents(app.
   // The expected offers only depend on the price overrides: keep the same array while they are unchanged, so
   // caches keyed on it (the waiting penalty) survive edits of plans or sale events.
   const same = app.overrides && app.expected && JSON.stringify(app.overrides.ships) === JSON.stringify(o.ships);
+  // `baseGraph` is the store-and-hangar graph; `graph` adds your virtual CCUs (plans.profile.virtualCcus).
+  const baseGraph = app.baseGraph ?? app.graph;
   const next = {
-    data: app.data, graph: app.graph, plans, overrides: o, saleEvents: ev, feedEvents: f.events, feedAt: f.at,
+    data: app.data, baseGraph, graph: planningGraph(baseGraph, plans), plans, overrides: o, saleEvents: ev, feedEvents: f.events, feedAt: f.at,
     expected: same ? app.expected : expectedOffers(app.data.offers, app.data.ships, o),
   };
   // One planning session per set of documents: everything derived from them is computed once and dropped with them.

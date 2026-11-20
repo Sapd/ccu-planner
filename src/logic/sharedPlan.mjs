@@ -157,7 +157,7 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
   const chains = Object.values(state.chains).sort(byPriority);
   const sig = JSON.stringify([
     maxSteps, state.profile?.credit ?? 0, state.profile?.tokens ?? null, state.profile?.excludedCopies ?? null,
-    chains.map((c) => ({ id: c.id, start: startOf(c), target: c.target, priority: c.priority, createdAt: c.createdAt, mode: c.mode, objective: c.objective, accepted: c.accepted })),
+    chains.map((c) => ({ id: c.id, start: startOf(c), target: c.target, priority: c.priority, createdAt: c.createdAt, mode: c.mode, objective: c.objective, via: c.via ?? null, accepted: c.accepted })),
   ]);
   let memo = tuned ? null : planMemo.get(graph);
   if (memo?.has(sig)) return memo.get(sig);
@@ -203,7 +203,7 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
     const fwd = reach(goalStarts(state, c, graph).map((st) => st.ship), (x) => (graph.edges.get(x) ?? []).map((e) => e.to));
     const back = reach([c.target], (x) => reverse.get(x) ?? []);
     const copies = new Set();
-    for (const from of fwd) for (const e of graph.edges.get(from) ?? []) if (e.kind === 'owned' && back.has(e.to)) for (const cp of e.copies) copies.add(cp.copyId);
+    for (const from of fwd) for (const e of graph.edges.get(from) ?? []) if ((e.kind === 'owned' || e.virtual) && back.has(e.to)) for (const cp of e.copies) copies.add(cp.copyId);
     const rel = { copies, tokens: startOf(c).kind === 'token' };
     relevantOf.set(c.id, rel);
     return rel;
@@ -226,7 +226,7 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
     searches++;
     const starts = goalStarts(state, c, graph, exclude);
     const [route] = starts.length
-      ? searchRoutes(graph, { starts, target: c.target, credit, maxSteps, excludeCopies: exclude, maxResults: 1, objective: c.objective ?? 'cash' })
+      ? searchRoutes(graph, { starts, target: c.target, credit, maxSteps, excludeCopies: exclude, maxResults: 1, objective: c.objective ?? 'cash', via: c.via ?? null })
       : [];
     return { exclude, credit, route: route ?? null, noToken: startOf(c).kind === 'token' && starts.length === 0 };
   };
@@ -256,7 +256,7 @@ export function proposeChain(state, chainId, graph, { k = 3, maxSteps = 25, plan
   const credit = shared.credit;
   const starts = goalStarts(state, chain, graph, shared.exclude);
   const noToken = startOf(chain).kind === 'token' && starts.length === 0;
-  const opts = { starts, target: chain.target, credit, maxSteps, excludeCopies: new Set(shared.exclude), objective: chain.objective ?? 'cash' };
+  const opts = { starts, target: chain.target, credit, maxSteps, excludeCopies: new Set(shared.exclude), objective: chain.objective ?? 'cash', via: chain.via ?? null };
   const routes = starts.length ? planRoutes(graph, opts, k) : [];
   return { routes, credit, noToken };
 }

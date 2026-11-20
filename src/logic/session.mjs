@@ -14,6 +14,10 @@ import { wantedWarbonds } from './wanted.mjs';
 import { warbondUsage } from './warbonds.mjs';
 import { availCtx, localToday } from './availability.mjs';
 import { aloneRoute, sharedEffect, planningLevels } from './sharedEffect.mjs';
+import { withVirtualCcus } from './planner.mjs';
+
+/** The graph goals are planned on: the store-and-hangar graph plus your virtual CCUs that have not expired on `today`. */
+export const planningGraph = (graph, plans, today = localToday()) => withVirtualCcus(graph, plans?.profile?.virtualCcus, today);
 
 export const MEMO_MAX = 16;
 

@@ -22,6 +22,10 @@ import { addChain, acceptRoute, releaseChain, setMode, setObjective, setLock, PR
  *   setTokenSettings { tokens: { limitCents?, use?, never? } }
  *   markToken { pledgeId, mark: 'use'|'never'|null }
  *   excludeCopy { copyId, excluded: boolean }           an owned CCU copy no plan may use; excluding releases reservations that hold it; result: the released goal ids
+ *   setVirtualCcu { ccu: { id?, from, to, cents, copies?, expires?: 'YYYY-MM-DD'|null, note? } }
+ *                                                        adds a virtual CCU (an upgrade you can get outside the store) or replaces the one with that id; result: the stored record
+ *   removeVirtualCcu { id }                              reserved chains that use it keep it
+ *   setVia { chainId, ship: number|null }                the goal's routes must pass through this ship; releases a reservation that does not
  *   accept { chainId, route }                            result: the accepted record; throws ConflictError
  *   release | remove { chainId }
  *   setMode | setObjective | setLock | setPriority { chainId, value }
@@ -114,6 +118,47 @@ export function applyAction(doc, action, ctx = {}) {
           if (c.accepted?.steps?.some((st) => st.copyId === action.copyId)) { releaseChain(plans, c.id); out.result.push(c.id); }
         }
       }
+      break;
+    }
+    case 'setVirtualCcu': {
+      const v = action.ccu ?? {};
+      const known = (id) => !ctx.ships || ctx.ships.has(id);
+      if (!Number.isInteger(v.from) || !Number.isInteger(v.to) || !known(v.from) || !known(v.to)) throw new Error('a virtual CCU needs a known source and target ship');
+      if (v.from === v.to) throw new Error('source and target ship must differ');
+      if (!Number.isInteger(v.cents) || v.cents < 0) throw new Error('price must be a whole number of cents, 0 or more');
+      const copies = v.copies ?? 1;
+      if (!Number.isInteger(copies) || copies < 1 || copies > 99) throw new Error('copies must be between 1 and 99');
+      if (v.expires != null && !isDay(v.expires)) throw new Error('expiration date must be YYYY-MM-DD');
+      const note = String(v.note ?? '').trim();
+      if (note.length > 100) throw new Error('note must be at most 100 characters');
+      const list = plans.profile.virtualCcus ?? [];
+      const prev = v.id != null ? list.find((x) => x.id === v.id) : null;
+      if (v.id != null && !prev) throw new Error(`unknown virtual CCU ${v.id}`);
+      const id = prev?.id ?? `v${plans.profile.nextVirtualId ?? 1}`;
+      if (!prev) plans.profile.nextVirtualId = (plans.profile.nextVirtualId ?? 1) + 1;
+      const rec = { id, from: v.from, to: v.to, cents: v.cents, copies, expires: v.expires ?? null, note, createdAt: prev?.createdAt ?? new Date().toISOString() };
+      plans.profile.virtualCcus = prev ? list.map((x) => (x.id === id ? rec : x)) : [...list, rec];
+      out.result = rec;
+      break;
+    }
+    case 'removeVirtualCcu': {
+      const list = plans.profile.virtualCcus ?? [];
+      if (!list.some((x) => x.id === action.id)) throw new Error(`unknown virtual CCU ${action.id}`);
+      plans.profile.virtualCcus = list.filter((x) => x.id !== action.id);
+      break;
+    }
+    case 'setVia': {
+      const c = chain(action.chainId);
+      const ship = action.ship ?? null;
+      if (ship != null) {
+        if (!Number.isInteger(ship) || (ctx.ships && !ctx.ships.has(ship))) throw new Error(`unknown ship ${ship}`);
+        if (ship === c.target) throw new Error('the ship to route through must differ from the target');
+        if (c.start?.kind === 'ship' && ship === c.start.ship) throw new Error('the ship to route through must differ from the start');
+      }
+      if (ship == null) delete c.via; else c.via = ship;
+      const passes = (a) => ship == null || a.token?.ship === ship || a.steps.some((st) => st.to === ship || st.from === ship);
+      out.result = [];
+      if (c.accepted && !passes(c.accepted)) { releaseChain(plans, c.id); out.result.push(c.id); }
       break;
     }
     case 'markToken': {

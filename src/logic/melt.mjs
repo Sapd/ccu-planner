@@ -20,7 +20,7 @@ import { goalNamer } from './ships.mjs';
 import { usd } from './format.mjs';
 import { routeAdvice } from './advice.mjs';
 import { buildGraph } from './planner.mjs';
-import { createSession } from './session.mjs';
+import { createSession, planningGraph } from './session.mjs';
 import { shipAvailability } from './availability.mjs';
 
 export const KEEP = {
@@ -147,7 +147,7 @@ export function meltPlan(data, state, { protect, expected, overrides = null, ava
       continue;
     }
     // A waiting goal that locks its target needs that Standard last step now; a lock covered by an owned CCU into the target reserves nothing.
-    session ??= createSession({ plans: state, graph: buildGraph(data), data });
+    session ??= createSession({ plans: state, graph: planningGraph(buildGraph(data), state), data });
     // Same answer as the session's cached advice when asked with the session's own overrides and today's availability.
     const own = session.plans === state && (overrides ?? null) === (session.overrides ?? null) && avail != null && avail === session.avail();
     const adv = own ? session.advice(c.id, { route: c.accepted }) : routeAdvice(session, c, c.accepted, { ships: data.ships, overrides, avail });

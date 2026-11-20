@@ -2,6 +2,7 @@
   import { shipName } from '$logic/ships.mjs';
   import { upgradeToolUrl, hangarUrl } from '$logic/links.mjs';
   import { usd } from '$logic/format.mjs';
+  import { stepKindLabel, virtualStepText } from '$logic/describe.mjs';
   import ShipThumb from './ShipThumb.svelte';
   import RsiLink from './RsiLink.svelte';
   import { localToday } from '$logic/availability.mjs';
@@ -33,11 +34,11 @@
             {#if c}· paid {usd(c.paid?.cents)} · {c.giftable ? 'giftable' : 'not giftable'}{/if}
             {#if s.otherCopies}· +{s.otherCopies} more copies{/if}</span>
         {:else}
-          <span class="meta">{s.kind === 'warbond' ? 'Warbond' : 'Standard'} {usd(s.cash)}</span>
+          <span class="meta" title={s.virtual ? virtualStepText(s) : undefined}>{stepKindLabel(s)} {usd(s.cash)}</span>
         {/if}
         {#if s.kind === 'owned'}
           <RsiLink href={hangarUrl()} label="Hangar" aria="Open {name(s.from)} to {name(s.to)} in the RSI hangar" />
-        {:else}
+        {:else if !s.virtual}
           <RsiLink href={upgradeToolUrl({ from: s.from, to: s.to })} label="Buy on RSI" aria="Buy {name(s.from)} to {name(s.to)} on RSI" />
         {/if}
         </span>

@@ -36,7 +36,7 @@ export function warbondUsage(session) {
   for (const c of Object.values(session.plans.chains)) {
     const best = session.route(c.id);
     for (const s of best?.steps ?? []) {
-      if (s.kind !== 'warbond') continue;
+      if (s.kind !== 'warbond' || s.virtual) continue;
       const key = `${s.from}-${s.to}`;
       usedBy.set(key, [...(usedBy.get(key) ?? []), c.id]);
     }

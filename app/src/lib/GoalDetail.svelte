@@ -105,7 +105,7 @@
     { key: 'without', label: 'If I remove this goal' },
     { key: 'cheaper', label: 'What would make it cheaper' },
     { key: 'chart', label: 'Price chart' },
-    { key: 'settings', label: 'What counts · remove' },
+    { key: 'settings', label: 'What counts · route · remove' },
   ]);
 
   // What sharing costs this goal, and the buy steps that only exist because another goal holds what its alone route uses.
@@ -175,6 +175,7 @@
   <ShipHero ship={ships.get(chain.target) ?? null} height={68}>
       <h2>{goal?.targetName ?? name(chain.target)}</h2>
       {#if goal?.startLine}<p class="start">{goal.startLine}</p>{/if}
+      {#if chain.via != null}<p class="start" data-via-line>Routed through {name(chain.via)} (change it under Settings)</p>{/if}
       {#if stuck}<p class="route">{goal ? goalStatusText(goal) : ''}</p>{/if}
   </ShipHero>
 

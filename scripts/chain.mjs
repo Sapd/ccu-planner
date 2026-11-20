@@ -30,7 +30,7 @@ import { availCtx, localToday, shipAvailability } from '../src/logic/availabilit
 import { hasPriceOverrides } from '../src/logic/prices.mjs';
 import { buildGraph } from '../src/logic/planner.mjs';
 import { goalNamer } from '../src/logic/ships.mjs';
-import { createSession } from '../src/logic/session.mjs';
+import { createSession, planningGraph } from '../src/logic/session.mjs';
 import { routeAdvice } from '../src/logic/advice.mjs';
 import { groupWanted } from '../src/logic/wantedView.mjs';
 import { changesSinceSync } from '../src/logic/changes.mjs';
@@ -70,7 +70,7 @@ const wrongCurrency = currencyProblem(data.pricing);
 if (wrongCurrency) { console.error(wrongCurrency); process.exit(1); }
 let state = loadPlans();
 const { ships } = data;
-const graph = buildGraph(data);
+const baseGraph = buildGraph(data); // plus your virtual CCUs, per plans state (planningGraph)
 const name = (shipId) => ships.get(shipId)?.name ?? `#${shipId}`;
 const goalName = (gid) => goalNamer(state, ships)(gid);
 const meta = { catalogAt: data.meta.catalogAt, hangarAt: data.meta.hangarAt };
@@ -89,7 +89,7 @@ const avail = () => availCtx({ data, saleEvents: planning(), overrides }, today)
 // One planning session per set of documents: everything derived from them is computed once. A command
 // that changes a document (see run) gets a new one.
 let session = null;
-const sess = () => (session?.plans === state && session.overrides === overrides && session.saleEvents === planning() ? session : (session = createSession({ plans: state, graph, data, overrides, saleEvents: planning(), expected })));
+const sess = () => (session?.plans === state && session.overrides === overrides && session.saleEvents === planning() ? session : (session = createSession({ plans: state, graph: planningGraph(baseGraph, state), data, overrides, saleEvents: planning(), expected })));
 
 // Every change goes through applyAction. Nothing is written until save(): each
 // document keeps the rev it was loaded at, and save() refuses if the file on

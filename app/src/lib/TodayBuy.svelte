@@ -3,7 +3,7 @@
   import { usd } from '$logic/format.mjs';
   import { upgradeToolUrl } from '$logic/links.mjs';
   import { shortDay } from '$logic/availability.mjs';
-  import { BEST_DIFFERS_PLAIN, DONT_LOCK_LABEL, OFFER_NOTE, KIND_HELP } from '$logic/describe.mjs';
+  import { BEST_DIFFERS_PLAIN, DONT_LOCK_LABEL, OFFER_NOTE, KIND_HELP, stepKindLabel, virtualStepText } from '$logic/describe.mjs';
   import { offerNoteAction, clearOfferNoteAction } from './view/today.mjs';
   import { dispatch, openStep } from './state.svelte.js';
   import ShipThumb from './ShipThumb.svelte';
@@ -31,13 +31,13 @@
     {#each row.goals as g (g.goalId)}
       <button type="button" class="goalchip" data-for-goal={g.goalId} aria-label="Open the {name(row.from)} to {name(row.to)} step in the chain for {g.name}" onclick={() => openStep(g.goalId, row.from, row.to)}>For {g.name} <span aria-hidden="true">→</span></button>
     {/each}
-    <button type="button" class="kind" aria-label="{row.kind === 'warbond' ? 'Warbond' : 'Standard'}: {KIND_HELP[row.kind]}" title={KIND_HELP[row.kind]}>{row.kind === 'warbond' ? 'Warbond' : 'Standard'}</button>
+    <button type="button" class="kind" aria-label="{stepKindLabel(row)}: {KIND_HELP[row.kind]}" title={KIND_HELP[row.kind]}>{stepKindLabel(row)}</button>
     {#if row.count > 1}<span class="count">{row.countText}</span>{/if}
   </p>
   <div class="pairrow">
     <span class="pair"><ShipThumb ship={ships.get(row.from) ?? null} size="s" /> <span class="nm">{name(row.from)}</span> <span aria-hidden="true">→</span> <ShipThumb ship={ships.get(row.to) ?? null} size="s" /> <span class="nm">{name(row.to)}</span></span>
     <span class="cash"><b class="price" data-price>{usd(row.cash)}</b>{#if row.standardText}<span class="std">{row.standardText}</span>{/if}</span>
-    <RsiLink href={upgradeToolUrl({ from: row.from, to: row.to })} label="Buy on RSI" aria="Buy {name(row.from)} to {name(row.to)} on RSI" />
+    {#if row.kind === 'virtual'}<span class="virt" data-virtual>Outside the store</span>{:else}<RsiLink href={upgradeToolUrl({ from: row.from, to: row.to })} label="Buy on RSI" aria="Buy {name(row.from)} to {name(row.to)} on RSI" />{/if}
   </div>
   <p class="outcome" data-outcome>{outcome ?? fallback}
     <button type="button" class="whybtn" aria-expanded={open} aria-controls="why-{uid}" onclick={() => { open = !open; }}>Why? {open ? '▴' : '▾'}</button></p>
@@ -53,8 +53,12 @@
       {#each row.needed as n (n)}<p data-needed>{n}</p>{/each}
       {#if row.tie}<p data-tie>{row.tie}</p>{/if}
       {#if row.steps.some((b) => b.differs)}<p data-differs>{BEST_DIFFERS_PLAIN}</p>{/if}
-      <BuyWhatIf {app} from={row.from} to={row.to} kind={row.kind} cash={row.cash} />
-      {#if !row.lock}
+      {#if row.kind === 'virtual'}
+        <p data-virtual-row>{virtualStepText({ note: row.virtualNote, cash: row.cash })}</p>
+      {:else}
+        <BuyWhatIf {app} from={row.from} to={row.to} kind={row.kind} cash={row.cash} />
+      {/if}
+      {#if !row.lock && row.kind !== 'virtual'}
         <p class="note">
           {#if row.note}
             Your note: {row.note.soon ? 'ends soon' : `runs until ${shortDay(row.note.until)}`}
@@ -73,6 +77,7 @@
 </li>
 
 <style>
+  .virt { font-size: 13px; color: var(--muted); }
   .buy { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: rgba(8, 12, 20, 0.35); border: 1px solid var(--glass-border); list-style: none; }
   p { margin: 0; }
   .for { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }

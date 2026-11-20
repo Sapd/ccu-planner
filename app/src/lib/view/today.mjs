@@ -130,14 +130,15 @@ function computeTodayView(app, today) {
   const rowMap = new Map();
   for (const b of buys) {
     const { step } = b;
-    const key = `${step.kind}|${step.from}-${step.to}|${step.cash}`;
+    const kind = step.virtual ? 'virtual' : step.kind;
+    const key = `${kind}|${step.from}-${step.to}|${step.cash}`;
     let row = rowMap.get(key);
     if (!row) {
-      const std = step.kind === 'warbond' ? standardOf(step.from, step.to) : null;
+      const std = kind === 'warbond' ? standardOf(step.from, step.to) : null;
       row = {
-        key, bucket: b.urgency, kind: step.kind, from: step.from, to: step.to, cash: step.cash, count: 0, goals: [], lock: true,
-        payment: paymentText(step.kind), standardText: std != null ? standardPriceText(std) : null,
-        reasons: [], since: null, until: null, untilBy: null, note: b.note, onSale: '', trades: [], steps: [],
+        key, bucket: b.urgency, kind, note: b.note, virtualNote: step.virtual ? step.note ?? null : null, from: step.from, to: step.to, cash: step.cash, count: 0, goals: [], lock: true,
+        payment: paymentText(kind), standardText: std != null ? standardPriceText(std) : null,
+        reasons: [], since: null, until: null, untilBy: null, onSale: '', trades: [], steps: [],
         get needed() { return [...new Set(this.steps.map((x) => x.needed).filter(Boolean))]; },
         get tie() { return this.steps.map((x) => tieNoteFor(session, x.goalId, x.step)).find(Boolean) ?? null; },
       };

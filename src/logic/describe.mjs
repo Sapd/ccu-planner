@@ -512,10 +512,23 @@ export const forGoalsText = (names) => `for ${names.join(', ')}`;
 export const KIND_HELP = {
   warbond: 'Warbond upgrades require new cash and are usually discounted, but they mostly appear during sales and can vanish.',
   standard: 'Standard upgrades use the regular price and can use store credit when offered.',
+  virtual: 'A virtual CCU you added: an upgrade you expect to get outside the RSI store (from a friend, a trade or a coming sale). Plans count its price as new cash; store credit cannot pay it.',
 };
 
-/** How a step is paid: Warbonds are cash only, Standard upgrades can use store credit. */
-export const paymentText = (kind) => (kind === 'warbond' ? 'cash only' : 'store credit works');
+/** Under the goal's "Route through this ship" field. */
+export const VIA_HELP = 'Plans for this goal only use routes that pass through this ship, for example a ship you want to fly on the way. A reserved chain that skips it is released.';
+
+/** The chip of a virtual step you can get now (it is not a store sale). */
+export const VIRTUAL_CHIP = 'Get it';
+
+/** The kind of a step or row as shown: Virtual, Warbond, Standard or Owned. */
+export const stepKindLabel = (s) => (s?.virtual || s?.kind === 'virtual' ? 'Virtual' : { warbond: 'Warbond', standard: 'Standard', owned: 'Owned' }[s?.kind] ?? 'Standard');
+
+/** The detail line of a virtual step. */
+export const virtualStepText = (s) => `A virtual CCU you added: get it outside the RSI store${s?.note ? ` (${s.note})` : ''}. It counts as ${s?.cash != null ? 'new cash' : 'cash'}; store credit cannot pay it.`;
+
+/** How a step is paid: Warbonds and virtual CCUs are cash only, Standard upgrades can use store credit. */
+export const paymentText = (kind) => (kind === 'warbond' || kind === 'virtual' ? 'cash only' : 'store credit works');
 
 /** Said once above the buy list when you have store credit. */
 export const creditLineText = (cents) => `You have ${usd(cents)} store credit for Standard upgrades`;
@@ -700,12 +713,12 @@ export function goalNextText(steps, name) {
   const pair = (s) => `${name(s.step.from)} → ${name(s.step.to)}`;
   const now = steps.filter((s) => s.state === 'now');
   const urgent = now.find((s) => !s.urgency || s.urgency === 'today');
-  if (urgent) return `Next: buy ${pair(urgent)} for ${usd(urgent.step.cash)}${urgent.step.kind === 'warbond' ? ' (Warbond, on sale)' : ''}.`;
+  if (urgent) return `Next: ${urgent.step.virtual ? 'get' : 'buy'} ${pair(urgent)} for ${usd(urgent.step.cash)}${urgent.step.virtual ? ' (your virtual CCU)' : urgent.step.kind === 'warbond' ? ' (Warbond, on sale)' : ''}.`;
   const wait = steps.find((s) => s.state === 'wait');
   const calm = now[0];
   if (calm) {
     const tail = wait ? ` Then wait for a sale on ${pair(wait)}.` : '';
-    return `Nothing must be bought today. Optional: ${pair(calm)} is on sale for ${usd(calm.step.cash)} (no rush).${tail}`;
+    return `Nothing must be bought today. Optional: ${pair(calm)} ${calm.step.virtual ? 'is your virtual CCU' : 'is on sale'} for ${usd(calm.step.cash)} (no rush).${tail}`;
   }
   if (wait) return `Next: wait for a sale on ${pair(wait)} (it costs ${usd(wait.step.cash)} today).`;
   return null;

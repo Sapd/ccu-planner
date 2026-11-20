@@ -74,7 +74,7 @@ export function buildGraph({ offers = [], owned = [], lti, ships }) {
 export function withEdge(graph, edge) {
   const edges = new Map(graph.edges);
   const list = graph.edges.get(edge.from) ?? [];
-  const at = list.findIndex((e) => e.kind === edge.kind && e.to === edge.to);
+  const at = list.findIndex((e) => !e.virtual && !!edge.virtual === false && e.kind === edge.kind && e.to === edge.to);
   if (at >= 0) edges.set(edge.from, list.map((e, i) => (i === at ? edge : e)));
   else {
     const pos = list.findLastIndex((e) => e.to <= edge.to) + 1;
@@ -87,7 +87,46 @@ export function cashNeeded(warbond, standard, credit) {
   return warbond + Math.max(0, standard - credit);
 }
 
-export const edgeKey = (e) => `${e.kind}:${e.from}-${e.to}`;
+export const edgeKey = (e) => (e.virtual ? `virtual:${e.virtualId}:${e.from}-${e.to}` : `${e.kind}:${e.from}-${e.to}`);
+
+/** The id prefix of a virtual CCU's copies: `virtual:<id>:<from>-<to>:<n>`. */
+export const VIRTUAL_COPY = 'virtual:';
+
+/** True when a virtual CCU has expired by `today` ('YYYY-MM-DD'): it is kept in the list but no longer planned with. */
+export const virtualExpired = (v, today) => !!(v?.expires && today && v.expires < today);
+
+/**
+ * A copy of `graph` with your virtual CCUs (plans.profile.virtualCcus) as edges: an upgrade you can get outside the
+ * store (a friend, a trade, a sale you expect) for `cents` new cash, `copies` times. Each is a Warbond-like edge (cash
+ * only, store credit cannot pay it) marked `virtual`, with copies `virtual:<id>:<from>-<to>:<n>` that goals claim one by one like
+ * owned CCUs. Expired ones are left out. Without any, the graph itself is returned.
+ */
+export function withVirtualCcus(graph, list, today = null) {
+  const live = (list ?? []).filter((v) => v && v.from !== v.to && Number.isInteger(v.cents) && v.cents >= 0 && !virtualExpired(v, today));
+  if (!live.length) return graph;
+  const edges = new Map(graph.edges);
+  for (const v of live) {
+    const n = Math.max(1, Math.trunc(v.copies ?? 1));
+    const edge = {
+      from: v.from, to: v.to, kind: 'warbond', cash: v.cents, virtual: true, virtualId: v.id, note: v.note ?? null, expires: v.expires ?? null,
+      // The pair is in the copy id: a record edited to another pair never shares a copy with a chain that kept the old one.
+      copies: Array.from({ length: n }, (_, i) => ({ copyId: `${VIRTUAL_COPY}${v.id}:${v.from}-${v.to}:${i + 1}` })),
+    };
+    const list2 = [...(edges.get(v.from) ?? []), edge];
+    list2.sort((a, b) => a.to - b.to || kindRank(a.kind) - kindRank(b.kind) || Number(!!a.virtual) - Number(!!b.virtual) || a.cash - b.cash);
+    edges.set(v.from, list2);
+  }
+  return { ...graph, edges };
+}
+
+/** `next` with the virtual CCU edges of `prev` added (for graphs rebuilt from offers and owned copies, which carry none). */
+export function keepVirtual(prev, next) {
+  const virtual = [...prev.edges.values()].flat().filter((e) => e.virtual);
+  if (!virtual.length) return next;
+  const edges = new Map(next.edges);
+  for (const e of virtual) edges.set(e.from, [...(edges.get(e.from) ?? []), e].sort((a, b) => a.to - b.to || kindRank(a.kind) - kindRank(b.kind) || Number(!!a.virtual) - Number(!!b.virtual) || a.cash - b.cash));
+  return { ...next, edges };
+}
 
 // Objectives
 //   cash   least new cash (credit covers Standard steps), then reuse owned copies
@@ -143,6 +182,12 @@ const onPath = (label, ship) => {
   return false;
 };
 
+// Every ship on x's path is also on y's: whatever y can still visit, x can too.
+const pathWithin = (x, y) => {
+  for (let l = x; l; l = l.prev) if (!onPath(y, l.ship)) return false;
+  return true;
+};
+
 /**
  * Finds the cheapest routes from base to target.
  * @param {Graph} graph from buildGraph
@@ -150,7 +195,8 @@ const onPath = (label, ship) => {
  *           excludeCopies?: Set<string>, excludeEdges?: Set<string>, allowOwned?: boolean,
  *           allowWarbond?: boolean, allowStandard?: boolean, maxLabelsPerShip?: number,
  *           maxResults?: number, starts?: Array<{ ship: number, token?: { copyId: string, pledgeId: string, paidCents: number|null } }>,
- *           heuristic?: Map<number, number>, bound?: number, prefer?: (edge: object) => boolean }} opts
+ *           heuristic?: Map<number, number>, bound?: number, prefer?: (edge: object) => boolean, via?: number|null }} opts
+ * `via`: only routes that pass through this ship count (a goal's "route through this ship").
  * With `starts`, base is ignored and every start seeds one label.
  * `heuristic` (A* search): ship -> a lower bound of what is still to pay from there to the target, in the objective's metric (new
  * cash, or all-in cost). It must never overestimate (a ship missing from it cannot reach the target). Labels are then expanded in
@@ -166,7 +212,7 @@ export function searchRoutes(graph, opts) {
   const {
     base, target, credit = 0, maxSteps = 15, excludeCopies = new Set(), excludeEdges = new Set(),
     allowOwned = true, allowWarbond = true, allowStandard = true, maxLabelsPerShip = 16, maxResults = 8,
-    objective = 'cash', starts, heuristic = null, bound = Infinity, prefer = null,
+    objective = 'cash', starts, heuristic = null, bound = Infinity, prefer = null, via = null,
   } = opts;
   if (!['cash', 'allin'].includes(objective)) throw new Error(`unknown objective ${objective}`);
   if (prefer && !heuristic) throw new Error('prefer needs a heuristic (it only orders the A* queue)');
@@ -183,7 +229,7 @@ export function searchRoutes(graph, opts) {
     : [{ ship: base, token: null, tokenCents: 0, key: String(base) }];
   for (const sd of seeds) {
     const start = { ship: sd.ship, token: sd.token };
-    const label = { ship: sd.ship, wb: 0, std: 0, basis: sd.tokenCents, unknownBasis: sd.unknown ?? 0, owned: 0, steps: 0, wbConcept: 0, edge: null, copy: null, prev: null, key: sd.key, tokenCents: sd.tokenCents, start };
+    const label = { passed: via == null || sd.ship === via, ship: sd.ship, wb: 0, std: 0, basis: sd.tokenCents, unknownBasis: sd.unknown ?? 0, owned: 0, steps: 0, wbConcept: 0, edge: null, copy: null, prev: null, key: sd.key, tokenCents: sd.tokenCents, start };
     if (heuristic) {
       const h = heuristic.get(sd.ship);
       if (h == null) continue;
@@ -196,7 +242,7 @@ export function searchRoutes(graph, opts) {
   while (queue.size && done.length < maxResults) {
     const cur = queue.pop();
     if (cur.dead) continue;
-    if (cur.ship === target) { done.push(cur); continue; }
+    if (cur.ship === target) { if (cur.passed) done.push(cur); continue; }
     if (cur.steps >= maxSteps) continue;
     for (const e of graph.edges.get(cur.ship) ?? []) {
       if (excludeEdges.has(edgeKey(e))) continue;
@@ -209,6 +255,10 @@ export function searchRoutes(graph, opts) {
         copy = objective === 'allin'
           ? free.reduce((m, c) => ((c.paid?.cents ?? 0) < (m.paid?.cents ?? 0) ? c : m))
           : free[0];
+      } else if (e.virtual) {
+        // A virtual CCU: limited copies like an owned one, but it costs its price in new cash.
+        copy = e.copies.find((c) => !excludeCopies.has(c.copyId));
+        if (!copy) continue;
       } else if ((e.kind === 'warbond' && !allowWarbond) || (e.kind === 'standard' && !allowStandard)) continue;
       if (onPath(cur, e.to)) continue;
       let h = 0;
@@ -220,8 +270,9 @@ export function searchRoutes(graph, opts) {
         ship: e.to,
         wb: cur.wb + (e.kind === 'warbond' ? e.cash : 0),
         std: cur.std + (e.kind === 'standard' ? e.cash : 0),
-        basis: cur.basis + (copy?.paid?.cents ?? 0),
-        unknownBasis: cur.unknownBasis + (copy && copy.paid?.cents == null ? 1 : 0),
+        basis: cur.basis + (e.kind === 'owned' ? copy.paid?.cents ?? 0 : 0),
+        unknownBasis: cur.unknownBasis + (e.kind === 'owned' && copy.paid?.cents == null ? 1 : 0),
+        passed: cur.passed || e.to === via,
         owned: cur.owned + (e.kind === 'owned' ? 1 : 0),
         steps: cur.steps + 1,
         wbConcept: cur.wbConcept + (e.kind === 'warbond' && concept.has(cur.ship) ? 1 : 0),
@@ -237,9 +288,13 @@ export function searchRoutes(graph, opts) {
         if (prefer) next.via = cur.via || prefer(e);
         if (next.f > bound) continue;
       }
-      const list = frontier.get(e.to) ?? [];
+      // With `via`, labels before and after the via ship compete apart (a cheap detour-free label must not crowd out one that passed it).
+      const fk = via == null ? e.to : `${e.to}|${next.passed ? 1 : 0}`;
+      const list = frontier.get(fk) ?? [];
       // With `prefer`, a label that did not go through the preferred edge never dominates one that did (it would hide the tied route through it).
-      const dominates = (x, y) => (!prefer || x.via || !y.via) && x.wb <= y.wb && x.std <= y.std && x.basis <= y.basis && x.owned >= y.owned && x.steps <= y.steps && x.tokenCents <= y.tokenCents && x.wbConcept <= y.wbConcept;
+      const dominates = (x, y) => (!prefer || x.via || !y.via) && (x.passed || !y.passed) && x.wb <= y.wb && x.std <= y.std && x.basis <= y.basis && x.owned >= y.owned && x.steps <= y.steps && x.tokenCents <= y.tokenCents && x.wbConcept <= y.wbConcept
+        // A route through `via` may have to go back down past ships it skipped: a cheaper label that visited other ships must not hide it.
+        && (via == null || pathWithin(x, y));
       if (list.some((o) => dominates(o, next))) continue;
       const kept = [];
       for (const o of list) {
@@ -252,7 +307,7 @@ export function searchRoutes(graph, opts) {
         kept.sort(prefer ? (a, b) => spent(a) - spent(b) || Number(!!b.via) - Number(!!a.via) || cmp(a, b) : cmp);
         for (const o of kept.splice(maxLabelsPerShip)) o.dead = true;
       }
-      frontier.set(e.to, kept);
+      frontier.set(fk, kept);
       if (!next.dead) queue.push(next);
     }
   }
@@ -263,7 +318,8 @@ function toRoute(label, credit) {
   const steps = [];
   for (let l = label; l.edge; l = l.prev) {
     const { copies, ...edge } = l.edge;
-    steps.unshift(l.copy ? { ...edge, ...l.copy, kind: 'owned', cash: 0, otherCopies: copies.length - 1 } : edge);
+    if (edge.virtual) steps.unshift({ ...edge, copyId: l.copy.copyId });
+    else steps.unshift(l.copy ? { ...edge, ...l.copy, kind: 'owned', cash: 0, otherCopies: copies.length - 1 } : edge);
   }
   return {
     steps,

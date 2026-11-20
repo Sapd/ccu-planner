@@ -135,7 +135,7 @@ export function creditCommitted(state, exceptChainId = null, graph = null) {
   return sum;
 }
 
-const slim = (s) => ({ kind: s.kind, from: s.from, to: s.to, cash: s.cash, ...(s.copyId ? { copyId: s.copyId } : {}), ...(s.skuId ? { skuId: s.skuId } : {}) });
+const slim = (s) => ({ kind: s.kind, from: s.from, to: s.to, cash: s.cash, ...(s.copyId ? { copyId: s.copyId } : {}), ...(s.skuId ? { skuId: s.skuId } : {}), ...(s.virtual ? { virtual: true, virtualId: s.virtualId } : {}) });
 
 export const byPriority = (a, b) => PRIORITY[a.priority] - PRIORITY[b.priority] || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
@@ -168,7 +168,17 @@ export function evaluateAccepted(state, chainId, { offers, owned, lti }) {
     blocked = true;
     issues.push({ kind: 'token-gone', pledgeId: tk.pledgeId, ship: tk.ship ?? null });
   }
+  const virtuals = new Map((state.profile?.virtualCcus ?? []).map((v) => [v.id, v]));
   for (const s of chain.accepted.steps) {
+    if (s.virtual) {
+      // A virtual CCU stays in a reserved chain even when you delete it or it expires (you planned to get it); a new price is a repricing.
+      if (others.has(s.copyId)) { blocked = true; issues.push({ kind: 'copy-shared', copyId: s.copyId, from: s.from, to: s.to, by: others.get(s.copyId) }); }
+      const v = virtuals.get(s.virtualId);
+      const now = v && v.from === s.from && v.to === s.to ? v.cents : s.cash; // edited to another pair: the kept step keeps its price
+      if (now !== s.cash) issues.push({ kind: 'repriced', step: 'virtual', from: s.from, to: s.to, was: s.cash, now });
+      wb += now;
+      continue;
+    }
     if (s.kind === 'owned') {
       if (!ownedIds.has(s.copyId)) { blocked = true; issues.push({ kind: 'copy-gone', copyId: s.copyId, from: s.from, to: s.to }); }
       if (others.has(s.copyId)) { blocked = true; issues.push({ kind: 'copy-shared', copyId: s.copyId, from: s.from, to: s.to, by: others.get(s.copyId) }); }
@@ -218,6 +228,7 @@ export function acceptRoute(state, chainId, route, meta = {}, { graph = null } =
   if (clash.length) throw new ConflictError(`copies already reserved: ${clash.map((s) => `${s.copyId} by ${others.get(s.copyId)}`).join(', ')}`);
   const tk = route.start?.token;
   if (tk && others.has(tk.copyId)) throw new ConflictError(`token already used by ${others.get(tk.copyId)}`);
+  if (chain.via != null && route.start?.ship !== chain.via && !route.steps.some((s) => s.to === chain.via)) throw new ConflictError('this route does not pass through the ship the goal must route through');
   const free = Math.max(0, (state.profile.credit ?? 0) - creditCommitted(state, chainId, graph));
   if (route.creditUsed > free) throw new ConflictError(`needs ${route.creditUsed} credit, only ${free} uncommitted`);
   const rev = (chain.accepted?.rev ?? 0) + 1;

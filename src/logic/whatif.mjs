@@ -10,7 +10,7 @@
 // worker (see jobs.mjs).
 import { applyAction } from './state.mjs';
 import { createSession, sessionFor } from './session.mjs';
-import { buildGraph } from './planner.mjs';
+import { buildGraph, keepVirtual } from './planner.mjs';
 import { expectedOffers } from './prices.mjs';
 import { goalLabel } from './ships.mjs';
 
@@ -25,13 +25,13 @@ function graphParts(graph) {
   for (const edges of graph.edges.values()) {
     for (const e of edges) {
       if (e.kind === 'owned') for (const c of e.copies) owned.push({ ...c, from: e.from, to: e.to });
-      else offers.push(e);
+      else if (!e.virtual) offers.push(e);
     }
   }
   return { owned, offers };
 }
 
-const rebuild = (graph, { owned, offers, ships }) => ({ ...buildGraph({ offers, owned, lti: graph.lti, ships }), concept: graph.concept });
+const rebuild = (graph, { owned, offers, ships }) => keepVirtual(graph, { ...buildGraph({ offers, owned, lti: graph.lti, ships }), concept: graph.concept });
 
 // One session for edited documents: everything else comes from `app`.
 function editedSession(app, { plans = app.plans, graph = app.graph, data = app.data ?? null }) {

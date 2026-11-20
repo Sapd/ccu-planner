@@ -24,7 +24,7 @@ export function buildSnapshot(session, at = new Date().toISOString()) {
   let total = 0;
   for (const [id, entry] of session.shared) {
     const r = entry.route;
-    goals[id] = { name: goalLabel(plans.chains[id], data?.ships), cash: r?.cash ?? null, route: r ? r.steps.map((s) => [s.from, s.to, s.kind, s.cash ?? 0, s.copyId ?? null]) : null };
+    goals[id] = { name: goalLabel(plans.chains[id], data?.ships), cash: r?.cash ?? null, route: r ? r.steps.map((s) => [s.from, s.to, s.virtual ? 'virtual' : s.kind, s.cash ?? 0, s.copyId ?? null]) : null };
     total += r?.cash ?? 0;
   }
   const msrp = {};
@@ -110,9 +110,9 @@ export function changesSinceSync(session, snapshots) {
         causes.push({ kind: 'msrp', shipId, was: prev.msrp[shipId], now: now.msrp[shipId] });
       }
     }
-    for (const [from, to, kind] of oldSteps) if (kind !== 'owned' && !offerCash.has(key(kind, from, to))) causes.push({ kind: 'step-gone', step: kind, from, to });
+    for (const [from, to, kind] of oldSteps) if (kind !== 'owned' && kind !== 'virtual' && !offerCash.has(key(kind, from, to))) causes.push({ kind: 'step-gone', step: kind, from, to });
     for (const [from, to, kind, cash] of oldSteps) {
-      const nowCash = kind === 'owned' ? undefined : offerCash.get(key(kind, from, to));
+      const nowCash = kind === 'owned' || kind === 'virtual' ? undefined : offerCash.get(key(kind, from, to));
       if (nowCash === undefined || nowCash === cash) continue;
       if (kind === 'standard' && (msrpMoved(from) || msrpMoved(to))) continue; // told by the msrp cause
       causes.push({ kind: 'step-repriced', step: kind, from, to, was: cash, now: nowCash });

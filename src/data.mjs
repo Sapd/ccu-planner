@@ -13,7 +13,7 @@ import { newState } from './logic/chains.mjs';
 import { emptySaleEvents } from './logic/availability.mjs';
 import { buildGraph } from './logic/planner.mjs';
 import { expectedOffers } from './logic/prices.mjs';
-import { createSession } from './logic/session.mjs';
+import { createSession, planningGraph } from './logic/session.mjs';
 import { setPricing } from './logic/format.mjs';
 import { withSnapshot } from './logic/changes.mjs';
 import { IDENTIFIER, migrateDefault } from './data-migrate.mjs';
@@ -208,8 +208,9 @@ export function saveSnapshots(snapshots, dir = DATA_DIR) {
 export function loadSession(dir = DATA_DIR) {
   const data = loadPlannerData(dir);
   const overrides = loadOverrides(dir);
+  const plans = loadPlans(dir);
   return createSession({
-    plans: loadPlans(dir), graph: buildGraph(data), data, overrides, saleEvents: loadPlanningSaleEvents(dir),
+    plans, graph: planningGraph(buildGraph(data), plans), data, overrides, saleEvents: loadPlanningSaleEvents(dir),
     expected: expectedOffers(data.offers, data.ships, overrides),
   });
 }

@@ -18,6 +18,7 @@
   import ShipsGrid from './hangar/ShipsGrid.svelte';
   import UpgradesTable from './hangar/UpgradesTable.svelte';
   import OtherList from './hangar/OtherList.svelte';
+  import VirtualCcus from './hangar/VirtualCcus.svelte';
   import { matchesQuery, searchText } from '$logic/search.mjs';
   import { noMatchesText } from '$logic/describe.mjs';
   import TokenPanel from './goals/TokenPanel.svelte';
@@ -218,6 +219,7 @@
               <p class="muted">{searching && view.review.length ? noMatchesText(query) : 'Nothing needs review.'}</p>
             {/each}
           {/if}
+          <VirtualCcus {app} />
         {:else}
           {#if otherShown.length}
             <OtherList items={otherShown} onopen={(id) => { openId = id; }} />

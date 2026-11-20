@@ -105,7 +105,7 @@ export function decisionGraph(app, chainId, { k = 5, wanted, avail, today = loca
     for (const e of graph.edges.get(s.from) ?? []) {
       if (e.to !== s.to) continue;
       if (e.kind === 'owned') for (const c of e.copies) raw.push({ kind: 'owned', cash: 0, copyId: c.copyId, paid: c.paid?.cents ?? null, reservedBy: taken.get(c.copyId) ?? null });
-      else raw.push({ kind: e.kind, cash: e.cash, ...(e.skuId != null ? { skuId: e.skuId } : {}) });
+      else raw.push({ kind: e.kind, cash: e.cash, ...(e.virtual ? { virtual: true, virtualId: e.virtualId } : {}), ...(e.skuId != null ? { skuId: e.skuId } : {}) });
     }
     const stdOffer = raw.find((o) => o.kind === 'standard');
     const diff = msrp(s.to) != null && msrp(s.from) != null ? msrp(s.to) - msrp(s.from) : null;
@@ -113,7 +113,7 @@ export function decisionGraph(app, chainId, { k = 5, wanted, avail, today = loca
     const exp = expected.find((o) => o.kind === 'standard' && o.assumed && o.from === s.from && o.to === s.to);
     if (exp) raw.push({ kind: 'expected', cash: exp.cash });
 
-    const isChosen = (o) => o.kind === s.kind && (s.kind !== 'owned' || o.copyId === s.copyId);
+    const isChosen = (o) => o.kind === s.kind && !!o.virtual === !!s.virtual && (!s.virtual || o.virtualId === s.virtualId) && (s.kind !== 'owned' || o.copyId === s.copyId);
     const lockText = !isLock ? null : lockWhy === 'event' ? eventLockWhy(targetEvent) : lockWhy === 'concept' ? 'concept: lock now'
       : lockWhy === 'expected' ? `price will rise (expected${exp ? ` ${usd(exp.cash)}` : ''})` : 'lock now: lock is set to on';
     // Compare with what the objective counts: all-in includes the paid basis of an owned copy.

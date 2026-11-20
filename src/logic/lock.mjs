@@ -57,7 +57,7 @@ const copiesOf = (r) => [...r.steps.filter((s) => s.copyId).map((s) => s.copyId)
 function computeCover(session, chain, plan, route, taken) {
   const { plans: state, graph, maxSteps } = session;
   const last = route.steps.at(-1);
-  const edgeNow = (s) => (graph.edges.get(s.from) ?? []).find((e) => e.kind === s.kind && e.to === s.to);
+  const edgeNow = (s) => (graph.edges.get(s.from) ?? []).find((e) => e.kind === s.kind && e.to === s.to && !!e.virtual === !!s.virtual && (!s.virtual || e.virtualId === s.virtualId));
   let wb = 0; let std = 0;
   for (const s of route.steps) {
     if (s.kind === 'owned') continue;
@@ -70,7 +70,7 @@ function computeCover(session, chain, plan, route, taken) {
   for (const edges of graph.edges.values()) for (const e of edges) if (e.to === chain.target && e.kind !== 'owned') excludeEdges.add(edgeKey(e));
   const starts = goalStarts(state, chain, graph, plan.exclude);
   const [backup] = starts.length
-    ? searchRoutes(graph, { starts, target: chain.target, credit: plan.credit, maxSteps, excludeCopies: taken, excludeEdges, maxResults: 1, objective: chain.objective ?? 'cash' })
+    ? searchRoutes(graph, { starts, target: chain.target, credit: plan.credit, maxSteps, excludeCopies: taken, excludeEdges, maxResults: 1, objective: chain.objective ?? 'cash', via: chain.via ?? null })
     : [];
   const end = backup?.steps.at(-1);
   return end?.kind === 'owned' && end.copyId && !taken.has(end.copyId)

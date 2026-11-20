@@ -72,11 +72,12 @@ export function offerNote(overrides, from, to, today) {
 export function classifyPurchase(step, { avail = null, overrides = null, alert = null, lock = false, limitedUseful = true, historyFrom = null, finish = false } = {}) {
   const today = avail?.today ?? localToday();
   const event = ongoingEvent(avail?.saleEvents, today);
-  const note = offerNote(overrides, step.from, step.to, today);
+  // A virtual CCU is not a store offer: no sale event, offer note or offer history applies to it.
+  const note = step.virtual ? null : offerNote(overrides, step.from, step.to, today);
   const since = dayOfIso(step.firstSeen);
-  const warbond = step.kind === 'warbond';
-  const until = note?.until ?? (warbond ? event?.to : null) ?? null;
-  const untilBy = note?.until ? 'note' : warbond && event ? 'event' : null;
+  const warbond = step.kind === 'warbond' && !step.virtual;
+  const until = note?.until ?? (warbond ? event?.to : null) ?? (step.virtual ? step.expires ?? null : null);
+  const untilBy = note?.until ? 'note' : warbond && event ? 'event' : step.virtual && step.expires ? 'note' : null;
   const base = { kind: step.kind, since: warbond ? since : null, until, untilBy, note };
   if (lock) return { bucket: 'optional', reasons: [], ...base };
 
@@ -84,6 +85,8 @@ export function classifyPurchase(step, { avail = null, overrides = null, alert =
   if (note?.soon) reasons.push({ code: 'note-soon' });
   else if (note?.until) {
     if (daysBetween(today, note.until) <= SOON_DAYS) reasons.push({ code: 'note-ends', until: note.until });
+  } else if (step.virtual && step.expires && daysBetween(today, step.expires) <= SOON_DAYS) {
+    reasons.push({ code: 'note-ends', until: step.expires });
   } else {
     if (limitedUseful && step.limited === true) reasons.push({ code: 'limited' });
     // Only a mid-event drop is news: not one from the event's first day (the sale opened with it), not one from

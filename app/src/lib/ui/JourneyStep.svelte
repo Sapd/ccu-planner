@@ -1,6 +1,6 @@
 <script>
   import { upgradeToolUrl, hangarUrl } from '$logic/links.mjs';
-  import { waitReasonText, wouldHelpLine, onSaleText, urgencyReasonText, FILLER_LABEL } from '$logic/describe.mjs';
+  import { waitReasonText, wouldHelpLine, onSaleText, urgencyReasonText, FILLER_LABEL, stepKindLabel, virtualStepText, VIRTUAL_CHIP } from '$logic/describe.mjs';
   import { usd } from '$logic/format.mjs';
   import ShipThumb from '../ShipThumb.svelte';
   import RsiLink from '../RsiLink.svelte';
@@ -39,11 +39,11 @@
         <ShipThumb ship={ships.get(s.to) ?? null} size="s" />
         <span class="names"><span class="nm">{name(s.from)}</span> <span aria-hidden="true">→</span> <span class="nm">{name(s.to)}</span></span>
       </span>
-      <span class="chipcell"><span aria-hidden={phrase ? 'true' : undefined}><StateChip state={item.state === 'now' && item.urgency === 'norush' ? 'norush' : item.state} lock={item.lock} text={item.state === 'wait' && item.filler ? FILLER_LABEL : null} /></span>{#if item.alert}<span class="warnmark" role="img" aria-label="Alert: {item.alert}" title={item.alert}>!</span>{/if}</span>
-      <span class="cost" aria-hidden={phrase ? 'true' : undefined}>{#if item.state !== 'own'}<b class="price">{usd(s.cash)}</b><span class="kind">{s.kind === 'warbond' ? 'Warbond' : 'Standard'}</span>{/if}</span>
+      <span class="chipcell"><span aria-hidden={phrase ? 'true' : undefined}><StateChip state={item.state === 'now' && item.urgency === 'norush' ? 'norush' : item.state} lock={item.lock} text={item.state === 'wait' && item.filler ? FILLER_LABEL : item.state === 'now' && s.virtual && !item.lock ? VIRTUAL_CHIP : null} /></span>{#if item.alert}<span class="warnmark" role="img" aria-label="Alert: {item.alert}" title={item.alert}>!</span>{/if}</span>
+      <span class="cost" aria-hidden={phrase ? 'true' : undefined}>{#if item.state !== 'own'}<b class="price">{usd(s.cash)}</b><span class="kind">{stepKindLabel(s)}</span>{/if}</span>
       <span class="chev" aria-hidden="true">{open ? '▾' : '›'}</span>
     </button>
-    {#if item.state === 'now'}
+    {#if item.state === 'now' && !s.virtual}
       <span class="act"><RsiLink href={upgradeToolUrl({ from: s.from, to: s.to })} label="Buy on RSI" aria="Buy {name(s.from)} to {name(s.to)} on RSI" /></span>
     {/if}
   </div>
@@ -76,6 +76,8 @@
           {#if seenLine && seenLine !== item.reason}<p>{seenLine}</p>{/if}
           {#if below != null}<p>{wouldHelpLine(usd(below))}</p>{/if}
         </div>
+      {:else if s.virtual}
+        <p class="why" data-virtual-step>{virtualStepText(s)}</p>
       {:else if app && item.state === 'now'}
         <div class="whatif"><BuyWhatIf {app} from={s.from} to={s.to} kind={s.kind} cash={s.cash} /></div>
       {/if}

@@ -20,6 +20,7 @@ export function storeVerdicts(goals) {
   for (const g of goals) {
     for (const x of g.journey?.steps ?? []) {
       if (x.state === 'own') continue;
+      if (x.step.virtual) continue;
       const verdict = x.state === 'now' && x.step.kind === 'warbond' ? 'plan' : 'helps';
       add(shipsOut, x.step.to, verdict, g);
       if (x.step.kind === 'warbond') add(pairs, `${x.step.from}-${x.step.to}`, verdict, g);
