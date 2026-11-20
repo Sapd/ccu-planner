@@ -18,9 +18,12 @@ export const busy = () => ui.syncBusy || ui.signingIn || ui.switching;
 export async function login() {
   if (busy()) return;
   ui.signingIn = true;
-  try { const notice = await backend.login(); ui.session = 'signed in'; ui.notice = notice ?? 'Signed in to RSI'; }
+  let signedIn = false;
+  try { const notice = await backend.login(); ui.session = 'signed in'; ui.notice = notice ?? 'Signed in to RSI'; signedIn = true; }
   catch (e) { ui.notice = e.message; }
   finally { ui.signingIn = false; }
+  // Signing in is when people expect their hangar to arrive: sync right away (the hangar, and the store first unless it is from today).
+  if (signedIn && !ui.sample) await syncFirstRun(ui.app);
 }
 
 export async function logout() {

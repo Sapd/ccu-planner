@@ -322,6 +322,14 @@ test('desktop sync snapshot: only a parse error counts as empty; a read error sk
   assert.equal(await recordPlanSnapshot(parse, aliases, 'T'), true);
 });
 
+test('signing in syncs right away: the first-run sync after a successful sign-in, not with sample data', () => {
+  const src = fs.readFileSync(new URL('../app/src/lib/sync-actions.svelte.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('export async function login()'), src.indexOf('export async function logout()'));
+  assert.match(body, /signedIn = true;/);
+  assert.match(body, /if \(signedIn && !ui\.sample\) await syncFirstRun\(ui\.app\);/);
+  assert.ok(body.indexOf('syncFirstRun') > body.indexOf('ui.signingIn = false'), 'after the sign-in has ended, so the sync is not refused as busy');
+});
+
 test('sync: a pending overwrite question is answered no when the sync ends', () => {
   const src = fs.readFileSync(new URL('../app/src/lib/sync-actions.svelte.js', import.meta.url), 'utf8');
   assert.match(src, /finally \{ answer\(false\)/);
