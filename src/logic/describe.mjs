@@ -150,6 +150,27 @@ export const LOCK_LABEL = 'Buy now · locks the price';
 /** The label of a waiting step no Warbond can make cheaper: bought whenever, with store credit too. */
 export const FILLER_LABEL = 'Filler · any time';
 
+/** What each chip means, shown as its tooltip. Same meaning as the glossary's "status" entry, one or two plain sentences each. */
+export const STATE_HELP = {
+  own: 'Owned: you already have this upgrade in your hangar. Nothing to buy.',
+  now: 'Buy now: buy it today. The offer may end soon, and waiting could cost more.',
+  wait: 'Wait: don\'t buy yet. A Warbond in this price range would make this step cheaper; they mostly appear during sales.',
+  norush: 'On sale: available now with no sign that it ends soon. Buy whenever you like.',
+  optional: 'Optional: a bet. Buying now may save money later, but you can also wait.',
+  reserved: 'Reserved: held for this goal by its reserved chain, so other goals cannot use it.',
+};
+/** Tooltip of a step that locks its price now. */
+export const LOCK_HELP = 'Buy now to lock the price: buying this Standard upgrade today fixes its price before it rises, even though you do not need it yet.';
+/** Tooltip of a filler step. */
+export const FILLER_HELP = 'Filler: no Warbond can make this step cheaper, because Warbonds at this price are discounted by more than the step costs. Buy the Standard upgrade whenever you like; store credit works.';
+
+/** The tooltip for a chip: the filler and lock texts take precedence over the state's own. */
+export function chipHelp(state, { lock = false, filler = false } = {}) {
+  if (filler) return FILLER_HELP;
+  if (lock && state === 'now') return LOCK_HELP;
+  return STATE_HELP[state] ?? null;
+}
+
 /** Shown where a lock would have been when an owned CCU into the target already caps a price rise. */
 export const lockCoveredText = (fromName, targetName, extraCash) => `Price rise covered: your ${fromName} → ${targetName} CCU limits it to ${usd(extraCash)} more`;
 
