@@ -21,6 +21,7 @@ import { addChain, acceptRoute, releaseChain, setMode, setObjective, setLock, PR
  *   setStart { chainId, start }                          also releases the accepted route
  *   setTokenSettings { tokens: { limitCents?, use?, never? } }
  *   markToken { pledgeId, mark: 'use'|'never'|null }
+ *   excludeCopy { copyId, excluded: boolean }           an owned CCU copy no plan may use; excluding releases reservations that hold it; result: the released goal ids
  *   accept { chainId, route }                            result: the accepted record; throws ConflictError
  *   release | remove { chainId }
  *   setMode | setObjective | setLock | setPriority { chainId, value }
@@ -99,6 +100,20 @@ export function applyAction(doc, action, ctx = {}) {
         use: t.use ? [...t.use] : cur.use,
         never: t.never ? [...t.never] : cur.never,
       };
+      break;
+    }
+    case 'excludeCopy': {
+      if (typeof action.copyId !== 'string' || !action.copyId) throw new Error('copyId must be a non-empty string');
+      if (typeof action.excluded !== 'boolean') throw new Error('excluded must be true or false');
+      const cur = (plans.profile.excludedCopies ?? []).filter((id) => id !== action.copyId);
+      plans.profile.excludedCopies = action.excluded ? [...cur, action.copyId] : cur;
+      // A reservation that holds the copy can no longer keep its chain: release it, like a changed start does.
+      out.result = [];
+      if (action.excluded) {
+        for (const c of Object.values(plans.chains)) {
+          if (c.accepted?.steps?.some((st) => st.copyId === action.copyId)) { releaseChain(plans, c.id); out.result.push(c.id); }
+        }
+      }
       break;
     }
     case 'markToken': {

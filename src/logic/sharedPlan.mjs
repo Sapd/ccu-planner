@@ -3,7 +3,7 @@
 
 import { searchRoutes, planRoutes } from './planner.mjs';
 import { tokenPool, tokenSettings, tokenCopyId } from './tokens.mjs';
-import { startOf, byPriority, settleStandard, acceptedInOrder, reservations } from './goals.mjs';
+import { startOf, byPriority, settleStandard, acceptedInOrder, reservations, excludedCopies } from './goals.mjs';
 import { createRouteReuse } from './routeReuse.mjs';
 
 /**
@@ -156,7 +156,7 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
   const tuned = searchCap !== SEARCH_CAP || noReuse || noImprove;
   const chains = Object.values(state.chains).sort(byPriority);
   const sig = JSON.stringify([
-    maxSteps, state.profile?.credit ?? 0, state.profile?.tokens ?? null,
+    maxSteps, state.profile?.credit ?? 0, state.profile?.tokens ?? null, state.profile?.excludedCopies ?? null,
     chains.map((c) => ({ id: c.id, start: startOf(c), target: c.target, priority: c.priority, createdAt: c.createdAt, mode: c.mode, objective: c.objective, accepted: c.accepted })),
   ]);
   let memo = tuned ? null : planMemo.get(graph);
@@ -166,9 +166,11 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
   const result = new Map();
   const accepted = chains.filter((c) => c.accepted);
   const heldBy = new Map(); // accepted goal -> claims
-  const claimed = new Set();
+  // Copies you excluded count as claimed by nobody's goal: every search skips them, and none settles a Standard step.
+  const excluded = excludedCopies(state);
+  const claimed = new Set(excluded);
   let creditUsed = 0;
-  const taken = new Set(reservations(state).keys());
+  const taken = new Set([...reservations(state).keys(), ...excluded]);
   for (const c of acceptedInOrder(state)) {
     const cl = claimsOf(c.accepted, graph, taken);
     for (const id of cl.copies) taken.add(id);
@@ -178,7 +180,7 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
   }
   for (const c of accepted) {
     const own = heldBy.get(c.id);
-    const exclude = new Set();
+    const exclude = new Set(excluded);
     for (const [id, cl] of heldBy) if (id !== c.id) for (const x of cl.copies) exclude.add(x);
     result.set(c.id, { exclude, credit: Math.max(0, total - (creditUsed - own.credit)), route: acceptedRoute(c.accepted), noToken: false });
   }

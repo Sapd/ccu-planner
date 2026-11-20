@@ -4,11 +4,13 @@
   import ShipThumb from './ShipThumb.svelte';
   import RsiLink from './RsiLink.svelte';
   import TokenMark from './goals/TokenMark.svelte';
+  import { EXCLUDE_COPY_HELP } from '$logic/describe.mjs';
 
   // A modal dialog: <dialog>.showModal() keeps focus inside and closes on Escape.
   // token: for an LTI ship pledge { settings, inPool }, else null.
   // goal: for a CCU a goal reserves ({ id, name }), else null; ongoal(id) opens that goal's chain.
-  let { pledge, onclose, ships: shipMap = null, token = null, goal = null, ongoal = null } = $props();
+  // copy: for an owned CCU copy { excluded }, else null; onexclude(excluded) sets whether plans may use it.
+  let { pledge, onclose, ships: shipMap = null, token = null, goal = null, ongoal = null, copy = null, onexclude = null } = $props();
   let dialog;
   const items = $derived(keyed(pledge.items, (it) => it.title));
   const ships = $derived(keyed(pledge.ships, (s) => s.shipId ?? s.title));
@@ -46,6 +48,11 @@
     </dd>
     {#if goal}<dt>Reserved</dt><dd>for {goal.name} <button type="button" class="gl" data-view-chain onclick={() => { dialog.close(); ongoal?.(goal.id); }}>View {goal.name} chain</button></dd>{/if}
   </dl>
+  {#if copy}
+    <h4>Planning</h4>
+    <label class="excl" data-exclude-copy><input type="checkbox" checked={copy.excluded} onchange={(e) => onexclude?.(e.currentTarget.checked)} /> Don't use this copy in plans</label>
+    <p class="muted small">{EXCLUDE_COPY_HELP}</p>
+  {/if}
   {#if token}
     <h4>Starting ship {#if token.inPool}<span class="tag tok">Starting ship</span>{/if}</h4>
     <TokenMark pledgeId={String(pledge.pledgeId)} settings={token.settings} />
@@ -65,6 +72,8 @@
 </dialog>
 
 <style>
+  .excl { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .small { font-size: 0.9em; margin-top: 4px; }
   dialog { width: min(560px, 92vw); max-height: 85vh; padding: 16px; background: #141c2e; color: var(--text); border: 1px solid var(--glass-border); border-radius: var(--radius); }
   dialog::backdrop { background: rgb(0 0 0 / 0.6); }
   header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }

@@ -51,6 +51,7 @@ export function groupCcuPairs(rows) {
     const whole = reservedCount === g.members.length && goals.length === 1;
     return {
       ...g, count: g.members.length, copyIds: g.members.map((m) => m.copyId), goals, reservedCount,
+      excludedCount: g.members.filter((m) => m.excluded).length,
       reservedBy: whole ? goals[0].id : null, reservedByName: whole ? goals[0].name : null,
     };
   });

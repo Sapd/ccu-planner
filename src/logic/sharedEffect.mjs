@@ -3,6 +3,7 @@
 // page. Pure; the planning session caches these (session.alone, session.sharedEffect, session.levels).
 import { searchRoutes, edgeKey } from './planner.mjs';
 import { goalStarts } from './sharedPlan.mjs';
+import { excludedCopies } from './goals.mjs';
 import { goalNamer } from './ships.mjs';
 
 /**
@@ -13,13 +14,15 @@ export function aloneRoute(session, chainId) {
   const { plans, graph, maxSteps } = session;
   const chain = plans.chains[chainId];
   // Nothing taken from this goal and all the credit left: the shared plan is the alone plan, no second search.
+  // Copies you excluded stay excluded alone too: "alone" means no other goal takes anything, not that your exclusions lapse.
+  const excluded = excludedCopies(plans);
   const entry = session.shared.get(chainId);
-  if (entry && entry.exclude.size === 0 && (entry.credit ?? 0) >= (plans.profile?.credit ?? 0)) return session.route(chainId);
+  if (entry && [...entry.exclude].every((id) => excluded.has(id)) && (entry.credit ?? 0) >= (plans.profile?.credit ?? 0)) return session.route(chainId);
   const starts = goalStarts(plans, chain, graph, new Set());
   if (!starts.length) return null;
   const [route] = searchRoutes(graph, {
     starts, target: chain.target, credit: plans.profile?.credit ?? 0, maxSteps,
-    excludeCopies: new Set(), maxResults: 1, objective: chain.objective ?? 'cash',
+    excludeCopies: excluded, maxResults: 1, objective: chain.objective ?? 'cash',
   });
   return route ?? null;
 }

@@ -27,7 +27,7 @@
   import { ownedFleet } from '$logic/hangar.mjs';
   import { hangarUrl, buybackUrl } from '$logic/links.mjs';
   import { scrollBehavior } from './view/motion.mjs';
-  import { ui, openGoalFrom } from './state.svelte.js';
+  import { ui, openGoalFrom, dispatch } from './state.svelte.js';
   import { tick } from 'svelte';
 
   let { app } = $props();
@@ -71,6 +71,12 @@
   // A reserved CCU's pledge shows which goal holds it, with a link to that chain.
   const openGoal = $derived(openId == null ? null : (view.rows.find((r) => String(r.copyId) === String(openId) && r.reservedBy) ?? null));
   const openPledge = $derived(openId == null ? null : pledgeById(pledges, openId));
+  // The owned CCU copy behind the open pledge (copy id = pledge id), for "Don't use this copy in plans".
+  const openCopy = $derived(openId == null ? null : (view.rows.find((r) => String(r.copyId) === String(openId)) ?? null));
+  async function setExcluded(excluded) {
+    const released = await dispatch({ type: 'excludeCopy', copyId: String(openCopy.copyId), excluded });
+    if (released?.length) ui.notice = `Released the reserved chain of ${released.map((id) => app.plans.chains[id]?.name ?? id).join(', ')}: it used this copy.`;
+  }
   const goChain = (id) => openGoalFrom(id, 'Back to Hangar');
 
   // ---- Ships ----
@@ -233,7 +239,7 @@
 </div>
 
 {#if openPledge}
-  {#key openPledge.pledgeId}<PledgeDetail pledge={openPledge} ships={app.data.ships} token={ltiIds.has(String(openPledge.pledgeId)) ? { settings: tokenCfg, inPool: poolIds.has(String(openPledge.pledgeId)) } : null} onclose={() => { openId = null; }} goal={openGoal ? { id: openGoal.reservedBy, name: openGoal.reservedByName } : null} ongoal={(id) => openGoalFrom(id, 'Back to Hangar')} />{/key}
+  {#key openPledge.pledgeId}<PledgeDetail pledge={openPledge} ships={app.data.ships} token={ltiIds.has(String(openPledge.pledgeId)) ? { settings: tokenCfg, inPool: poolIds.has(String(openPledge.pledgeId)) } : null} onclose={() => { openId = null; }} goal={openGoal ? { id: openGoal.reservedBy, name: openGoal.reservedByName } : null} ongoal={(id) => openGoalFrom(id, 'Back to Hangar')} copy={openCopy ? { excluded: openCopy.excluded } : null} onexclude={setExcluded} />{/key}
 {/if}
 
 <style>

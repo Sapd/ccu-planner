@@ -315,6 +315,9 @@ export const LEVEL_TEXT = {
   low: { title: 'Low priority', help: 'Planned last: these goals only get what everything above leaves.' },
 };
 
+/** Under the Hangar's "Don't use this copy in plans". */
+export const EXCLUDE_COPY_HELP = 'For a CCU you want to keep, melt or gift: no goal will use this copy, and plans find another way. Excluding it releases a reserved chain that holds it.';
+
 /** Where reserving is offered (the list's "Reserve all chains" and the goal's "Reserve this chain"). */
 export const ACCEPT_HELP = 'Optional, and nothing is bought. Reserving keeps this exact chain: it holds the CCUs, starting ship and store credit it uses so other goals cannot take them, and the planner stops switching it to a cheaper route (it tells you if a price changes). Leave it off to always get the cheapest plan. You can release it any time.';
 export const ACCEPT_THIS_HELP = ACCEPT_HELP;

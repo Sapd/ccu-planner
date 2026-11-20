@@ -50,6 +50,7 @@
             {#if g.count > 1}<button type="button" class="x" aria-expanded={expanded.includes(g.copyId)} aria-label="{g.count} copies of {g.fromName} to {g.toName}: {expanded.includes(g.copyId) ? 'hide' : 'show'} each copy" onclick={() => ontoggle(g.copyId)}>×{g.count} <span aria-hidden="true">{expanded.includes(g.copyId) ? '▾' : '▸'}</span></button>{:else}1{/if}
           </td>
           <td class="res">
+            {#if g.excludedCount}<span class="tag off" title="You chose not to use {g.count === 1 ? 'this copy' : 'these copies'} in plans. Open a copy to change it.">{g.count === 1 ? 'Not used in plans' : `${g.excludedCount} not used in plans`}</span>{/if}
             {#if g.reservedCount}
               {@const partial = g.count > 1 && !g.reservedBy}
               {#if g.reservedBy}<button type="button" class="link goal" data-view-chain title="Reserved for {g.reservedByName}: view its chain" onclick={() => ongoal(g.reservedBy)}>{g.reservedByName}</button>
@@ -75,7 +76,7 @@
             <tr class="sub" data-copy-of={g.copyId} data-member={m.copyId} tabindex="-1">
               <td class="pic"></td>
               <td class="c"></td>
-              <td class="res">{#if m.reservedBy}<button type="button" class="link goal" data-view-chain title="Reserved for {m.reservedByName}: view its chain" onclick={() => ongoal(m.reservedBy)}>{m.reservedByName}</button>{/if}</td>
+              <td class="res">{#if m.excluded}<span class="tag off" title="You chose not to use this copy in plans. Open it to change it.">Not used in plans</span>{/if}{#if m.reservedBy}<button type="button" class="link goal" data-view-chain title="Reserved for {m.reservedByName}: view its chain" onclick={() => ongoal(m.reservedBy)}>{m.reservedByName}</button>{/if}</td>
               <td class="nm" colspan="2"><button type="button" class="link" onclick={() => onopen(m.copyId)}>Copy {n + 1} of {g.count}</button></td>
               <td class="num" colspan="3"></td>
               <td class="num">{money(m.paid)}</td>
@@ -93,6 +94,7 @@
 </div>
 
 <style>
+  .tag.off { color: var(--muted); border-color: currentColor; margin-right: 6px; }
   .wrap { overflow-x: auto; border-radius: 10px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th { text-align: left; font-size: 12px; padding: 4px 6px; color: var(--muted); font-weight: 600; white-space: nowrap; }

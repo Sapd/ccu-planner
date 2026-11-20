@@ -1,5 +1,6 @@
 // Hangar, Melt and Prices tab helpers. Pure.
 import { reservations } from '../../../../src/logic/chains.mjs';
+import { excludedCopies } from '../../../../src/logic/goals.mjs';
 import { shipName, goalNamer } from '../../../../src/logic/ships.mjs';
 import { matchesQuery, searchText } from '../../../../src/logic/search.mjs';
 import { parseSlackUsd } from '../../../../src/logic/wantedView.mjs';
@@ -13,6 +14,7 @@ import { sessionOf } from '../../../../src/logic/session.mjs';
 /** One row per owned CCU copy. `review` items stay as they are. */
 export function hangarRows(data, plans) {
   const reserved = reservations(plans);
+  const excluded = excludedCopies(plans);
   const goalName = goalNamer(plans, data.ships);
   return {
     rows: data.owned.map((c) => ({
@@ -22,6 +24,7 @@ export function hangarRows(data, plans) {
       reservedBy: reserved.get(c.copyId) ?? null,
       reservedByName: reserved.has(c.copyId) ? goalName(reserved.get(c.copyId)) : null,
       matchMethod: c.matchMethod, extras: c.extras ?? [], edition: c.edition ?? null,
+      excluded: excluded.has(String(c.copyId)),
     })),
     review: data.review ?? [],
   };

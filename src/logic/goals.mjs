@@ -117,12 +117,15 @@ export function creditToSpend(accepted, graph = null, taken = new Set()) {
   return settleStandard(accepted, graph, taken).credit;
 }
 
+/** Owned CCU copies you excluded from planning (Hangar: "Don't use in plans"): no goal's route may use them. */
+export const excludedCopies = (state) => new Set((state.profile?.excludedCopies ?? []).map(String));
+
 /** Accepted goals in the one order every credit and copy claim is settled in. */
 export const acceptedInOrder = (state) => Object.values(state.chains).filter((c) => c.accepted).sort(byPriority);
 
 /** Credit held by the reservations of all goals (except one): see creditToSpend. One copy settles one goal's step only. */
 export function creditCommitted(state, exceptChainId = null, graph = null) {
-  const taken = graph ? new Set(reservations(state).keys()) : null;
+  const taken = graph ? new Set([...reservations(state).keys(), ...excludedCopies(state)]) : null;
   let sum = 0;
   for (const c of acceptedInOrder(state)) {
     const { credit, bought } = settleStandard(c.accepted, graph, taken ?? undefined);

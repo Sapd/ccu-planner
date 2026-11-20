@@ -1,5 +1,6 @@
 <script>
   import { planRoutes, summarize, incomingCount } from '$logic/planner.mjs';
+  import { excludedCopies } from '$logic/goals.mjs';
   import { routeLine, noRouteMessage, OBJECTIVE_CHOICE } from '$logic/describe.mjs';
   import { shipName } from '$logic/ships.mjs';
   import ShipPicker from './ShipPicker.svelte';
@@ -36,7 +37,7 @@
   function run(e) {
     e.preventDefault();
     if (problem) return;
-    const routes = planRoutes(app.graph, { base: from, target: to, credit, maxSteps, allowOwned: !noOwned, allowWarbond: !noWarbond, objective }, k);
+    const routes = planRoutes(app.graph, { base: from, target: to, credit, maxSteps, allowOwned: !noOwned, allowWarbond: !noWarbond, objective, excludeCopies: excludedCopies(app.plans) }, k);
     result = { from, to, routes, none: routes.length ? null : noRouteMessage(shipName(ships, to), incomingCount(app.graph, to)) };
   }
 </script>
