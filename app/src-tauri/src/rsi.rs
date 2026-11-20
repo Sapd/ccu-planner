@@ -19,6 +19,9 @@ const CATALOG_GQL: &str = "/graphql";
 const CATALOG_OPERATION: &str = "GetBrowseSkusByFilter";
 const CONTEXT: &str = "/api/ship-upgrades/setContextToken";
 const PROBE: &str = "/en/account/pledges?page=1&pagesize=1";
+/// RSI's sign-in page; after signing in it goes on to the hangar.
+const SIGNIN_PAGE: &str = "/en/connect?jumpto=/account/pledges";
+const LOGIN_REPROBE_SECS: u64 = 15;
 const EXPIRED: &str = "Sign-in expired";
 const SESSION_NOT_SAVED: &str =
     "Signed in, but the session couldn't be saved; you'll need to sign in again next time";
@@ -590,7 +593,7 @@ pub async fn rsi_login(
         &app,
         "rsi-login",
         WebviewUrl::External(
-            format!("{ORIGIN}/en/")
+            format!("{ORIGIN}{SIGNIN_PAGE}")
                 .parse()
                 .map_err(|_| "Invalid RSI URL")?,
         ),
@@ -600,11 +603,15 @@ pub async fn rsi_login(
     // No popups from the remote page: a window.open or target=_blank would escape the navigation allowlist above.
     .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
     .title("Sign in to RSI")
+    // RSI switches to its phone layout below about 1000 px; open at a desktop size.
+    .inner_size(1200.0, 860.0)
+    .center()
     .build()
     .map_err(|e| e.to_string())?;
     let result = async {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(600);
-        let mut last_cookies = None;
+        let mut last_seen = None;
+        let mut last_probe = tokio::time::Instant::now();
         while tokio::time::Instant::now() < deadline {
             tokio::time::sleep(Duration::from_secs(2)).await;
             if app.get_webview_window("rsi-login").is_none() {
@@ -621,12 +628,17 @@ pub async fn rsi_login(
                 .filter(|c| needed_cookie(c.name()))
                 .map(|c| (c.name().into(), c.value().into()))
                 .collect();
-            // Anonymous pages can carry Rsi-Token too. Probe only when cookies change,
-            // instead of repeatedly requesting the hangar while the user enters 2FA.
-            if last_cookies.as_ref() == Some(&jar) {
+            // Anonymous pages carry Rsi-Token too, and RSI can keep the same token when the user signs in.
+            // Probe when the cookies or the page change, and otherwise at most every 15 s (not while 2FA is typed).
+            let page = window.url().map(|u| u.to_string()).unwrap_or_default();
+            let seen = (jar.clone(), page);
+            if last_seen.as_ref() == Some(&seen)
+                && last_probe.elapsed() < Duration::from_secs(LOGIN_REPROBE_SECS)
+            {
                 continue;
             }
-            last_cookies = Some(jar.clone());
+            last_seen = Some(seen);
+            last_probe = tokio::time::Instant::now();
             let mut client = state.0.lock().await;
             let previous = client.session.take();
             let expires_at = cookies
@@ -1236,6 +1248,12 @@ mod tests {
             |_| panic!("no error"),
         );
         assert_eq!(saves, 1);
+    }
+    #[test]
+    fn login_window_opens_rsi_sign_in_page() {
+        let url: reqwest::Url = format!("{ORIGIN}{SIGNIN_PAGE}").parse().unwrap();
+        assert!(login_navigation(&url));
+        assert_eq!(url.path(), "/en/connect");
     }
     #[test]
     fn login_navigation_is_https_and_rsi_hosts_only() {
