@@ -23,6 +23,22 @@ It is not yet clear whether I will maintain it over the long term the way the CC
 maintained; I want to see first how much work keeping it current takes. Until then, please check its
 plans against the [CCU Game](https://ccugame.app/) extension as well, especially before larger purchases.
 
+## Screenshots
+
+These screenshots show a made-up hangar, goals, and store offers.
+
+![Today page with upgrade recommendations](docs/screenshots/today.png)
+*Today shows which upgrades to buy now and which offers can wait.*
+
+![Goals page with the Corsair chain open](docs/screenshots/goals.png)
+*Goals shows the upgrades you own and the steps left in each chain.*
+
+![Hangar page showing owned upgrades](docs/screenshots/hangar.png)
+*Hangar shows what you paid for your upgrades and which ones are reserved.*
+
+![Store page with Warbond offers and a sale event](docs/screenshots/store.png)
+*Store shows Warbond prices, savings, and the current sale event.*
+
 ## Install
 
 Download the installer for your system from the project's releases page and run it (macOS, Windows or
