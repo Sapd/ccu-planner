@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { money, usd, setPricing, currencyProblem, normalizePricing } from '../src/logic/format.mjs';
 import { buildPlannerData } from '../src/logic/mapping.mjs';
 import { deriveAppState } from '../app/src/lib/view/derive.mjs';
-import { onboardingSteps, syncProgressView } from '../app/src/lib/view/onboarding.mjs';
+import { onboardingSteps, syncProgressView, syncKinds } from '../app/src/lib/view/onboarding.mjs';
 import { createSampleBackend } from '../app/src/lib/view/sample.mjs';
 import { createController } from '../app/src/lib/view/controller.mjs';
 import { buildSample } from '../src/logic/sampleData.mjs';
@@ -341,4 +341,13 @@ test('onboarding: a running sync shows how far it is', () => {
   assert.deepEqual(syncProgressView({ phase: 'hangar', done: 2, total: null }), { text: 'Loading your hangar… page 2', value: null, max: null });
   assert.deepEqual(syncProgressView({ phase: 'upgrades', done: 0, total: null }), { text: 'Loading the store’s upgrades…', value: null, max: null });
   assert.equal(syncProgressView({ phase: 'details', done: 40, total: 244 }).text, 'Loading upgrade prices… 40 of 244');
+});
+
+test('an unfinished store sync (offers without details) is not fresh: the first-run sync runs the store again and the step is not done', () => {
+  const now = new Date(2026, 10, 20, 12);
+  const app = (inferredKinds) => ({ data: { meta: { catalogAt: new Date(2026, 10, 20, 9).toISOString(), hangarAt: 'x', inferredKinds } }, plans: { chains: {} } });
+  assert.deepEqual(syncKinds(app(0), now), ['hangar']);
+  assert.deepEqual(syncKinds(app(3), now), ['upgrades', 'hangar']);
+  assert.equal(onboardingSteps({ session: 'signed in', app: app(0) })[1].done, true);
+  assert.equal(onboardingSteps({ session: 'signed in', app: app(3) })[1].done, false);
 });

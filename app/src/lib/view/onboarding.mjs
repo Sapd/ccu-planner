@@ -9,7 +9,7 @@ export const ONBOARDING_TITLE = 'Get started in three steps';
  */
 export function onboardingSteps({ session, app }) {
   const meta = app?.data?.meta ?? {};
-  const hasStore = !!meta.catalogAt;
+  const hasStore = !!meta.catalogAt && storeComplete(app);
   const hasHangar = !!meta.hangarAt;
   const goals = Object.keys(app?.plans?.chains ?? {}).length;
   // Only a live RSI session counts: data imported from a folder says nothing about being signed in.
@@ -24,10 +24,16 @@ export function onboardingSteps({ session, app }) {
   return steps.map((s, i) => ({ ...s, next: i === nextIndex }));
 }
 
-/** True when the store data is from the same local day as `now`. */
+/**
+ * Whether the last store sync finished: every offer has its details (Standard/Warbond title and the ship's item IDs). A cancelled
+ * or failed store sync leaves offers without them, and hangar upgrades RSI names its own way cannot be mapped without the details.
+ */
+export const storeComplete = (app) => (app?.data?.meta?.inferredKinds ?? 0) === 0;
+
+/** True when the store data is from the same local day as `now` and that store sync finished. */
 export const storeIsFresh = (app, now = new Date()) => {
   const at = app?.data?.meta?.catalogAt;
-  return !!at && new Date(at).toDateString() === now.toDateString();
+  return !!at && new Date(at).toDateString() === now.toDateString() && storeComplete(app);
 };
 
 /** What the first-run "Sync store and hangar" runs: the hangar alone when the store data is fresh. */
