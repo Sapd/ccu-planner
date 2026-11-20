@@ -10,6 +10,19 @@ Cloud Imperium Rights LLC. This is an unofficial fan tool.
 The planner only reads your account. It never buys, melts, gifts or applies anything, never asks for
 your RSI password and never touches your cart. You do every purchase yourself on the RSI website.
 
+## About this project
+
+CCU Planner is an experiment. It is meant above all for people new to CCUs: it explains each step in
+plain words and tells you what to buy now and what can wait. When several goals share your CCUs and
+store credit, it tries different orders of planning them to find the combination that costs least
+overall. If you want, it also picks a cheap LTI ship from your hangar as the starting ship by itself.
+In my own hangar it found real savings compared with the plans I had made before with the CCU Game
+extension. It is open source, so you can read exactly what it does with your account, and improve it.
+
+It is not yet clear whether I will maintain it over the long term the way the CCU Game extension is
+maintained; I want to see first how much work keeping it current takes. Until then, please check its
+plans against the [CCU Game](https://ccugame.app/) extension as well, especially before larger purchases.
+
 ## Install
 
 Download the installer for your system from the project's releases page and run it (macOS, Windows or
