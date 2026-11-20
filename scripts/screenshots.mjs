@@ -7,14 +7,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { writeDemoData } from './demo-data.mjs';
+import { refreshFeed, fetchFeedImages } from '../src/feed.mjs';
 
 const appRoot = fileURLToPath(new URL('../app/', import.meta.url));
 const output = fileURLToPath(new URL('../docs/screenshots/', import.meta.url));
 const requireFromApp = createRequire(path.join(appRoot, 'package.json'));
 const { createServer } = await import(pathToFileURL(requireFromApp.resolve('vite')).href);
 
-// Let the real data plugin serve the demo files. The app's background session and
-// feed checks are simulated so they cannot launch a sync, read a session or fetch artwork.
+// Let the real data plugin serve the demo files and the ship pictures. The app's background session and
+// feed checks are simulated so they cannot launch a sync or read a session; the pictures are fetched once below.
 const localDataOnly = {
   name: 'screenshots-local-data',
   enforce: 'pre',
@@ -27,7 +28,7 @@ const localDataOnly = {
     ]);
     server.middlewares.use('/__dev', (req, res, next) => {
       const endpoint = req.url.split('?')[0];
-      if (req.method === 'GET' && reads.has(endpoint)) return next();
+      if (req.method === 'GET' && (reads.has(endpoint) || endpoint.startsWith('/images/'))) return next();
       const response = simulated.get(`${req.method} ${endpoint}`);
       res.writeHead(response === undefined ? 403 : 200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(response ?? { error: 'Only demo data is available during capture' }));
@@ -40,6 +41,11 @@ let server;
 let browser;
 try {
   await writeDemoData(dir);
+  // The ship pictures come from the project's own signed data feed (sapd.github.io), never from an account.
+  const feed = await refreshFeed({ dir, force: true });
+  if (feed.status !== 'updated' && feed.status !== 'skipped') throw new Error(`could not load the data feed (${feed.status})`);
+  const pictures = await fetchFeedImages({ dir, scope: 'ships', limit: 500 });
+  console.log(`ship pictures: ${pictures.downloaded} downloaded`);
   process.env.CCU_DATA = dir;
   server = await createServer({
     root: appRoot,
@@ -75,6 +81,11 @@ try {
 
   const capture = async (name, ready, zoom = 1) => {
     await ready.waitFor();
+    // Ship pictures appear once the app has read the feed's picture list: wait until some are shown and the visible ones have loaded.
+    await page.waitForFunction(() => {
+      const shown = [...document.querySelectorAll('main img')].filter((i) => { const r = i.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
+      return shown.length > 0 && shown.every((i) => i.complete && i.naturalWidth > 0);
+    }, null, { timeout: 20000 });
     await page.mouse.move(1439, 899);
     await page.evaluate(async (scale) => {
       document.activeElement?.blur();
@@ -109,7 +120,7 @@ try {
 
   await nav.getByRole('button', { name: 'Store' }).click();
   await page.getByRole('checkbox', { name: 'only my goals' }).check();
-  await page.getByText('Sale events (1)', { exact: true }).click();
+  await page.getByText(/^Sale events \(\d+\)$/).click();
   screenshots.push(await capture('store', page.locator('#sale-events [data-event]').filter({ hasText: 'Ship Expo' }), 0.79));
 
   await mkdir(output, { recursive: true });
