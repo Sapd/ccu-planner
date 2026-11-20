@@ -40,7 +40,7 @@
 <div class="start">
   <label for="start-{uid}">Starts from
     <select id="start-{uid}" value={mode} onchange={(e) => choose(e.currentTarget.value)}>
-      <option value="any">Any cheap LTI ship of mine</option>
+      <option value="any">Automatic: the cheapest LTI ship you own</option>
       {#each pool as t (t.pledgeId)}<option value="pledge:{t.pledgeId}">{optionLabels.get(t.pledgeId)}</option>{/each}
       {#if missing}<option value="pledge:{start.pledgeId}">The starting ship you picked (not one any more)</option>{/if}
       <option value="fixed">A ship I choose…</option>

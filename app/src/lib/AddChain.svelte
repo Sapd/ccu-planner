@@ -40,7 +40,7 @@
   }
 
   const problem = $derived(
-    target == null ? 'Pick the ship you want.' : fixed && base == null ? 'Pick the start ship, or untick “Choose the starting ship myself”.' : fixed && base === target ? 'Start and target must differ.' : null,
+    target == null ? 'Pick the ship you want.' : fixed && base == null ? 'Pick the starting ship, or switch back to Automatic.' : fixed && base === target ? 'Start and target must differ.' : null,
   );
 
   // The preview plans every goal again with this one added, in memory. Nothing is saved. A result is only shown for the
@@ -76,16 +76,18 @@
     <p><button type="button" class="example" data-sample-example onclick={useExample}>{SAMPLE_EXAMPLE_LABEL}</button></p>
   {/if}
   {#key resets}<ShipPicker {ships} bind:value={target} label="Ship you want" id="add-to" {suggest} onpick={() => { touched = true; }} />{/key}
-  <label class="check"><input type="checkbox" bind:checked={fixed} onchange={() => { touched = true; }} /> Choose the starting ship myself</label>
+  <fieldset class="starts">
+    <legend>Starts from</legend>
+    <label class="check"><input type="radio" name="add-start" value={false} bind:group={fixed} onchange={() => { touched = true; }} /> Automatic: the cheapest LTI ship you own</label>
+    <label class="check"><input type="radio" name="add-start" value={true} bind:group={fixed} onchange={() => { touched = true; }} /> A ship I choose</label>
+  </fieldset>
   {#if fixed}
-    {#key resets}<ShipPicker {ships} bind:value={base} label="Start from" id="add-from" />{/key}
+    {#key resets}<ShipPicker {ships} bind:value={base} label="Starting ship" id="add-from" />{/key}
   {:else if starter === 'none'}
     <div class="nostarter" role="status" data-no-starter>
       <p>{NO_STARTER_TEXT}</p>
       <p><button type="button" onclick={chooseShip}>Choose a ship</button></p>
     </div>
-  {:else}
-    <p class="help">The goal starts from a cheap ship you own that has lifetime insurance (LTI); the planner picks the cheapest one.</p>
   {/if}
   {#if endpoints}
     <p class="endpoints" data-endpoints>{endpoints}{#if goalCash != null} · {goalCash === 0 ? 'no new cash needed' : `${usd(goalCash)} new cash`}{/if}</p>
@@ -125,6 +127,8 @@
   .nostarter p { margin: 0 0 6px; color: var(--warn); font-size: 13px; }
   .nostarter p:last-child { margin: 0; }
   .example { border-color: var(--accent); color: var(--accent); }
+  .starts { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; }
+  .starts legend { padding: 0; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
   .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .help { margin: 0; color: var(--muted); font-size: 12px; }
   .fine { color: var(--muted); font-size: 12px; }
