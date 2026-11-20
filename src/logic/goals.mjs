@@ -88,25 +88,28 @@ export function reservations(state, exceptChainId = null) {
 }
 
 /**
- * What a reservation's Standard steps do with the owned copies nobody reserves: a reserved Standard step counts as bought
- * once you own a copy of that upgrade that no reservation holds and no earlier goal has used (the credit it used is
- * gone from the balance already, so it must not stay committed). That copy then belongs to this goal alone.
+ * What a reservation's purchase steps (Warbond, Standard or virtual) do with the owned copies nobody reserves: a reserved
+ * step counts as bought once you own a copy of that upgrade that no reservation holds and no earlier goal has used. That
+ * copy then belongs to this goal alone, and the step costs nothing more. A bought Standard step frees the credit it
+ * reserved (that credit is gone from the balance already, so it must not stay committed).
  * `taken` = copy ids already reserved or used by earlier goals (not changed here).
- * @returns {{ credit: number, bought: string[] }} credit still to spend, and the copies this reservation uses up
+ * @returns {{ credit: number, bought: string[], settled: Map<number, object> }} credit still to spend, the copies this
+ *   reservation uses up, and step index -> the owned copy that settles it
  */
 export function settleStandard(accepted, graph, taken = new Set()) {
   const credit = accepted?.creditUsed ?? 0;
-  if (!graph) return { credit, bought: [] };
+  if (!graph) return { credit, bought: [], settled: new Map() };
   const used = new Set(taken);
   const bought = [];
+  const settled = new Map();
   let toBuy = 0;
-  for (const s of accepted.steps) {
-    if (s.kind !== 'standard') continue;
+  accepted.steps.forEach((s, i) => {
+    if (s.kind === 'owned') return;
     const edge = (graph.edges.get(s.from) ?? []).find((e) => e.kind === 'owned' && e.to === s.to);
     const copy = edge?.copies.find((c) => !used.has(c.copyId));
-    if (copy) { used.add(copy.copyId); bought.push(copy.copyId); } else toBuy += s.cash;
-  }
-  return { credit: Math.min(credit, toBuy), bought };
+    if (copy) { used.add(copy.copyId); bought.push(copy.copyId); settled.set(i, { ...copy, from: s.from, to: s.to }); } else if (s.kind === 'standard') toBuy += s.cash;
+  });
+  return { credit: Math.min(credit, toBuy), bought, settled };
 }
 
 /**
@@ -171,6 +174,8 @@ export function evaluateAccepted(state, chainId, { offers, owned, lti }) {
   const virtuals = new Map((state.profile?.virtualCcus ?? []).map((v) => [v.id, v]));
   for (const s of chain.accepted.steps) {
     if (s.virtual) {
+      const got = owned.find((o) => o.from === s.from && o.to === s.to && !others.has(o.copyId) && !usedHere.has(o.copyId));
+      if (got) { usedHere.add(got.copyId); continue; } // you got the real upgrade
       // A virtual CCU stays in a reserved chain even when you delete it or it expires (you planned to get it); a new price is a repricing.
       if (others.has(s.copyId)) { blocked = true; issues.push({ kind: 'copy-shared', copyId: s.copyId, from: s.from, to: s.to, by: others.get(s.copyId) }); }
       const v = virtuals.get(s.virtualId);
@@ -184,11 +189,11 @@ export function evaluateAccepted(state, chainId, { offers, owned, lti }) {
       if (others.has(s.copyId)) { blocked = true; issues.push({ kind: 'copy-shared', copyId: s.copyId, from: s.from, to: s.to, by: others.get(s.copyId) }); }
       continue;
     }
+    // A step you now own a usable copy of (not held by another goal) is bought: it costs nothing more, whether its offer is still on sale or gone.
+    const bought = owned.find((o) => o.from === s.from && o.to === s.to && !others.has(o.copyId) && !usedHere.has(o.copyId));
+    if (bought) { usedHere.add(bought.copyId); continue; }
     const cur = bestOffer.get(edgeKey(s));
     if (!cur) {
-      // A step you now own a usable copy of (not held by another goal) is bought, so its offer may be gone.
-      const bought = owned.find((o) => o.from === s.from && o.to === s.to && !others.has(o.copyId) && !usedHere.has(o.copyId));
-      if (bought) { usedHere.add(bought.copyId); continue; }
       blocked = true; issues.push({ kind: 'offer-gone', step: s.kind, from: s.from, to: s.to });
       continue;
     }

@@ -32,17 +32,30 @@ export function goalStarts(state, chain, graph, exclude = new Set()) {
   return out;
 }
 
-// The accepted route as a route-shaped object (for fleet plans).
-const acceptedRoute = (a) => ({
-  steps: a.steps, cash: a.cash, creditUsed: a.creditUsed ?? 0, ownedBasis: a.ownedBasis ?? null, allIn: a.allIn ?? null,
-  start: { ship: a.token?.ship ?? a.steps[0]?.from ?? null, token: a.token ? { copyId: a.token.copyId, pledgeId: a.token.pledgeId } : null },
-});
+// The accepted route as a route-shaped object (for fleet plans). `settled` (settleStandard): step index -> the owned copy
+// that already bought it; such a step shows as owned and costs nothing more, so the goal's cost is what is still to pay.
+const acceptedRoute = (a, settled = new Map(), credit = a.creditUsed ?? 0) => {
+  const steps = a.steps.map((s, i) => {
+    const c = settled.get(i);
+    if (!c) return s;
+    const { virtual, virtualId, note, expires, skuId, ...rest } = s;
+    return { ...rest, ...c, kind: 'owned', cash: 0 };
+  });
+  let wb = 0; let std = 0;
+  for (const s of steps) if (s.kind === 'standard') std += s.cash; else if (s.kind !== 'owned') wb += s.cash;
+  const creditUsed = Math.min(std, credit);
+  return {
+    steps, cash: settled.size ? wb + std - creditUsed : a.cash, creditUsed: settled.size ? creditUsed : a.creditUsed ?? 0, ownedBasis: a.ownedBasis ?? null, allIn: a.allIn ?? null,
+    start: { ship: a.token?.ship ?? a.steps[0]?.from ?? null, token: a.token ? { copyId: a.token.copyId, pledgeId: a.token.pledgeId } : null },
+  };
+};
 
 // What a reservation holds. Its credit only covers the Standard steps still to buy: once one is owned, its credit is free again.
 // A Standard step you already own the copy for holds that copy (one copy settles one goal's step only).
 const claimsOf = (accepted, graph, taken) => {
-  const { credit, bought } = settleStandard(accepted, graph, taken);
+  const { credit, bought, settled } = settleStandard(accepted, graph, taken);
   return {
+    settled,
     copies: [...accepted.steps.filter((s) => s.copyId).map((s) => s.copyId), ...(accepted.token?.copyId ? [accepted.token.copyId] : []), ...bought],
     credit,
   };
@@ -182,7 +195,7 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
     const own = heldBy.get(c.id);
     const exclude = new Set(excluded);
     for (const [id, cl] of heldBy) if (id !== c.id) for (const x of cl.copies) exclude.add(x);
-    result.set(c.id, { exclude, credit: Math.max(0, total - (creditUsed - own.credit)), route: acceptedRoute(c.accepted), noToken: false });
+    result.set(c.id, { exclude, credit: Math.max(0, total - (creditUsed - own.credit)), route: acceptedRoute(c.accepted, own.settled, own.credit), noToken: false });
   }
   // Plan the rest level by level (priority always wins). Inside one level the order is searched.
   // A goal's search only sees claimed copies that sit on an owned CCU between its start ships and its target

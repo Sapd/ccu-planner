@@ -63,3 +63,23 @@ test('an accepted chain whose Warbond step is now owned is not blocked when the 
   // Still blocked when the copy is not there (or another goal holds it).
   assert.equal(evaluateAccepted(state, c.id, { offers: [std], owned: [], lti: [] }).status, 'blocked');
 });
+
+test('a reserved Warbond step you bought while it is still on sale counts as owned, not as still to buy', async () => {
+  const { buildGraph } = await import('../src/logic/planner.mjs');
+  const { newState, addChain, proposeChain, acceptRoute, evaluateAccepted, planGoals } = await import('../src/logic/chains.mjs');
+  const ships = new Map([1, 2, 3].map((id) => [id, { id, name: `S${id}`, msrp: id * 5000 }]));
+  const offers = [{ from: 1, to: 2, kind: 'warbond', cash: 2000 }, { from: 2, to: 3, kind: 'standard', cash: 5000 }];
+  const s = newState();
+  addChain(s, { start: { kind: 'ship', ship: 1 }, target: 3 });
+  const before = buildGraph({ offers, ships });
+  acceptRoute(s, 'c1', proposeChain(s, 'c1', before, { k: 1 }).routes[0], {}, { graph: before });
+  const owned = [{ copyId: 'p1', from: 1, to: 2, paid: { cents: 2000 } }];
+  const after = buildGraph({ offers, owned, ships });
+  const r = planGoals(s, after).get('c1').route;
+  assert.deepEqual(r.steps.map((x) => [x.kind, x.copyId ?? null]), [['owned', 'p1'], ['standard', null]]);
+  assert.equal(r.cash, 5000);
+  assert.equal(evaluateAccepted(s, 'c1', { offers, owned }).cash, 5000);
+  // A second goal cannot take that copy: it settles the reserved step.
+  addChain(s, { start: { kind: 'ship', ship: 1 }, target: 2 });
+  assert.equal(planGoals(s, after).get('c2').route.steps[0].kind, 'warbond');
+});

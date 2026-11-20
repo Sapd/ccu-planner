@@ -72,7 +72,7 @@ function computeTodayView(app, today) {
       : j);
     goals.push({ get counted() { return counted(); }, goalId: chain.id, cash: route?.cash ?? null, acceptedCash: chain.accepted ? (chain.accepted.cash ?? null) : null,
       // What the plan total counts for this goal: an accepted goal at the price it was accepted at, the others at today's route.
-      countedCash: chain.accepted ? (chain.accepted.cash ?? null) : (route?.cash ?? null), get aloneCash() { const e = fx(); return e.extra > 0 ? e.alone.cash : null; }, name: chain.name ?? chain.id, targetName: data.ships?.get(chain.target)?.name ?? chain.name ?? chain.id, start, startLine, targetId: chain.target, journey: j, status, buyCount, noRushCount, optionalCount, waitCount: waitN,
+      countedCash: chain.accepted ? (session.shared.get(chain.id)?.route?.cash ?? chain.accepted.cash ?? null) : (route?.cash ?? null), get aloneCash() { const e = fx(); return e.extra > 0 ? e.alone.cash : null; }, name: chain.name ?? chain.id, targetName: data.ships?.get(chain.target)?.name ?? chain.name ?? chain.id, start, startLine, targetId: chain.target, journey: j, status, buyCount, noRushCount, optionalCount, waitCount: waitN,
       startShip: startShip(chain, route ?? null), token: tokenUsed, noToken: proposal.noToken });
 
     const order = goalChains.indexOf(chain);

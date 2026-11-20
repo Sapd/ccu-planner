@@ -82,17 +82,19 @@ test('buy: a CCU no goal can use saves nothing', () => {
   assert.match(buyRowText(e.rows[0]), /no goal would use it/);
 });
 
-test('buy: the pair an accepted goal already buys is "already a step of its plan", not "no goal would use it"', async () => {
+test('buy: a copy of a step a reserved goal buys settles that step (paid early at its price, cheaper below it)', async () => {
   const { acceptRoute } = await import('../src/logic/goals.mjs');
   const { sessionFor } = await import('../src/logic/session.mjs');
   const { app, ids: [a] } = setup({ goals: [{ base: 1, target: 2 }] });
   acceptRoute(app.plans, a, sessionFor(app).shared.get(a).route);
-  const row = buyEffect(app, { from: 1, to: 2, kind: 'standard', cash: 2500, maxCopies: 1 }).rows[0];
-  assert.equal(row.usedCopies, 0);
-  assert.deepEqual(row.plannedBy, ['Hercules']);
-  assert.equal(buyRowText(row), "1 copy ($25): this is already a step of Hercules's plan, and that plan would still buy it anyway. An extra copy would be a second purchase: $25 more.");
-  assert.doesNotMatch(buyRowText(row), /no goal would use|cheaper|changes nothing/);
-  assert.match(buyRowText({ ...row, plannedBy: ['Orion', 'Carrack'] }), /^1 copy \(\$25\): this is already a step of the plans of Orion and Carrack, and those plans would still buy them anyway\./);
+  const same = buyEffect(app, { from: 1, to: 2, kind: 'standard', cash: 2500, maxCopies: 1 }).rows[0];
+  assert.equal(same.usedCopies, 1);
+  assert.equal(same.net, 0);
+  assert.equal(buyRowText(same), "1 copy ($25): buying it now pays $25 of Hercules's plan early; the total stays the same.");
+  const cheaper = buyEffect(app, { from: 1, to: 2, kind: 'standard', cash: 1000, maxCopies: 1 }).rows[0];
+  assert.equal(buyRowText(cheaper), '1 copy ($10): goals get $25 cheaper (Hercules -$25); you come out $15 ahead.');
+  // The wording for a pair other plans keep buying is unchanged.
+  assert.match(buyRowText({ ...same, usedCopies: 0, plannedBy: ['Orion', 'Carrack'] }), /^1 copy \(\$25\): this is already a step of the plans of Orion and Carrack, and those plans would still buy them anyway\./);
 });
 
 test('price: Standard offers follow the new msrp, Warbonds stay', () => {
