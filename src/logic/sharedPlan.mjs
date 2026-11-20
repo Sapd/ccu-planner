@@ -3,7 +3,7 @@
 
 import { searchRoutes, planRoutes } from './planner.mjs';
 import { tokenPool, tokenSettings, tokenCopyId } from './tokens.mjs';
-import { startOf, byPriority, creditToSpend, reservations } from './goals.mjs';
+import { startOf, byPriority, settleStandard, acceptedInOrder, reservations } from './goals.mjs';
 import { createRouteReuse } from './routeReuse.mjs';
 
 /**
@@ -39,10 +39,14 @@ const acceptedRoute = (a) => ({
 });
 
 // What a reservation holds. Its credit only covers the Standard steps still to buy: once one is owned, its credit is free again.
-const claimsOf = (accepted, graph, taken) => ({
-  copies: [...accepted.steps.filter((s) => s.copyId).map((s) => s.copyId), ...(accepted.token?.copyId ? [accepted.token.copyId] : [])],
-  credit: creditToSpend(accepted, graph, taken),
-});
+// A Standard step you already own the copy for holds that copy (one copy settles one goal's step only).
+const claimsOf = (accepted, graph, taken) => {
+  const { credit, bought } = settleStandard(accepted, graph, taken);
+  return {
+    copies: [...accepted.steps.filter((s) => s.copyId).map((s) => s.copyId), ...(accepted.token?.copyId ? [accepted.token.copyId] : []), ...bought],
+    credit,
+  };
+};
 
 /** Route searches (all levels together) after which one planGoals call stops trying other goal orders; the default order of every level is always planned in full. */
 export const SEARCH_CAP = 32;
@@ -165,8 +169,9 @@ export function planGoals(state, graph, { maxSteps = 25, searchCap = SEARCH_CAP,
   const claimed = new Set();
   let creditUsed = 0;
   const taken = new Set(reservations(state).keys());
-  for (const c of accepted) {
+  for (const c of acceptedInOrder(state)) {
     const cl = claimsOf(c.accepted, graph, taken);
+    for (const id of cl.copies) taken.add(id);
     heldBy.set(c.id, cl);
     for (const id of cl.copies) claimed.add(id);
     creditUsed += cl.credit;

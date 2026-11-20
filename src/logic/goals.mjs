@@ -88,30 +88,47 @@ export function reservations(state, exceptChainId = null) {
 }
 
 /**
- * The store credit a reservation still has to spend: its credit, capped by the Standard steps that are not bought
- * yet. A reserved Standard step counts as bought once you own a copy of that upgrade that no reservation holds
- * (the credit it used is gone from the balance already, so it must not stay committed). Without `graph` the whole
- * reserved credit counts.
+ * What a reservation's Standard steps do with the owned copies nobody reserves: a reserved Standard step counts as bought
+ * once you own a copy of that upgrade that no reservation holds and no earlier goal has used (the credit it used is
+ * gone from the balance already, so it must not stay committed). That copy then belongs to this goal alone.
+ * `taken` = copy ids already reserved or used by earlier goals (not changed here).
+ * @returns {{ credit: number, bought: string[] }} credit still to spend, and the copies this reservation uses up
  */
-export function creditToSpend(accepted, graph = null, taken = new Set()) {
+export function settleStandard(accepted, graph, taken = new Set()) {
   const credit = accepted?.creditUsed ?? 0;
-  if (!credit || !graph) return credit;
+  if (!graph) return { credit, bought: [] };
   const used = new Set(taken);
+  const bought = [];
   let toBuy = 0;
   for (const s of accepted.steps) {
     if (s.kind !== 'standard') continue;
     const edge = (graph.edges.get(s.from) ?? []).find((e) => e.kind === 'owned' && e.to === s.to);
     const copy = edge?.copies.find((c) => !used.has(c.copyId));
-    if (copy) used.add(copy.copyId); else toBuy += s.cash;
+    if (copy) { used.add(copy.copyId); bought.push(copy.copyId); } else toBuy += s.cash;
   }
-  return Math.min(credit, toBuy);
+  return { credit: Math.min(credit, toBuy), bought };
 }
 
-/** Credit held by the reservations of all goals (except one): see creditToSpend. */
+/**
+ * The store credit a reservation still has to spend: its credit, capped by the Standard steps that are not bought
+ * yet (see settleStandard). Without `graph` the whole reserved credit counts.
+ */
+export function creditToSpend(accepted, graph = null, taken = new Set()) {
+  return settleStandard(accepted, graph, taken).credit;
+}
+
+/** Accepted goals in the one order every credit and copy claim is settled in. */
+export const acceptedInOrder = (state) => Object.values(state.chains).filter((c) => c.accepted).sort(byPriority);
+
+/** Credit held by the reservations of all goals (except one): see creditToSpend. One copy settles one goal's step only. */
 export function creditCommitted(state, exceptChainId = null, graph = null) {
   const taken = graph ? new Set(reservations(state).keys()) : null;
   let sum = 0;
-  for (const c of Object.values(state.chains)) if (c.id !== exceptChainId && c.accepted) sum += creditToSpend(c.accepted, graph, taken ?? undefined);
+  for (const c of acceptedInOrder(state)) {
+    const { credit, bought } = settleStandard(c.accepted, graph, taken ?? undefined);
+    if (taken) for (const id of bought) taken.add(id);
+    if (c.id !== exceptChainId) sum += credit;
+  }
   return sum;
 }
 
