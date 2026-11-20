@@ -70,6 +70,54 @@ everything in memory and leaves your own data alone; **Leave sample data** takes
 Your data stays on your computer; see [docs/PRIVACY.md](docs/PRIVACY.md) for exactly what is stored and
 which requests are made. The planner currently supports store accounts that pay in USD only.
 
+## Ask Claude about your plan (MCP)
+
+The planner comes with an [MCP](https://modelcontextprotocol.io) server, so Claude can answer questions
+from your own plan: "What should I buy today?", "Why does my Liberator chain cost that much?", "Is this
+Warbond in the sale worth it for me?" (paste the offer), or "What if I bought two Prowler to Carrack
+upgrades for $20?". It uses the same data folder and the same planning code as the app, so its answers
+match what the app shows. Sync in the app first; the server reads what the app saved.
+
+**What you need:** [Node.js](https://nodejs.org) 22 or newer and a copy of this repository:
+
+```bash
+git clone https://github.com/Sapd/ccu-planner.git
+```
+
+```bash
+cd ccu-planner && npm install
+```
+
+**Claude Code:** register the server once (use the full path to your copy; `-s user` makes it available
+in every project):
+
+```bash
+claude mcp add -s user ccu-planner -- node /full/path/to/ccu-planner/scripts/mcp.mjs
+```
+
+**Claude Desktop:** open Settings → Developer → Edit Config and add this to `claude_desktop_config.json`,
+then restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "ccu-planner": {
+      "command": "node",
+      "args": ["/full/path/to/ccu-planner/scripts/mcp.mjs"]
+    }
+  }
+}
+```
+
+On Windows write the path with double backslashes, for example `"C:\\Users\\you\\ccu-planner\\scripts\\mcp.mjs"`.
+
+By default Claude can only read: it can look at your plan and goals and try what-ifs in memory. Syncing
+is easiest in the app. If you want Claude to sync your hangar or the store too (read-only), sign in once
+for the server with `npm run login` in your copy; the app's own sign-in is separate. To let it also add or remove
+goals, reserve chains or set your store credit, add `--allow-writes` after `mcp.mjs`. Either way it can
+never buy, melt, gift or apply anything on RSI, and it never sees your password. The full list of tools and
+safety rules is in [docs/MCP.md](docs/MCP.md).
+
 ## For developers
 
 Setup, tests, the command line, how the planner works, the RSI endpoints used and the safety rules are in
