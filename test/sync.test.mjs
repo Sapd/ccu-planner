@@ -383,3 +383,15 @@ test('losing more than a fifth of the hangar in one full sync asks first; a few 
   await sync('hangar', fine, { full: true }); // 5 of 40 gone
   assert.equal(Object.values(fine.files['hangar.json'].entries).filter((e) => e.goneSince).length, 5);
 });
+
+test('a ship that left the upgrade sources loses its offers after a complete store sync, recorded as disappeared', async () => {
+  const seen = [];
+  const io = memory({ 'upgrades/9.json': { fetchedAt: '2026-11-01', fromId: 9, fromName: 'Gone', targets: [{ toId: 3, skus: [{ id: 77, available: true, upgradeUsdCents: 1000 }] }] } }, storeRequest(seen));
+  await sync('upgrades', io, { from: undefined });
+  assert.deepEqual(io.files['upgrades/9.json'].targets, []);
+  const gone = io.files['offer-history.jsonl'].trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.fromId === 9);
+  assert.deepEqual(gone.map((e) => [e.event, e.toId, e.skuId, e.cash]), [['disappeared', 3, 77, 1000]]);
+  const partial = memory({ 'upgrades/9.json': { fetchedAt: '2026-11-01', fromId: 9, targets: [{ toId: 3, skus: [{ id: 77, available: true, upgradeUsdCents: 1000 }] }] } }, storeRequest([]));
+  await sync('upgrades', partial, { from: '1' }); // a partial sync says nothing about the other sources
+  assert.equal(partial.files['upgrades/9.json'].targets.length, 1);
+});

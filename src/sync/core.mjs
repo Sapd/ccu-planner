@@ -129,6 +129,19 @@ export async function sync(cmd, io, options = {}) {
         log(`upgrades ${i + 1}/${sources.length}: ${names.get(fromId) ?? fromId} -> ${targets.length} targets`);
       }
     }
+    // A ship that left RSI's "upgrade from" list keeps its old upgrades/<id>.json, whose offers can no longer be bought. After a
+    // complete pass (not --from or --limit), empty those files and record their offers as disappeared.
+    if (!opt('from') && !opt('limit')) {
+      const current = new Set(sources);
+      for (const prev of await readJson('upgrades', [])) {
+        if (current.has(prev.fromId) || !prev.targets?.length) continue;
+        const lost = [...offerMap(prev).values()].map((p) => ({ at: now, event: 'disappeared', fromId: prev.fromId, ...p, lastSeen: prev.fetchedAt }));
+        await writeJson(join('upgrades', `${prev.fromId}.json`), { ...prev, fetchedAt: now, targets: [], leftStore: now });
+        if (lost.length) await appendLine('offer-history.jsonl', lost.map((e) => JSON.stringify(e)).join('\n'));
+        events.push(...lost);
+        log(`upgrades: ${prev.fromName ?? prev.fromId} is no longer an upgrade source; ${lost.length} offer(s) removed`);
+      }
+    }
     const count = (e) => events.filter((x) => x.event === e).length;
     log(`upgrades: ${sources.length} source ships, ${pairs} pairs · offers appeared ${count('appeared')}, disappeared ${count('disappeared')}, repriced ${count('repriced')}`);
 
