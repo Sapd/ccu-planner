@@ -19,7 +19,7 @@ reads it when it connects, so no separate agents file is needed.
 - Tools that change your plans exist **only** when the server is started with `--allow-writes`. Without the flag they are not
   listed and cannot be called. Each one saves through the same revisioned save as the app: if another app or session saved
   first, the tool returns an error and writes nothing.
-- `compare_ccugame` reads only the one file you name: an absolute `.json` path of at most 5 MB. The resolved real path must not be
+- `compare_ccugame` and `import_goals` read only the one file you name: an absolute `.json` path of at most 5 MB. The resolved real path must not be
   inside the planner data folder or any `.local` folder. Errors are generic ("Could not read that file").
 - Argument limits: text arguments at most 200 characters (the path 1024, pasted offer text 20000); amounts at most $100,000.
 - The server logs to stderr only (stdout is the protocol).
@@ -38,6 +38,13 @@ Always available, read-only:
 | `check_offer` | What a CCU offer means for you: `from`, `to`, `price`, `kind`, or pasted text in `text` |
 | `compare_ccugame` | Your goals against a CCU Game Saved Chains `.json` file (`path`) |
 | `hangar_ccus_into` | The CCUs you own into a ship and what each copy is used for |
+| `virtual_ccus` | List virtual upgrades with IDs, prices, copies, expiry and notes. |
+| `owned_ccus` | List owned upgrade copies with their IDs, paid prices, exclusions and goals using them. |
+| `lti_tokens` | List LTI pledges with paid and catalog prices, use or never marks and whether their catalog value is within the token limit. |
+| `settings` | Show store credit, token settings, expected ship prices, availability marks and offer end notes. |
+| `sale_events` | List sale events with IDs and inclusive dates, including events from the feed. |
+| `melt_advice` | Show the Hangar melt candidates and suggested copies, potential credit and new money before and after. Advice only. |
+| `alternative_routes` | Compare routes for a goal using its start, constraints, objective and share of the fleet resources. |
 
 Always listed, they only read RSI. RSI code (and with it playwright, a dev dependency) is loaded only when a sync runs, so
 the other tools work without it; a sync without playwright says so.
@@ -65,8 +72,25 @@ Only with `--allow-writes`:
 | `lock` / `unlock` | Lock the price of the last step (`on` or `auto`), or never lock (`off`) |
 | `set_credit` | Sets your store credit |
 | `price_override` | Sets or clears the expected price of a ship (stored apart from the synced catalog) |
+| `set_start` | Change a goal to a fixed ship or specific LTI pledge. Omit both to use any eligible LTI token. Releases its reservation. |
+| `set_token_settings` | Update the LTI catalog price limit in dollars or replace either pledge ID list. Use admits above-limit tokens and never takes precedence. |
+| `mark_token` | Set or clear one LTI pledge’s use or never mark. |
+| `exclude_copy` | Exclude an owned copy from plans or allow it again. Reports released reservations. |
+| `set_virtual_ccu` | Add a virtual upgrade, or replace one by ID. Give the price per copy in dollars. Omitted copies default to one, expiry and note to empty. |
+| `remove_virtual_ccu` | Remove a virtual upgrade by ID. Reserved chains that use it keep it. |
+| `set_via` | Route a goal through a ship, or omit ship to clear it. Reports a released reservation. |
+| `release` | Release a goal’s reserved chain and free its resources. |
+| `set_mode` | Set a goal to watch for savings or finish as soon as possible. |
+| `set_objective` | Rank routes by least new money (cash) or total purchase cost plus the cost of consumed owned CCUs (allin). |
+| `set_priority` | Set a goal’s planning priority to high, normal or low. |
+| `set_availability` | Mark a ship as regular or event-only, or clear the mark to use observed availability. |
+| `set_offer_end` | Record when a pair’s offer ends. Give a calendar day, soon, or clear to remove the note. |
+| `add_sale_event` | Add a named store sale with inclusive start and end dates. |
+| `remove_sale_event` | Remove a user-created store sale event by ID. |
+| `accept_fleet` | Reserve the shared best chains for all unreserved goals with a route, in one save. |
+| `import_goals` | Import only new goals from a CCU Game Saved Chains JSON export. Reports duplicate or unresolved rows. |
 
-Ships and goals are given by name (or numeric ship id; goals also by id such as `c3`). Money in and out is US dollars. Every
+Ships and goals are given by name (or numeric ship id; goals also by id such as `c3`). Money arguments and display text use US dollars. Monetary amounts in structured results are integer cents. Every
 result has readable text and the same data as `structuredContent`, with ship names next to ids.
 
 `what_if` plans the whole account again and can take seconds on a big hangar; it honours request cancellation between its two

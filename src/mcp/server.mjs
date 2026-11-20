@@ -16,13 +16,13 @@ The planner's words:
 - Step states: own (a copy is in the hangar), buy now, on sale (available now, no rush unless the sale ends), optional (a bet: buying now may save money later, but waiting is fine too), wait (no offer yet; a later Warbond may make it cheaper, or it is a Standard filler that can be bought any time).
 - Reserve (the accept tool): keeps a goal on its current chain and holds the owned CCUs it uses for it. Steps of a reserved chain that the user then buys count as owned.
 - Lock: buy the last step now at today's price, before an announced price rise.
-- Virtual CCUs (upgrades the user expects from outside the store) and "route through this ship" are app settings; tool output already includes them.
+- Virtual CCUs (upgrades the user expects from outside the store) can be managed with set_virtual_ccu and remove_virtual_ccu. Use set_via for a route-through ship and exclude_copy to control whether plans can use a specific owned copy.
 
 How to answer:
 - Data is only as fresh as the last sync. Prices and sales change often: if the user is about to buy, or the data looks old, suggest syncing first (in the app, or with sync_* when they ask).
 - Use the tools for every number and route: today for what to buy, goals and goal for costs and reasons, check_offer for a specific offer, what_if for "what if I…" questions, changes_since_sync for "why did my plan change". Never work out routes or prices yourself, and quote amounts as the tools give them.
-- Write tools (add_goal, remove_goal, accept, lock, unlock, set_credit, price_override) change the user's saved plan: use them only when the user asks, and say what changed.
-- Purchases happen only on the RSI website, by the user. Melting, gifting, applying a CCU, virtual CCUs, route-through ships and excluding a CCU from plans are done by the user, in the app or on RSI; say so instead of pretending a tool did it.`;
+- Write tools (available with --allow-writes) change the user's saved plan: use them only when the user asks, and say what changed.
+- Purchases, melting, gifting and applying a CCU happen only on the RSI website, by the user; no tool can do them. melt_advice only says what is worth melting. Say so instead of pretending a tool did it.`;
 
 /** @param {object} deps see tools.mjs  @param {{ allowWrites?: boolean, version?: string }} options */
 export function createServer(baseDeps, { allowWrites = false, version = '0.1.0' } = {}) {

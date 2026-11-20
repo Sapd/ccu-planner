@@ -113,8 +113,9 @@ On Windows write the path with double backslashes, for example `"C:\\Users\\you\
 
 By default Claude can only read: it can look at your plan and goals and try what-ifs in memory. Syncing
 is easiest in the app. If you want Claude to sync your hangar or the store too (read-only), sign in once
-for the server with `npm run login` in your copy; the app's own sign-in is separate. To let it also add or remove
-goals, reserve chains or set your store credit, add `--allow-writes` after `mcp.mjs`. Either way it can
+for the server with `npm run login` in your copy; the app's own sign-in is separate. To let it also change your plan the
+way the app does (goals and their settings, reserved chains, store credit, virtual CCUs, LTI tokens, sale events and the other
+settings), add `--allow-writes` after `mcp.mjs`. Either way it can
 never buy, melt, gift or apply anything on RSI, and it never sees your password. The full list of tools and
 safety rules is in [docs/MCP.md](docs/MCP.md).
 

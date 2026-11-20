@@ -39,8 +39,8 @@ test('lists the read-only and sync tools without --allow-writes, and calls today
   const w = world({ goals: [{ base: 1, target: 4, mode: 'finish' }], owned: [copy('x', 1, 3)] });
   const { client, close } = await connect(w.deps);
   const names = (await client.listTools()).tools.map((t) => t.name);
-  assert.deepEqual(names, ['today', 'goals', 'goal', 'changes_since_sync', 'what_if', 'check_offer', 'compare_ccugame', 'hangar_ccus_into', 'sync_hangar', 'sync_store']);
-  for (const n of ['add_goal', 'remove_goal', 'accept', 'lock', 'unlock', 'set_credit', 'price_override']) assert.ok(!names.includes(n), n);
+  assert.deepEqual(names, ['today', 'goals', 'goal', 'changes_since_sync', 'what_if', 'check_offer', 'compare_ccugame', 'hangar_ccus_into', 'virtual_ccus', 'owned_ccus', 'lti_tokens', 'settings', 'sale_events', 'melt_advice', 'alternative_routes', 'sync_hangar', 'sync_store']);
+  for (const n of ['add_goal', 'remove_goal', 'accept', 'lock', 'unlock', 'set_credit', 'price_override', 'set_start', 'set_token_settings', 'mark_token', 'exclude_copy', 'set_virtual_ccu', 'remove_virtual_ccu', 'set_via', 'release', 'set_mode', 'set_objective', 'set_priority', 'set_availability', 'set_offer_end', 'add_sale_event', 'remove_sale_event', 'accept_fleet', 'import_goals']) assert.ok(!names.includes(n), n);
   const r = await client.callTool({ name: 'today', arguments: {} });
   assert.ok(!r.isError);
   assert.match(r.content[0].text, /Liberator/);
@@ -67,7 +67,7 @@ test('--allow-writes adds the write tools; a stale save comes back as an error r
   const w = world({ goals: [{ base: 1, target: 4 }] });
   const { client, close } = await connect(w.deps, { allowWrites: true });
   const names = (await client.listTools()).tools.map((t) => t.name);
-  for (const n of ['add_goal', 'remove_goal', 'accept', 'lock', 'unlock', 'set_credit', 'price_override']) assert.ok(names.includes(n), n);
+  for (const n of ['add_goal', 'remove_goal', 'accept', 'lock', 'unlock', 'set_credit', 'price_override', 'set_start', 'set_token_settings', 'mark_token', 'exclude_copy', 'set_virtual_ccu', 'remove_virtual_ccu', 'set_via', 'release', 'set_mode', 'set_objective', 'set_priority', 'set_availability', 'set_offer_end', 'add_sale_event', 'remove_sale_event', 'accept_fleet', 'import_goals']) assert.ok(names.includes(n), n);
   const ok = await client.callTool({ name: 'set_credit', arguments: { dollars: 5 } });
   assert.ok(!ok.isError);
   assert.equal(w.disk.plans.profile.credit, 500);
@@ -156,4 +156,16 @@ test('a server started without the flag refuses writes even if a write handler i
   const names = (await client.listTools()).tools.map((t) => t.name);
   assert.ok(!names.includes('set_credit'));
   await close();
+});
+
+test('argumentless plan views reject unexpected filters', async () => {
+  const w = world({ goals: [] });
+  const { client, close } = await connect(w.deps);
+  try {
+    for (const name of ['virtual_ccus', 'owned_ccus', 'lti_tokens', 'settings', 'sale_events', 'melt_advice']) {
+      const r = await client.callTool({ name, arguments: { unknown: true } });
+      assert.equal(r.isError, true, name);
+    }
+    assert.deepEqual(w.saves, []);
+  } finally { await close(); }
 });

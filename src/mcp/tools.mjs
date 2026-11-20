@@ -5,7 +5,7 @@
 //   load()            a fresh app object { data, graph, plans, overrides, saleEvents, expected, session } of the data folder
 //   snapshots()       the stored plan snapshots (plan-snapshots.json), oldest first
 //   save(name, doc)   revisioned save of 'plans' | 'overrides' | 'sale-events'; false when the file moved on (stale rev)
-//   readFile(path)    text of one file (compare_ccugame only)
+//   readFile(path)    text of one file (Saved Chains export)
 //   sync              { available(): boolean, run(cmd, options, { onProgress, signal }): Promise<{ requests, seconds }> }
 //   now()             a Date
 //   aliases           the ship aliases (compare_ccugame)
@@ -25,7 +25,13 @@ import { ownedInto } from '../logic/ownedInto.mjs';
 import { changesSinceSync } from '../logic/changes.mjs';
 import { sessionOf } from '../logic/session.mjs';
 import { findShip, norm, goalLabel } from '../logic/ships.mjs';
-import { localToday } from '../logic/availability.mjs';
+import { virtualRows } from '../../app/src/lib/view/virtual.mjs';
+import { hangarRows, meltView } from '../../app/src/lib/view/hangar.mjs';
+import { copyUsers } from '../../app/src/lib/view/copyUse.mjs';
+import { parseSavedChains, importRows } from '../logic/ccugame.mjs';
+import { tokenSettings } from '../logic/tokens.mjs';
+import { OBJECTIVES } from '../logic/goals.mjs';
+import { localToday, AVAILABILITY, isDay } from '../logic/availability.mjs';
 import { usd } from '../logic/format.mjs';
 import {
   heroBuyTitle, NOTHING_TODAY, BUY_GROUPS, nothingWhyText, eventRiskText, goalStatusText, goalCostText,
@@ -282,16 +288,19 @@ function checkOfferTool(deps, args) {
   return { text: [...blocks, ...notes].join('\n\n'), data: { offers: results, notes } };
 }
 
-function compareCcugameTool(deps, args) {
-  const app = deps.load();
+function readSavedChains(deps, args) {
   const p = String(args.path ?? '');
   if (!isAbsolute(p) || !/\.json$/i.test(p)) throw new ToolError('Give the absolute path of a CCU Game Saved Chains .json file.');
-  let text;
   try {
-    text = deps.readFile(p, MAX_FILE_BYTES);
+    return deps.readFile(p, MAX_FILE_BYTES);
   } catch {
     throw new ToolError('Could not read that file.');
   }
+}
+
+function compareCcugameTool(deps, args) {
+  const app = deps.load();
+  const text = readSavedChains(deps, args);
   let r;
   try {
     r = compareCcuGame(app, text, { aliases: deps.aliases ?? null });
@@ -448,12 +457,209 @@ function priceOverride(deps, args) {
   return { text: `${ship.name}: expected price ${usd(cents)} (RSI today ${usd(ship.msrp)}).`, data: { shipId: ship.id, cents } };
 }
 
+function listResult(key, rows, describe, empty) {
+  return { text: rows.length ? rows.map(describe).join('\n') : empty, data: { [key]: rows } };
+}
+
+function listVirtual(deps) {
+  const app = deps.load();
+  const goals = Object.values(app.plans.chains);
+  const routes = new Map(goals.map(c => [c.id, { name: goalLabel(c, app.data.ships), route: sessionOf(app).route(c.id) }]));
+  const rows = virtualRows(app.plans, app.data.ships, routes, dayOf(deps));
+  return listResult('ccus', rows, v => `${v.id} · ${v.fromName} → ${v.toName} · ${v.copies} × ${usd(v.cents)} · ${v.expires ? (v.expired ? 'expired ' : 'expires ') + v.expires : 'no expiry'}${v.note ? ` · ${v.note}` : ''}`, 'No virtual CCUs.');
+}
+
+function listOwned(deps) {
+  const app = deps.load();
+  const users = copyUsers(todayView(app, dayOf(deps)).goals);
+  const rows = hangarRows(app.data, app.plans).rows.map(r => ({ ...r, goals: users.get(String(r.copyId)) ?? [] }));
+  return listResult('copies', rows, r => `${r.copyId} · ${r.fromName} → ${r.toName} · ${r.paid == null ? 'paid price unknown' : `paid ${usd(r.paid)}`} · ${r.excluded ? 'excluded' : 'allowed'} · ${r.goals.map(g => goalLabel(app.plans.chains[g.goalId], app.data.ships)).join(', ') || 'unused'}`, 'No owned CCU copies.');
+}
+
+function listTokens(deps) {
+  const app = deps.load();
+  const settings = tokenSettings(app.plans);
+  const rows = (app.data.lti ?? []).map(t => ({
+    ...t, withinLimit: t.msrpCents != null && t.msrpCents <= settings.limitCents,
+    mark: settings.never.includes(t.pledgeId) ? 'never' : settings.use.includes(t.pledgeId) ? 'use' : null,
+  }));
+  return listResult('tokens', rows, t => `${t.pledgeId} · ${t.name} · paid ${usd(t.paidCents)}, catalog ${usd(t.msrpCents)} · ${t.withinLimit ? 'within limit' : 'outside limit'} · ${t.mark ?? 'unmarked'}`, 'No LTI tokens.');
+}
+
+function settingsTool(deps) {
+  const app = deps.load();
+  const credit = app.plans.profile.credit ?? 0;
+  const tokens = tokenSettings(app.plans);
+  const ships = Object.entries(app.overrides.ships).map(([id, o]) => ({ ...o, ship: Number(id), name: nameOf(app)(Number(id)) }));
+  const offers = Object.entries(app.overrides.pairs ?? {}).map(([key, note]) => ({ ...pairData(app, ...key.split('-').map(Number)), ...note }));
+  const lines = [`Store credit ${usd(credit)}. Token limit ${usd(tokens.limitCents)}. Use: ${tokens.use.join(', ') || 'none'}. Never: ${tokens.never.join(', ') || 'none'}.`];
+  for (const s of ships) {
+    if (s.msrp != null) lines.push(`${s.name} expected price ${usd(s.msrp)} ${s.note ?? ''}`.trim());
+    if (s.availability) lines.push(`${s.name} availability ${s.availability} ${s.availabilityNote ?? ''}`.trim());
+  }
+  for (const o of offers) lines.push(`${o.fromName} → ${o.toName} ends ${o.until ?? 'soon'}`);
+  return { text: lines.join('\n'), data: { credit, tokens, ships, offers } };
+}
+
+function saleEventsTool(deps) {
+  const rows = deps.load().saleEvents?.events ?? [];
+  return listResult('events', rows, e => `${e.name} [${e.id}] · ${e.from} through ${e.to}${e.source ? ' · ' + e.source : ''}${e.note ? ' · ' + e.note : ''}`, 'No sale events.');
+}
+
+function meltAdvice(deps) {
+  const app = deps.load();
+  const { plan } = meltView(app, { today: dayOf(deps) });
+  const selected = new Set(plan.melt.map(c => c.copy.copyId));
+  const candidates = plan.candidates.map(({ copy, paid }) => ({ ...pairData(app, copy.from, copy.to), copyId: copy.copyId, paid, selected: selected.has(copy.copyId) }));
+  const lines = [`${candidates.length} melt candidate(s) worth ${usd(plan.candidateCredit)} in credit.`,
+    `Credit needed beyond your balance: ${usd(plan.need)}. Suggested copies yield ${usd(plan.meltCredit)}, bringing new money from ${usd(plan.newMoneyBefore)} to ${usd(plan.newMoneyAfter)}.`];
+  for (const c of candidates) lines.push(`${c.copyId} · ${c.fromName} → ${c.toName} · ${usd(c.paid)}${c.selected ? ' · suggested' : ''}`);
+  return { text: lines.join('\n'), data: { ...plan, candidates, melt: candidates.filter(c => c.selected) } };
+}
+
+function alternativeRoutes(deps, args) {
+  const app = deps.load();
+  const c = goalOf(app, args.goal);
+  const routes = sessionOf(app).proposal(c.id, args.count ?? 3).routes.map(r => ({
+    start: r.start, cash: r.cash, creditUsed: r.creditUsed, allIn: r.allIn,
+    steps: r.steps.map(s => ({
+      ...pairData(app, s.from, s.to), kind: s.virtual ? 'virtual' : s.kind, cash: s.cash, copyId: s.copyId ?? null,
+    })),
+  }));
+  return listResult('routes', routes, (r, i) => {
+    const steps = r.steps.map(s => `${s.fromName} → ${s.toName} (${s.kind})`).join(', ');
+    return `${i + 1}. ${usd(r.cash)} new money, ${usd(r.allIn)} all-in: ${steps || 'already at target'}`;
+  }, 'No route for this goal.');
+}
+
+function setStartTool(deps, { goal, ship, pledge_id }) {
+  const app = deps.load();
+  const c = goalOf(app, goal);
+  if (ship != null && pledge_id != null) throw new ToolError('Choose a fixed ship or an LTI token.');
+  if (pledge_id != null && !app.data.lti?.some(t => t.pledgeId === pledge_id)) throw new ToolError('Unknown LTI pledge.');
+  const start = ship != null ? { kind: 'ship', ship: shipOf(app, ship).id } : pledge_id ? { kind: 'token', pledgeId: pledge_id } : { kind: 'token' };
+  commit(deps, app, { type: 'setStart', chainId: c.id, start });
+  return { text: `${goalLabel(c, app.data.ships)} starts from ${ship != null ? nameOf(app)(start.ship) : pledge_id ?? 'any LTI token'}.${c.accepted ? ' Reservation released.' : ''}`, data: { id: c.id, start } };
+}
+
+function setTokenSettingsTool(deps, { limit, use, never }) {
+  if (limit == null && !use && !never) throw new ToolError('Give a token limit, use list or never list.');
+  const tokens = { limitCents: limit == null ? undefined : toCents(limit), use, never };
+  const out = commit(deps, deps.load(), { type: 'setTokenSettings', tokens });
+  const saved = tokenSettings(out.plans);
+  return { text: `LTI token limit ${usd(saved.limitCents)}. Use: ${saved.use.join(', ') || 'none'}. Never: ${saved.never.join(', ') || 'none'}.`, data: saved };
+}
+
+function markTokenTool(deps, { pledge_id, mark }) {
+  const app = deps.load();
+  if (mark !== 'clear' && !app.data.lti?.some(t => t.pledgeId === pledge_id)) throw new ToolError('Unknown LTI pledge.');
+  commit(deps, app, { type: 'markToken', pledgeId: pledge_id, mark: mark === 'clear' ? null : mark });
+  return { text: `Token ${pledge_id}: ${mark}.`, data: { pledgeId: pledge_id, mark: mark === 'clear' ? null : mark } };
+}
+
+function releasedText(app, ids) {
+  return ids.length ? ' Released: ' + ids.map(id => goalLabel(app.plans.chains[id], app.data.ships) + ' [' + id + ']').join(', ') + '.' : '';
+}
+
+function excludeCopyTool(deps, { copy_id, excluded }) {
+  const app = deps.load();
+  if (!app.data.owned.some(c => String(c.copyId) === copy_id) && !app.plans.profile.excludedCopies?.includes(copy_id)) throw new ToolError('Unknown owned copy.');
+  const { result } = commit(deps, app, { type: 'excludeCopy', copyId: copy_id, excluded });
+  return { text: `${copy_id} is ${excluded ? 'excluded from' : 'allowed in'} plans.${releasedText(app, result)}`, data: { copyId: copy_id, excluded, released: result } };
+}
+
+function setVirtual(deps, { id, from, to, price, copies, expires, note }) {
+  const app = deps.load();
+  const ccu = { id, from: shipOf(app, from).id, to: shipOf(app, to).id, cents: toCents(price), copies, expires, note };
+  const { result } = commit(deps, app, { type: 'setVirtualCcu', ccu });
+  return { text: `Saved ${result.id}: ${pair(app, result.from, result.to)}, ${result.copies} × ${usd(result.cents)}.`, data: result };
+}
+
+function removeRecord(type, label) {
+  return (deps, { id }) => {
+    commit(deps, deps.load(), { type, id });
+    return { text: `Removed ${label} ${id}.`, data: { id } };
+  };
+}
+
+function setViaTool(deps, { goal, ship }) {
+  const app = deps.load();
+  const c = goalOf(app, goal);
+  const via = ship == null ? null : shipOf(app, ship).id;
+  const { result } = commit(deps, app, { type: 'setVia', chainId: c.id, ship: via });
+  return { text: `${goalLabel(c, app.data.ships)}: ${via == null ? 'cleared route-through ship' : 'route through ' + nameOf(app)(via)}.${releasedText(app, result)}`, data: { id: c.id, via, released: result } };
+}
+
+function goalSetting(type, field) {
+  return (deps, args) => {
+    const app = deps.load();
+    const c = goalOf(app, args.goal);
+    const value = args[field];
+    commit(deps, app, { type, chainId: c.id, value });
+    return { text: `${goalLabel(c, app.data.ships)}: ${field} ${value}.`, data: { id: c.id, [field]: value } };
+  };
+}
+
+function releaseTool(deps, { goal }) {
+  const app = deps.load();
+  const c = goalOf(app, goal);
+  if (!c.accepted) throw new ToolError('This goal has no reservation to release.');
+  commit(deps, app, { type: 'release', chainId: c.id });
+  return { text: `${goalLabel(c, app.data.ships)}: reservation released.`, data: { id: c.id } };
+}
+
+function availabilityTool(deps, { ship, value, note }) {
+  const app = deps.load();
+  const s = shipOf(app, ship);
+  commit(deps, app, { type: value === 'clear' ? 'clearAvailability' : 'setAvailability', shipId: s.id, value, note });
+  return { text: `${s.name} availability: ${value}.`, data: { shipId: s.id, value } };
+}
+
+function offerEndTool(deps, { from, to, end }) {
+  const app = deps.load();
+  const ids = { from: shipOf(app, from).id, to: shipOf(app, to).id };
+  commit(deps, app, { type: end === 'clear' ? 'clearOfferEnd' : 'setOfferEnd', ...ids, soon: end === 'soon', until: end });
+  return { text: `${pair(app, ids.from, ids.to)} offer end: ${end}.`, data: { ...ids, end } };
+}
+
+function addEvent(deps, { name, from, to }) {
+  const { result } = commit(deps, deps.load(), { type: 'setSaleEvent', name, from, to });
+  return { text: `Added ${result.name} [${result.id}], ${from} through ${to}.`, data: result };
+}
+
+function acceptFleet(deps) {
+  const app = deps.load();
+  const plans = sessionOf(app).fleet().plans.filter(p => p.route && !app.plans.chains[p.chainId].accepted);
+  if (!plans.length) throw new ToolError('No unreserved goals have a route.');
+  commit(deps, app, { type: 'acceptFleet', plans });
+  const ids = plans.map(p => p.chainId);
+  return { text: 'Reserved: ' + ids.map(id => goalLabel(app.plans.chains[id], app.data.ships)).join(', ') + '.', data: { ids } };
+}
+
+function importGoalsTool(deps, args) {
+  const app = deps.load();
+  const text = readSavedChains(deps, args);
+  let parsed;
+  try { parsed = parseSavedChains(text); } catch (e) { throw new ToolError(e.message); }
+  const rows = importRows(parsed, { ships: app.data.ships, plans: app.plans, lti: app.data.lti, aliases: deps.aliases });
+  const fresh = rows.filter(r => r.status === 'new');
+  const skipped = rows.filter(r => r.status !== 'new').map(r => ({ name: r.name, status: r.status }));
+  const ids = fresh.length ? commit(deps, app, { type: 'importGoals', rows: fresh }).result : [];
+  return { text: [`Imported ${ids.length} goal(s).`, ...fresh.map((r, i) => `${r.name} [${ids[i]}]`), ...skipped.map(r => `Skipped ${r.name}: ${r.status}`)].join('\n'), data: { ids, skipped } };
+}
+
 // ----- the table -----
 
 const object = (shape) => z.object(shape);
 const priority = z.enum(['high', 'normal', 'low']).optional();
 const mode = z.enum(['watch', 'finish']).optional().describe('watch: wait for sales when it saves money; finish: get it as soon as possible');
 const buyKind = z.enum(['warbond', 'standard']).optional().describe('Default warbond');
+
+const recordId = z.string().min(1).max(200);
+const pledgeId = recordId.describe('Pledge ID from lti_tokens');
+const nonnegativeDollars = z.number().min(0).max(MAX_DOLLARS).describe('US dollars');
+const day = z.string().refine(isDay, 'Expected a calendar date YYYY-MM-DD').describe('Calendar day YYYY-MM-DD');
+const exportPath = z.string().max(1024).describe('Absolute path to the Saved Chains .json file (not inside the planner data folder)');
 
 const DEFINITIONS = [
   { name: 'today', group: 'read', description: 'What to buy today across all goals: buy now, on sale (no rush), optional, with counts, prices and payment (store credit works for Standard only). Same answer as the Today page.', schema: object({}), handler: today },
@@ -473,8 +679,22 @@ const DEFINITIONS = [
     name: 'check_offer', group: 'read', description: 'What a CCU offer means for your goals: do you own copies, which routes use the pair, what buying one saves, with a verdict. Give from, to and price, or paste offer text (e.g. a CCU Game post) in `text`.',
     schema: object({ from: shipArg.optional(), to: shipArg.optional(), price: dollars('Offer price').optional(), kind: buyKind, text: z.string().max(20000).optional().describe('Free text with one offer per line, e.g. "Pulse → Orion $150"') }), handler: checkOfferTool,
   },
-  { name: 'compare_ccugame', group: 'read', description: 'Compare your goals with a CCU Game Saved Chains export (reads only that one .json file).', schema: object({ path: z.string().max(1024).describe('Absolute path to the Saved Chains .json file (not inside the planner data folder)') }), handler: compareCcugameTool },
+  { name: 'compare_ccugame', group: 'read', description: 'Compare your goals with a CCU Game Saved Chains export (reads only that one .json file).', schema: object({ path: exportPath }), handler: compareCcugameTool },
   { name: 'hangar_ccus_into', group: 'read', description: 'The CCUs you own into a ship, grouped by source ship, and what each copy is used for.', schema: object({ ship: shipArg }), handler: hangarCcusInto },
+  { name: 'virtual_ccus', group: 'read', description: 'List virtual upgrades with IDs, prices, copies, expiry and notes.',
+    schema: z.strictObject({}), handler: listVirtual },
+  { name: 'owned_ccus', group: 'read', description: 'List owned upgrade copies with their IDs, paid prices, exclusions and goals using them.',
+    schema: z.strictObject({}), handler: listOwned },
+  { name: 'lti_tokens', group: 'read', description: 'List LTI pledges with paid and catalog prices, use or never marks and whether their catalog value is within the token limit.',
+    schema: z.strictObject({}), handler: listTokens },
+  { name: 'settings', group: 'read', description: 'Show store credit, token settings, expected ship prices, availability marks and offer end notes.',
+    schema: z.strictObject({}), handler: settingsTool },
+  { name: 'sale_events', group: 'read', description: 'List sale events with IDs and inclusive dates, including events from the feed.',
+    schema: z.strictObject({}), handler: saleEventsTool },
+  { name: 'melt_advice', group: 'read', description: 'Show the Hangar melt candidates and suggested copies, potential credit and new money before and after. Advice only.',
+    schema: z.strictObject({}), handler: meltAdvice },
+  { name: 'alternative_routes', group: 'read', description: 'Compare routes for a goal using its start, constraints, objective and share of the fleet resources.',
+    schema: z.strictObject({ goal: goalArg, count: z.number().int().min(1).max(5).optional().describe('Maximum routes, default 3') }), handler: alternativeRoutes },
   { name: 'sync_hangar', group: 'sync', description: 'Read your hangar from RSI (read-only requests) and update the local data. Needs a stored RSI session from the app or CLI.', schema: object({ full: z.boolean().optional().describe('Re-read every pledge instead of only new ones') }), handler: syncHangar },
   { name: 'sync_store', group: 'sync', description: 'Read the upgrade store from RSI (read-only requests) and update prices and offers; reports progress, can take minutes. Needs a stored RSI session from the app or CLI.', schema: object({ full: z.boolean().optional().describe('Start over instead of resuming an interrupted sync') }), handler: syncStore },
   { name: 'add_goal', group: 'write', description: 'Add a goal (target ship). Writes the plans file.', schema: object({ target: shipArg, start: shipArg.optional().describe('Fixed start ship; default any LTI token'), priority, mode }), handler: addGoal },
@@ -484,6 +704,40 @@ const DEFINITIONS = [
   { name: 'unlock', group: 'write', description: "Set a goal to never lock the price (the app's \"Don't lock this goal\"). Writes the plans file.", schema: object({ goal: goalArg }), handler: setLockTool('off') },
   { name: 'set_credit', group: 'write', description: 'Set your store credit. Writes the plans file.', schema: object({ dollars: z.number().min(0).max(MAX_DOLLARS).describe('Store credit in US dollars') }), handler: setCredit },
   { name: 'price_override', group: 'write', description: 'Set or clear your expected price for a ship (an announced price rise). Writes the price-overrides file, never the synced catalog.', schema: object({ ship: shipArg, price: dollars('Expected price').optional(), clear: z.boolean().optional(), note: z.string().max(200).optional() }), handler: priceOverride },
+  { name: 'set_start', group: 'write', description: 'Change a goal to a fixed ship or specific LTI pledge. Omit both to use any eligible LTI token. Releases its reservation.',
+    schema: z.strictObject({ goal: goalArg, ship: shipArg.optional(), pledge_id: pledgeId.optional() }), handler: setStartTool },
+  { name: 'set_token_settings', group: 'write', description: 'Update the LTI catalog price limit in dollars or replace either pledge ID list. Use admits above-limit tokens and never takes precedence.',
+    schema: z.strictObject({ limit: nonnegativeDollars.optional(), use: z.array(pledgeId).optional(), never: z.array(pledgeId).optional() }), handler: setTokenSettingsTool },
+  { name: 'mark_token', group: 'write', description: 'Set or clear one LTI pledge’s use or never mark.',
+    schema: z.strictObject({ pledge_id: pledgeId, mark: z.enum(['use', 'never', 'clear']) }), handler: markTokenTool },
+  { name: 'exclude_copy', group: 'write', description: 'Exclude an owned copy from plans or allow it again. Reports released reservations.',
+    schema: z.strictObject({ copy_id: recordId, excluded: z.boolean() }), handler: excludeCopyTool },
+  { name: 'set_virtual_ccu', group: 'write', description: 'Add a virtual upgrade, or replace one by ID. Give the price per copy in dollars. Omitted copies default to one, expiry and note to empty.',
+    schema: z.strictObject({ id: recordId.optional(), from: shipArg, to: shipArg, price: nonnegativeDollars, copies: z.number().int().min(1).max(99).optional(), expires: day.optional(), note: z.string().max(100).optional() }), handler: setVirtual },
+  { name: 'remove_virtual_ccu', group: 'write', description: 'Remove a virtual upgrade by ID. Reserved chains that use it keep it.',
+    schema: z.strictObject({ id: recordId }), handler: removeRecord('removeVirtualCcu', 'virtual CCU') },
+  { name: 'set_via', group: 'write', description: 'Route a goal through a ship, or omit ship to clear it. Reports a released reservation.',
+    schema: z.strictObject({ goal: goalArg, ship: shipArg.optional() }), handler: setViaTool },
+  { name: 'release', group: 'write', description: 'Release a goal’s reserved chain and free its resources.',
+    schema: z.strictObject({ goal: goalArg }), handler: releaseTool },
+  { name: 'set_mode', group: 'write', description: 'Set a goal to watch for savings or finish as soon as possible.',
+    schema: z.strictObject({ goal: goalArg, mode: mode.unwrap() }), handler: goalSetting('setMode', 'mode') },
+  { name: 'set_objective', group: 'write', description: 'Rank routes by least new money (cash) or total purchase cost plus the cost of consumed owned CCUs (allin).',
+    schema: z.strictObject({ goal: goalArg, objective: z.enum(OBJECTIVES) }), handler: goalSetting('setObjective', 'objective') },
+  { name: 'set_priority', group: 'write', description: 'Set a goal’s planning priority to high, normal or low.',
+    schema: z.strictObject({ goal: goalArg, priority: priority.unwrap() }), handler: goalSetting('setPriority', 'priority') },
+  { name: 'set_availability', group: 'write', description: 'Mark a ship as regular or event-only, or clear the mark to use observed availability.',
+    schema: z.strictObject({ ship: shipArg, value: z.enum([...AVAILABILITY, 'clear']), note: z.string().max(200).optional() }), handler: availabilityTool },
+  { name: 'set_offer_end', group: 'write', description: 'Record when a pair’s offer ends. Give a calendar day, soon, or clear to remove the note.',
+    schema: z.strictObject({ from: shipArg, to: shipArg, end: z.union([day, z.enum(['soon', 'clear'])]) }), handler: offerEndTool },
+  { name: 'add_sale_event', group: 'write', description: 'Add a named store sale with inclusive start and end dates.',
+    schema: z.strictObject({ name: z.string().trim().min(1).max(200), from: day, to: day }), handler: addEvent },
+  { name: 'remove_sale_event', group: 'write', description: 'Remove a user-created store sale event by ID.',
+    schema: z.strictObject({ id: recordId }), handler: removeRecord('removeSaleEvent', 'sale event') },
+  { name: 'accept_fleet', group: 'write', description: 'Reserve the shared best chains for all unreserved goals with a route, in one save.',
+    schema: z.strictObject({}), handler: acceptFleet },
+  { name: 'import_goals', group: 'write', description: 'Import only new goals from a CCU Game Saved Chains JSON export. Reports duplicate or unresolved rows.',
+    schema: z.strictObject({ path: exportPath }), handler: importGoalsTool },
 ];
 
 /** The same tools with an async handler (a sync throw becomes a rejection); `raw` is the plain function. */
