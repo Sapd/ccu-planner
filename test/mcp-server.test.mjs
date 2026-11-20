@@ -51,6 +51,18 @@ test('lists the read-only and sync tools without --allow-writes, and calls today
   await close();
 });
 
+test('the client gets the CCU primer, and every tool it names exists', async () => {
+  const { INSTRUCTIONS } = await import('../src/mcp/server.mjs');
+  const w = world({ goals: [{ base: 1, target: 4 }] });
+  const { client, close } = await connect(w.deps, { allowWrites: true });
+  assert.equal(client.getInstructions(), INSTRUCTIONS);
+  assert.match(INSTRUCTIONS, /Warbond CCUs are cheaper but .* never store credit/);
+  const names = new Set((await client.listTools()).tools.map((t) => t.name));
+  const named = INSTRUCTIONS.match(/\b[a-z]+_[a-z_]+\b|\b(?:today|goals|goal|accept|lock|unlock)\b(?= (?:for|and|tool|,|\)))/g).filter((n) => !n.endsWith('_'));
+  for (const n of named) assert.ok(names.has(n), `instructions name ${n}, which is no tool`);
+  await close();
+});
+
 test('--allow-writes adds the write tools; a stale save comes back as an error result', async () => {
   const w = world({ goals: [{ base: 1, target: 4 }] });
   const { client, close } = await connect(w.deps, { allowWrites: true });

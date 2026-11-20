@@ -5,6 +5,11 @@ from your own plan: what to buy today, what a goal costs alone and shared, what 
 without digging through the CLI. It reads the same data folder as the app (`CCU_DATA` overrides it) and uses the same planning
 code, so its answers match the app's wording.
 
+The server sends the client a short guide with its instructions (`INSTRUCTIONS` in `src/mcp/server.mjs`): how CCUs work
+(Standard vs Warbond, store credit, LTI tokens, shared copies), what the planner's words mean (goal modes, step states, reserve,
+lock), and how to answer (sync first before a purchase, take every number from a tool, use write tools only when asked). Claude
+reads it when it connects, so no separate agents file is needed.
+
 ## Safety
 
 - **No tool buys, melts, gifts or applies anything on RSI.** The server has no such code, and it never touches the cart or buyback.
