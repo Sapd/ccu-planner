@@ -10,10 +10,11 @@
     { "id": 5, "skus": [{ "id": 500, "available": true, "upgradePrice": 1000 }, { "id": 501, "available": true, "upgradePrice": 1000 }] }
   ],
   "knownSkus": [300],
-  "legacyRequests": [
+  "requests": [
     ["initShipUpgrade", {}],
     ["filterShips", { "fromFilters": [], "toFilters": [] }],
     ["filterShips", { "fromId": 1, "fromFilters": [], "toFilters": [] }],
+    ["getShipDetails", { "id": 2, "fromShipId": 1 }],
     ["getShipDetails", { "id": 5, "fromShipId": 1 }]
   ]
 }

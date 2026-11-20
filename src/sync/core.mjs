@@ -90,7 +90,6 @@ export async function sync(cmd, io, options = {}) {
       && started.toDateString() === clock().toDateString();
     const resume = canResume ? sources.indexOf(state.lastFinished) + 1 : 0;
     const startedAt = resume ? state.startedAt : now;
-    const pendingAppeared = resume ? (state.pendingAppeared ?? []) : [];
     if (resume) {
       const message = `Resuming store sync from ship ${Math.min(resume + 1, sources.length)} of ${sources.length} (started ${started.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })})`;
       log(message);
@@ -125,8 +124,7 @@ export async function sync(cmd, io, options = {}) {
         }
         await writeJson(file, next);
         if (events.length > eventStart) await appendLine('offer-history.jsonl', events.slice(eventStart).map((e) => JSON.stringify(e)).join('\n'));
-        pendingAppeared.push(...events.slice(eventStart).filter((e) => e.event === 'appeared'));
-        await writeJson('sync-state.json', { key, lastFinished: fromId, startedAt, pendingAppeared });
+        await writeJson('sync-state.json', { key, lastFinished: fromId, startedAt });
         await progress({ phase: 'upgrades', done: i + 1, total: sources.length });
         log(`upgrades ${i + 1}/${sources.length}: ${names.get(fromId) ?? fromId} -> ${targets.length} targets`);
       }
@@ -134,13 +132,18 @@ export async function sync(cmd, io, options = {}) {
     const count = (e) => events.filter((x) => x.event === e).length;
     log(`upgrades: ${sources.length} source ships, ${pairs} pairs · offers appeared ${count('appeared')}, disappeared ${count('disappeared')}, repriced ${count('repriced')}`);
 
-    // New SKUs have no title yet (Standard/Warbond): fetch details for those targets only.
+    // SKUs without details have no title yet (Standard/Warbond), and their target ship's item ID is what maps hangar CCUs
+    // whose item names differ from the store's ("Hercules Starlifter M2"). Fetch details for every target with an available
+    // SKU that has none: on a first sync that is every target (no offer "appeared", there was no earlier file), later only new
+    // SKUs. Unavailable SKUs are skipped: their details would only describe offers that cannot be bought.
     const known = new Set();
     const details = await readJson(join('ship-details.json'), { details: {} });
     for (const d of Object.values(details.details)) for (const s of d.skus) known.add(s.id);
-    // appeared events are produced only for available SKUs. Retain them across resume,
-    // rather than scanning every unavailable/historical SKU for missing details.
-    const newTargets = [...new Set(pendingAppeared.filter((e) => !known.has(e.skuId)).map((e) => e.toId))];
+    const missing = new Set();
+    for (const u of await readJson('upgrades', [])) {
+      for (const t of u.targets) if (t.skus.some((s) => s.available && !known.has(s.id))) missing.add(t.toId);
+    }
+    const newTargets = [...missing].sort((a, b) => a - b);
     if (newTargets.length) await syncDetails(newTargets);
 
     // Lowest Warbond price seen per pair. Last on purpose: the Warbond/Standard split needs the SKU titles just fetched.

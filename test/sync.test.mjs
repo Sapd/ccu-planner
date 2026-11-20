@@ -209,23 +209,35 @@ test('shared data directory matches Tauri platform conventions and originals kee
   assert.equal(shipThumbs({ thumbs: { s: '../1-original.png', l: '../1-original.png' } }, 1), null);
 });
 
-test('details request list matches the legacy appeared/unknown/available scope on a fixture', async () => {
+// RSI answers each operation of a batch in order; getShipDetails returns two SKUs for any ship.
+const detailsServer = (requests, after) => async ({ body }) => body.map(({ operationName, variables }) => {
+  requests.push([operationName, variables]);
+  if (operationName === 'initShipUpgrade') return { data: { ...fixture.catalog, app: { pricing: { currencyCode: 'USD', taxRate: 0 } } } };
+  if (operationName === 'getShipDetails') return { data: { ship: { skus: [{ id: variables.id * 100, title: 'Warbond' }, { id: variables.id * 100 + 1, title: 'Standard' }] } } };
+  if (!variables.fromId) return { data: { from: { ships: [{ id: 1 }] } } };
+  return { data: { to: { ships: after } } };
+});
+
+test('details are fetched for every target with an available SKU that has none, never for unavailable or known SKUs', async () => {
   const sample = JSON.parse(fs.readFileSync(new URL('./fixtures/sync-details-scope.json', import.meta.url)));
   const requests = [];
   const io = memory({
     'upgrades/1.json': { fetchedAt: '2026-11-19', fromId: 1, targets: sample.before },
     'ship-details.json': { details: { 3: { skus: sample.knownSkus.map((id) => ({ id, title: 'Standard' })) } } },
-  }, async ({ body }) => {
-    const { operationName, variables } = body[0]; requests.push([operationName, variables]);
-    let data;
-    if (operationName === 'initShipUpgrade') data = { ...fixture.catalog, app: { pricing: { currencyCode: 'USD', taxRate: 0 } } };
-    else if (operationName === 'getShipDetails') data = { ship: { skus: [{ id: 500, title: 'Warbond' }, { id: 501, title: 'Standard' }] } };
-    else if (!variables.fromId) data = { from: { ships: [{ id: 1 }] } };
-    else data = { to: { ships: sample.after } };
-    return [{ data }];
-  });
+  }, detailsServer(requests, sample.after));
   await sync('upgrades', io);
-  assert.deepEqual(requests, sample.legacyRequests);
+  assert.deepEqual(requests, sample.requests);
+});
+
+test('a first upgrades sync (no earlier files) fetches details, so hangar CCUs can map by item ID', async () => {
+  const requests = [];
+  const io = memory({}, detailsServer(requests, [{ id: 2, skus: [{ id: 200, available: true, upgradePrice: 1000 }] }]));
+  await sync('upgrades', io);
+  assert.deepEqual(requests.filter(([op]) => op === 'getShipDetails'), [['getShipDetails', { id: 2, fromShipId: 1 }]]);
+  assert.deepEqual(Object.keys(io.files['ship-details.json'].details), ['2']);
+  requests.length = 0;
+  await sync('upgrades', io); // details known now: no second fetch
+  assert.equal(requests.filter(([op]) => op === 'getShipDetails').length, 0);
 });
 
 test('resume expires after 24 hours or a local day change, and emits the starting point', async () => {
