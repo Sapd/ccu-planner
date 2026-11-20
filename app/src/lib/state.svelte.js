@@ -239,6 +239,11 @@ export const openHangarUpgrades = (shipName, label) => navigate(label, () => {
   ui.hangar.chip = 'ccu'; ui.hangar.sel.ccu = null; ui.hangar.query = shipName; ui.hangar.picked = true;
   goSection('hangar');
 });
+/** The hangar-health banner -> the Hangar's upgrades with only "Needs review" ticked: the upgrades the planner could not read. */
+export const openNeedsReview = (label = 'Back') => navigate(label, () => {
+  ui.hangar.chip = 'ccu'; ui.hangar.sel.ccu = { use: ['review'] }; ui.hangar.query = ''; ui.hangar.picked = true;
+  goSection('hangar');
+});
 /** Open Today and bring the "Since last sync" panel into view. */
 export const openChanges = async () => {
   goSection('today');

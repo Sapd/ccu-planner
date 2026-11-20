@@ -25,6 +25,25 @@ import { normalizePricing } from './format.mjs';
 // Items that are not part of the ship identity (insurance, paint, ...).
 const EXTRA = /insurance|name reservation|paint|poster|jacket|figurine|model|decal|flair|trophy|coin|plaque/i;
 
+/**
+ * The two ships of an upgrade pledge title, "Upgrade - <from> to <to> <Warbond|Standard> Edition", by exact normalized
+ * store name only. Null unless exactly one way of splitting at " to " names two known, unambiguous ships.
+ * @param {string} name pledge title
+ * @param {Map<string, number|null>} shipByName normalized store name -> ship ID (null = ambiguous)
+ */
+export function titleShips(name, shipByName) {
+  const m = /^Upgrade - (.+) (?:Warbond|Standard) Edition$/i.exec(String(name ?? '').trim());
+  if (!m) return null;
+  const parts = m[1].split(' to ');
+  const found = [];
+  for (let i = 1; i < parts.length; i++) {
+    const from = shipByName.get(norm(parts.slice(0, i).join(' to ')));
+    const to = shipByName.get(norm(parts.slice(i).join(' to ')));
+    if (from && to && from !== to) found.push({ from, to });
+  }
+  return found.length === 1 ? found[0] : null;
+}
+
 /** offer-history.jsonl text -> events. Blank and unreadable lines are skipped; a missing history gives []. */
 export function parseHistory(text) {
   const out = [];
@@ -126,21 +145,39 @@ export function buildPlannerData(raw, aliases) {
     const uniqueShips = (list) => [...new Map(list.map((x) => [x.r.shipId, x])).values()];
     const from = uniqueShips(resolveOf(u.match_items)).map((x) => x.r);
     const to = uniqueShips(resolveOf(u.target_items));
-    if (from.length !== 1 || to.length !== 1) {
-      review.push({ pledgeId: p.pledgeId, name: p.name, reason: `from matches ${from.length}, ship targets ${to.length}`, match: u.match_items, target: u.target_items });
+    // RSI names hangar items its own way ("Hercules Starlifter M2"), but the pledge title uses the store's names
+    // ("Upgrade - M2 Hercules to Liberator Warbond Edition"). A side the items cannot resolve takes the title's ship;
+    // a side they resolve must agree with it.
+    const title = titleShips(p.name, shipByName);
+    let fromId = from.length === 1 ? from[0].shipId : null;
+    let toId = to.length === 1 ? to[0].r.shipId : null;
+    const conflict = title && ((fromId != null && fromId !== title.from) || (toId != null && toId !== title.to));
+    const fromTitle = title && !conflict && fromId == null;
+    const toTitle = title && !conflict && toId == null;
+    if (fromTitle) fromId = title.from;
+    if (toTitle) toId = title.to;
+    if (fromId == null || toId == null || conflict) {
+      review.push({
+        pledgeId: p.pledgeId, name: p.name,
+        reason: conflict ? 'the item IDs and the title name different ships' : `from matches ${from.length}, ship targets ${to.length}`,
+        match: u.match_items, target: u.target_items,
+        // The side that did resolve, so a plan can say which goal an unreadable upgrade may belong to.
+        fromShip: from.length === 1 ? from[0].shipId : null, toShip: to.length === 1 ? to[0].r.shipId : null,
+      });
       continue;
     }
+    const byName = fromTitle || toTitle || from[0].method === 'name' || to[0].r.method === 'name';
     owned.push({
       copyId: String(p.pledgeId),
-      from: from[0].shipId,
-      to: to[0].r.shipId,
+      from: fromId,
+      to: toId,
       name: p.name,
       edition: /warbond/i.test(p.name) ? 'Warbond' : /standard/i.test(p.name) ? 'Standard' : 'Other',
       paid: p.value,
       giftable: p.canGift,
       meltable: p.canReclaim,
-      matchMethod: from[0].method === 'name' || to[0].r.method === 'name' ? 'name' : 'item-id',
-      extras: u.target_items.filter((it) => it.id !== to[0].it.id).map((it) => it.name),
+      matchMethod: fromTitle || toTitle ? 'title' : byName ? 'name' : 'item-id',
+      extras: toTitle ? u.target_items.filter((it) => EXTRA.test(it.name)).map((it) => it.name) : u.target_items.filter((it) => it.id !== to[0].it.id).map((it) => it.name),
     });
   }
 

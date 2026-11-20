@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildPlannerData } from '../src/logic/mapping.mjs';
+import { buildPlannerData, titleShips } from '../src/logic/mapping.mjs';
 import { shipName } from '../src/logic/ships.mjs';
 
 const raw = JSON.parse(fs.readFileSync(new URL('./fixtures/raw-small.json', import.meta.url), 'utf8'));
@@ -39,4 +39,38 @@ test('shipName says "unknown ship" for a ship that is not in the catalog', () =>
   const data = buildPlannerData(raw, aliases);
   assert.equal(shipName(data.ships, 99), 'unknown ship');
   assert.equal(shipName(data.ships, 2), 'Beta');
+});
+
+// A hangar entry whose items RSI names its own way; the title carries the store names.
+const withEntry = (pledgeId, name, match, target) => ({
+  ...raw,
+  hangar: { entries: { ...raw.hangar.entries, [pledgeId]: { data: { pledgeId, name, value: { cents: 500, currency: 'USD' }, canGift: false, canReclaim: true, upgrade: { name, match_items: match, target_items: target } } } } },
+});
+
+test('an upgrade whose items do not resolve maps by the exact store names in its title', () => {
+  const data = buildPlannerData(withEntry(9100, 'Upgrade - Gamma to Beta Warbond Edition',
+    [{ id: 8001, name: 'Gamma Starlifter' }], [{ id: 8002, name: 'Beta Hauler' }, { id: 11437, name: '120 Month Insurance' }]), aliases);
+  const copy = data.owned.find((o) => o.copyId === '9100');
+  assert.deepEqual([copy.from, copy.to, copy.matchMethod, copy.edition], [3, 2, 'title', 'Warbond']);
+  assert.deepEqual(copy.extras, ['120 Month Insurance']);
+  assert.ok(!data.review.some((r) => r.pledgeId === 9100));
+});
+
+test('a title that names other ships than the resolved items goes to review, with the side that resolved', () => {
+  const data = buildPlannerData(withEntry(9101, 'Upgrade - Gamma to Beta Standard Edition',
+    [{ id: 1001, name: 'Alpha Module' }], [{ id: 8002, name: 'Beta Hauler' }]), aliases);
+  assert.ok(!data.owned.some((o) => o.copyId === '9101'));
+  const r = data.review.find((x) => x.pledgeId === 9101);
+  assert.match(r.reason, /title name different ships/);
+  assert.deepEqual([r.fromShip, r.toShip], [1, null]);
+});
+
+test('titleShips accepts only one exact split and never a similar name', () => {
+  const byName = new Map([['alpha', 1], ['beta to go', 2], ['beta', 3], ['go', 4], ['twin', null]]);
+  assert.deepEqual(titleShips('Upgrade - Alpha to Beta Warbond Edition', byName), { from: 1, to: 3 });
+  assert.deepEqual(titleShips('Upgrade - Alpha to Beta to Go Standard Edition', byName), { from: 1, to: 2 });
+  assert.equal(titleShips('Upgrade - Beta to Go to Beta Warbond Edition', new Map([['beta', 3], ['go to beta', 5], ['beta to go', 2]])), null); // two readings
+  assert.equal(titleShips('Upgrade - Alpha to Bet Warbond Edition', byName), null);
+  assert.equal(titleShips('Upgrade - Alpha to Twin Warbond Edition', byName), null); // ambiguous store name
+  assert.equal(titleShips('F7A Hornet Mk II Upgrade', byName), null);
 });

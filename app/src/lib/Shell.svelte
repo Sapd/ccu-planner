@@ -27,6 +27,9 @@
   import { shouldShowExplainer } from './view/firstRun.mjs';
   import { updater, startUpdater, checkForUpdate, restartToUpdate } from './updater.svelte.js';
   import { checkLine } from './view/updater.mjs';
+  import { hangarHealth } from './view/health.mjs';
+  import { todayView } from './view/today.mjs';
+  import { openNeedsReview } from './state.svelte.js';
 
   let today = $state(new Date());
   // Reads the saved data again (not a sync): the Reload button of Today's old hero lives beside the data dates now.
@@ -58,6 +61,11 @@
   const wrongCurrency = $derived(currencyProblem(ui.app.data?.pricing));
   const chain = $derived(ui.selected ? ui.app.plans.chains[ui.selected] : null);
   const meta = $derived(ui.app.data?.meta ?? {});
+  // Upgrades in the hangar the planner could not read: plans cannot use them. Not shown for the sample's made-up hangar.
+  const health = $derived(ui.sample || !ui.app.data ? null : hangarHealth(ui.app.data, todayView(ui.app).goals));
+  const HEALTH_KEY = 'ccu.hangarHealthDismissed';
+  let healthDismissed = $state((() => { try { return localStorage.getItem(HEALTH_KEY); } catch { return null; } })());
+  const dismissHealth = () => { healthDismissed = health.key; try { localStorage.setItem(HEALTH_KEY, health.key); } catch { /* storage unavailable: hidden for this session */ } };
   const stamp = (value) => stampLabel(value, today);
   // Orange only when the data is really old (over two days); "yesterday" is grey like everything else in the header.
   const stale = $derived(stampIsStale(meta.catalogAt, today) || stampIsStale(meta.hangarAt, today));
@@ -137,6 +145,9 @@
   </header>
   {#if ui.notice}
     <div class="notice" role="alert">{ui.notice} {#if ui.bought}<button disabled={ui.syncBusy} onclick={() => window.dispatchEvent(new CustomEvent('sync-hangar'))}>Bought it? Sync hangar</button>{/if} <button onclick={dismissNotice}>Dismiss</button></div>
+  {/if}
+  {#if health && health.key !== healthDismissed}
+    <div class="health" role="status" data-hangar-health>{health.text} <button type="button" onclick={() => openNeedsReview()}>Show them</button> <button type="button" onclick={dismissHealth}>Dismiss</button></div>
   {/if}
   {#if ui.sample}
     <div class="sample" role="status"><b>Sample data</b> — made-up ships, not your account. Changes you make here are forgotten when you leave. <button type="button" onclick={leaveSample}>Leave sample data</button></div>
@@ -242,6 +253,8 @@
   .currency p { margin: 0; font-size: 16px; }
   .notice { padding: 8px 18px; background: #3d2b00; color: var(--warn); }
   .notice button { margin-left: 8px; }
+  .health { padding: 8px 18px; background: #3d2b00; color: var(--warn); border-bottom: 1px solid rgba(255, 196, 0, 0.35); }
+  .health button { margin-left: 8px; }
   .body { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr; }
   .main { grid-column: -2 / -1; padding: 18px; overflow: auto; min-width: 0; }
   @media (max-width: 1023px) {
