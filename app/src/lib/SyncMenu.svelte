@@ -52,7 +52,7 @@
         <p class="grouptitle">Update your data</p>
         <button onclick={() => sync('hangar')}><span class="lbl">Hangar (fast)</span><span class="note">{hangarLast}</span></button>
         <button onclick={() => sync('buyback')}><span class="lbl">Buyback</span><span class="note">Items you melted that can be bought back</span></button>
-        <button onclick={() => sync('upgrades')}><span class="lbl">Store (about 4–5 min)</span><span class="note">{storeLast}</span></button>
+        <button onclick={() => sync('upgrades')}><span class="lbl">Store (about 1–2 min)</span><span class="note">{storeLast}</span></button>
         <button onclick={() => sync('store-catalog')}><span class="lbl">Store catalog (about 5 min)</span><span class="note">{catalogNote}</span></button>
         <button onclick={() => sync('images')}><span class="lbl">Ship pictures</span><span class="note">Downloads missing ship art</span></button>
         <hr />

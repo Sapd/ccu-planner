@@ -95,7 +95,7 @@ test('onboarding: steps follow the real data', () => {
   assert.match(onboardingSteps({ session: 'expired', app: null })[0].text, /run out/);
   const [signin, sync, goal] = onboardingSteps({ session: 'none', app: null });
   assert.equal(signin.text, 'Opens the RSI website; the planner never sees your password.');
-  assert.deepEqual([signin.note, sync.note, goal.note], ['', 'takes a few minutes', ''], 'labels are separate fields, never glued into the title');
+  assert.deepEqual([signin.note, sync.note, goal.note], ['', 'takes a minute or two', ''], 'labels are separate fields, never glued into the title');
   assert.deepEqual(onboardingSteps({ session: 'signed in', app: null })[0].note, 'already signed in');
   const synced = { data: { meta: { catalogAt: 'C', hangarAt: 'H' } }, plans: { chains: {} } };
   assert.deepEqual(state('signed in', synced), ['signin:done', 'sync:done', 'goal:next']);

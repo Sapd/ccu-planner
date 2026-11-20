@@ -7,6 +7,7 @@ import { QUERIES } from './queries.mjs';
 import { CATALOG_PATH } from './catalog-query.mjs';
 import { fetchItems, assessCatalog, catalogDoc, signedInWarning, shortListings } from './catalog-fetch.mjs';
 import { readCatalog } from '../logic/store-catalog.mjs';
+import { hasSigninForm } from './signin.mjs';
 
 // RSI's upgrade GraphQL answers at most 5 operations per request ("Maximum subquery limit of 5 reached").
 // Requests are spaced 1 s apart by the transport, so sending 5 per request makes the long phases about 5x faster.
@@ -26,7 +27,12 @@ export async function sync(cmd, io, options = {}) {
     return io.request(...args);
   };
   const client = {
-    getHtml: (path) => request({ method: 'GET', path }),
+    // An account page that comes back as RSI's sign-in page is a lost session, not an empty hangar: stop before anything is saved.
+    getHtml: async (path) => {
+      const html = await request({ method: 'GET', path });
+      if (hasSigninForm(html)) throw new Error('RSI session missing or expired: RSI showed its sign-in page instead of your account. Sign in again, then sync.');
+      return html;
+    },
     upgrade: async (...ops) => {
       const data = await request({ method: 'POST', path: '/pledge-store/api/upgrade/v2/graphql', body: ops.map(({ operationName, variables = {} }) => ({ operationName, variables, query: QUERIES[operationName] })) });
       const errors = data.flatMap((d) => d.errors ?? []);
@@ -260,6 +266,7 @@ export async function sync(cmd, io, options = {}) {
       for (const [id, v] of Object.entries(fresh)) store.entries[id] = v;
       log(`${name}: incremental sync, ${changed} new/changed, ${page} page(s) read`);
     }
+    if (name === 'hangar' && seen.size === 0 && page === 1) log('warning: RSI listed no pledges in your hangar. If you have pledges, sign in to RSI again and sync the hangar');
     store.lastSync = new Date().toISOString();
     await writeJson(file, store);
   }

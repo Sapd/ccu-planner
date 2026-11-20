@@ -289,7 +289,7 @@ offers sign-in again. A 403 alone reports “RSI refused the request (403)”; i
 the session expired only when a separate hangar probe redirects to sign-in.
 
 Choose **Hangar (fast)** for your pledges, **Buyback** for buyback entries, or
-**Store (about 4–5 min)** for catalog, upgrades, offer details and sale/Warbond
+**Store (about 1–2 min)** for catalog, upgrades, offer details and sale/Warbond
 history. Progress and **Cancel** appear in the top bar. Cancellation finishes
 the current request; the next Store sync resumes after the last completed
 source ship, within the same local day and 24 hours of its start. Older checkpoints

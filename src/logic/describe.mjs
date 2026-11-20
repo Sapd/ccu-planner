@@ -750,5 +750,6 @@ export function settingsSummary(chain, startLine) {
 
 // ---- New goal form: the starting ship ----
 export const NO_STARTER_TEXT = 'No eligible LTI ship in this hangar. Choose a starting ship, or save this goal for later.';
+export const NO_HANGAR_TEXT = 'Your hangar is not synced yet, so the planner cannot see your LTI ships. Sync the hangar, or choose a starting ship.';
 export const NO_STARTER_NOTE = 'Without a starting ship the goal shows "needs a starting ship" until you choose one.';
 export const SAMPLE_EXAMPLE_LABEL = 'Try Alpha → Beta using an upgrade you already own';

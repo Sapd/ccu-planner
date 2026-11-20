@@ -129,6 +129,25 @@ test('hangar: large drop preserves data until confirmed, or --force; small hanga
   }
 });
 
+test('a sign-in page instead of the hangar is a lost session: nothing is saved', async () => {
+  const signinPage = '<html><body><form class="js-signin-form" action="/api/account/v2/signin"><input name="login"></form></body></html>';
+  for (const kind of ['hangar', 'buyback']) {
+    const io = memory({}, async () => signinPage);
+    await assert.rejects(sync(kind, io, { full: true }), /session missing or expired/);
+    assert.equal(io.files[`${kind}.json`], undefined, kind);
+  }
+});
+
+test('a hangar with no pledges is saved but warns', async () => {
+  const io = memory({}, async () => '<html><body><ul class="list-items"></ul></body></html>');
+  await sync('hangar', io, { full: true });
+  assert.deepEqual(io.files['hangar.json'].entries, {});
+  assert.ok(io.logs.some((l) => /^warning: RSI listed no pledges/.test(l)), io.logs.join('\n'));
+  const one = memory({}, async (r) => (r.path.includes('page=1&') ? '<li><input class="js-pledge-id" value="1"><input class="js-pledge-name" value="Alpha"></li>' : ''));
+  await sync('hangar', one, { full: true });
+  assert.ok(!one.logs.some((l) => /no pledges/.test(l)));
+});
+
 test('hangar incremental early stop, full disappearance, and empty first run keep existing formats', async () => {
   const html = '<li><input class="js-pledge-id" value="1"><input class="js-pledge-name" value="Alpha"></li>';
   let calls = 0;

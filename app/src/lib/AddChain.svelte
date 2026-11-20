@@ -1,9 +1,10 @@
 <script>
   import ShipPicker from './ShipPicker.svelte';
-  import { MODE_CHOICE, PRIORITY_CHOICE, NO_STARTER_TEXT, NO_STARTER_NOTE, SAMPLE_EXAMPLE_LABEL } from '$logic/describe.mjs';
+  import { MODE_CHOICE, PRIORITY_CHOICE, NO_STARTER_TEXT, NO_HANGAR_TEXT, NO_STARTER_NOTE, SAMPLE_EXAMPLE_LABEL } from '$logic/describe.mjs';
   import { tokenPool, tokenSettings } from '$logic/tokens.mjs';
   import { starterState, sampleExample, endpointsText } from './view/addGoal.mjs';
   import { dispatch, ui, openGoal } from './state.svelte.js';
+  import { sync } from './sync-actions.svelte.js';
   import { onDestroy, tick, untrack } from 'svelte';
   import { Job } from './jobs.svelte.js';
   import { addGoalText, signed } from '$logic/whatifText.mjs';
@@ -26,6 +27,8 @@
   // The usable LTI starting ships right now: the form says before saving whether the planner would find one.
   const pool = $derived(tokenPool(app.data.lti ?? [], tokenSettings(app.plans)));
   const starter = $derived(starterState({ fixed, poolCount: pool.length }));
+  // Without a hangar sync the pool is empty because the planner has not seen the hangar, not because it has no LTI ship.
+  const hangarSynced = $derived(!!app.data.meta?.hangarAt);
   const example = $derived(ui.sample ? sampleExample(ships) : null);
   const nameOf = (id) => (id == null ? null : ships.get(id)?.name ?? null);
   const endpoints = $derived(endpointsText({ state: starter, startName: nameOf(base), startPoolName: pool[0]?.name ?? null, targetName: nameOf(target) }));
@@ -85,8 +88,11 @@
     {#key resets}<ShipPicker {ships} bind:value={base} label="Starting ship" id="add-from" />{/key}
   {:else if starter === 'none'}
     <div class="nostarter" role="status" data-no-starter>
-      <p>{NO_STARTER_TEXT}</p>
-      <p><button type="button" onclick={chooseShip}>Choose a ship</button></p>
+      <p>{hangarSynced ? NO_STARTER_TEXT : NO_HANGAR_TEXT}</p>
+      <p class="actions">
+        {#if !hangarSynced}<button type="button" disabled={ui.syncBusy} onclick={() => sync('hangar')}>{ui.syncBusy ? 'Syncing…' : 'Sync hangar'}</button>{/if}
+        <button type="button" onclick={chooseShip}>Choose a ship</button>
+      </p>
     </div>
   {/if}
   {#if endpoints}
@@ -126,6 +132,7 @@
   .nostarter { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--warn); }
   .nostarter p { margin: 0 0 6px; color: var(--warn); font-size: 13px; }
   .nostarter p:last-child { margin: 0; }
+  .nostarter .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .example { border-color: var(--accent); color: var(--accent); }
   .starts { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; }
   .starts legend { padding: 0; margin-bottom: 4px; color: var(--muted); font-size: 12px; }

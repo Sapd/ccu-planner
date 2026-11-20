@@ -17,7 +17,7 @@ export function onboardingSteps({ session, app }) {
   // note: a short label after the title ("Sign in to RSI · already signed in"); text: one muted line under it.
   const steps = [
     { key: 'signin', title: 'Sign in to RSI', note: signedIn ? 'already signed in' : '', text: signedIn ? '' : session === 'expired' ? 'Your RSI sign-in has run out. Sign in again; the planner never sees your password.' : 'Opens the RSI website; the planner never sees your password.', done: signedIn },
-    { key: 'sync', title: 'Sync store and hangar', note: hasStore && hasHangar ? 'done' : 'takes a few minutes', text: '', done: hasStore && hasHangar },
+    { key: 'sync', title: 'Sync store and hangar', note: hasStore && hasHangar ? 'done' : 'takes a minute or two', text: '', done: hasStore && hasHangar },
     { key: 'goal', title: 'Pick your first goal', note: goals > 0 ? 'done' : '', text: '', done: goals > 0 },
   ];
   const nextIndex = steps.findIndex((s) => !s.done);
