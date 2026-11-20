@@ -12,7 +12,8 @@
   // copy: the owned CCU record for an owned step ({ copyId, paid, giftable }) or null.
   // needed: "Needed because <goal> uses <what>" for a purchase only the shared plan makes, or null.
   // app: the planner app; with it a buy step offers "If I buy this".
-  let { item, ships, below = null, copy = null, needed = null, onExpand, app = null, number = null, phrase = '', onViewCopy = null } = $props();
+  // others: the other copies of this owned upgrade with the goals that use them ({ copyId, goals: [{ goalId, name }] }).
+  let { item, ships, below = null, copy = null, others = [], needed = null, onExpand, app = null, number = null, phrase = '', onViewCopy = null } = $props();
   const s = $derived(item.step);
   const name = (id) => ships.get(id)?.name ?? 'unknown ship';
   let open = $state(false);
@@ -57,6 +58,13 @@
       {#if needed}<p class="why needed">{needed}</p>{/if}
       {#if item.state === 'own'}
         <p class="why">Owned CCU{ownTail}</p>
+        {#if others.length}
+          <ul class="copies" data-other-copies>
+            {#each others as o, i (o.copyId)}
+              <li>Copy {i + 2}: {o.goals.length ? `used by ${o.goals.map((g) => g.name).join(', ')}` : 'not used by any goal'}{#if onViewCopy} <button type="button" class="more" onclick={() => onViewCopy(o.copyId)}>View in Hangar</button>{/if}</li>
+            {/each}
+          </ul>
+        {/if}
         <p class="links">
           {#if copy && onViewCopy}<button type="button" class="more" data-view-copy onclick={() => onViewCopy(copy.copyId)}>View this copy in Hangar</button>{/if}
           <RsiLink href={hangarUrl()} label="Open on RSI" aria="Open {name(s.from)} to {name(s.to)} in the RSI hangar" />
@@ -75,6 +83,7 @@
 </div>
 
 <style>
+  .copies { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
   .row { position: relative; padding: 0 12px; border-radius: 10px; background: rgba(8, 12, 20, 0.35); border: 1px solid var(--glass-border); border-left: 4px solid var(--own); }
   .row.now { border-left-color: var(--now); }
   .row.now.calm { border-left-color: var(--accent); }

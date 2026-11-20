@@ -10,6 +10,7 @@
   import { goalCostLines, issueLine, noRouteMessage, goalStatusText, noTokenHelp, TOKEN_HELP, ownedRunText, stepNumber, stepPhrase, CHAIN_ORDER_NOTE, FIGURE_HELP, NO_SALES_SEEN, estimateText, estimateHowText, cashCutText, breakdownLines, NEW_CASH_LABEL, LIST_VALUE_LABEL, SALES_CASH_LABEL, otherWaysTitle, bestDiffers, BEST_DIFFERS_LABEL, neededBecauseText, acceptedStatusText, acceptedStatusLine, goalNextText, sharedEffectShort, sharedEffectParts, ACCEPT_THIS_HELP, NO_TOKEN_TITLE, NO_TOKEN_OTHER } from '$logic/describe.mjs';
   import { neededBecause } from '$logic/sharedEffect.mjs';
   import { todayView } from './view/today.mjs';
+  import { copyUsers, otherCopies } from './view/copyUse.mjs';
   import { chainProgress, progressText } from './view/goalTable.mjs';
   import { usd } from '$logic/format.mjs';
   import { tokenPool, tokenSettings } from '$logic/tokens.mjs';
@@ -50,6 +51,9 @@
   const stuck = $derived(noRoute || noToken);
   const pool = $derived(tokenPool(app.data.lti ?? [], tokenSettings(app.plans)));
   const owned = $derived(new Map(app.data.owned.map((o) => [o.copyId, o])));
+  // For an owned step: the other copies of the same upgrade and the goals that use them.
+  const users = $derived(copyUsers(todayView(app).goals));
+  const othersOf = (step) => (step.kind === 'owned' && step.otherCopies ? otherCopies(app.data.owned, step, users) : []);
 
   const prop = $derived(session.proposal(chain.id, 3));
   const best = $derived(prop.routes[0] ?? null);
@@ -237,7 +241,7 @@
         {#each jv.groups as g (g.kind === 'step' ? `s${g.index}` : `r${g.from}`)}
           {#if g.kind === 'step'}
             {@const it = jv.steps[g.index]}
-            <li><JourneyStep item={it} {ships} {app} number={stepNumber(g.index + 1, total)} phrase={phraseOf(it, g.index)} copy={owned.get(it.step.copyId) ?? null} below={belowFor(it.step)} needed={neededFor(it)} onExpand={() => { wantNeeded = true; }} onViewCopy={viewCopy} /></li>
+            <li><JourneyStep item={it} {ships} {app} number={stepNumber(g.index + 1, total)} phrase={phraseOf(it, g.index)} copy={owned.get(it.step.copyId) ?? null} others={othersOf(it.step)} below={belowFor(it.step)} needed={neededFor(it)} onExpand={() => { wantNeeded = true; }} onViewCopy={viewCopy} /></li>
           {:else}
             {@const key = `${chainKey}-${g.from}-${g.to}`}
             <li class="run">
@@ -247,7 +251,7 @@
               {#if openRuns.includes(key)}
                 <ol class="runsteps" role="list">
                   {#each jv.steps.slice(g.from, g.to + 1) as it, i (g.from + i)}
-                    <li><JourneyStep item={it} {ships} number={stepNumber(g.from + i + 1, total)} phrase={phraseOf(it, g.from + i)} copy={owned.get(it.step.copyId) ?? null} onViewCopy={viewCopy} /></li>
+                    <li><JourneyStep item={it} {ships} number={stepNumber(g.from + i + 1, total)} phrase={phraseOf(it, g.from + i)} copy={owned.get(it.step.copyId) ?? null} others={othersOf(it.step)} onViewCopy={viewCopy} /></li>
                   {/each}
                 </ol>
               {/if}
