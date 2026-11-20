@@ -156,6 +156,7 @@ export function evaluateAccepted(state, chainId, { offers, owned, lti }) {
   }
   const others = reservations(state, chainId);
   const issues = [];
+  const usedHere = new Set(chain.accepted.steps.filter((s) => s.copyId).map((s) => s.copyId));
   let blocked = false;
   let wb = 0;
   let std = 0;
@@ -171,7 +172,13 @@ export function evaluateAccepted(state, chainId, { offers, owned, lti }) {
       continue;
     }
     const cur = bestOffer.get(edgeKey(s));
-    if (!cur) { blocked = true; issues.push({ kind: 'offer-gone', step: s.kind, from: s.from, to: s.to }); continue; }
+    if (!cur) {
+      // A step you now own a usable copy of (not held by another goal) is bought, so its offer may be gone.
+      const bought = owned.find((o) => o.from === s.from && o.to === s.to && !others.has(o.copyId) && !usedHere.has(o.copyId));
+      if (bought) { usedHere.add(bought.copyId); continue; }
+      blocked = true; issues.push({ kind: 'offer-gone', step: s.kind, from: s.from, to: s.to });
+      continue;
+    }
     if (cur.cash !== s.cash) issues.push({ kind: 'repriced', step: s.kind, from: s.from, to: s.to, was: s.cash, now: cur.cash });
     if (s.kind === 'warbond') wb += cur.cash; else std += cur.cash;
   }

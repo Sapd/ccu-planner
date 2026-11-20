@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup, copy, ships } from './support/ladder.mjs';
 import { acceptRoute, addChain } from '../src/logic/chains.mjs';
-import { creditCommitted } from '../src/logic/goals.mjs';
-import { buildGraph } from '../src/logic/planner.mjs';
+import { creditCommitted, evaluateAccepted, newState } from '../src/logic/goals.mjs';
+import { buildGraph, planRoutes } from '../src/logic/planner.mjs';
 import { createSession } from '../src/logic/session.mjs';
 
 const copiesOf = (route) => route.steps.filter((s) => s.copyId).map((s) => s.copyId);
@@ -46,4 +46,20 @@ test('a copy bought for an accepted goal without store credit is not planned ont
   const s = createSession({ plans: app.plans, graph, data });
   assert.deepEqual(copiesOf(s.route(b)), [], 'the copy is the accepted goal\'s');
   assert.equal(s.route(b).cash, 2500);
+});
+
+test('an accepted chain whose Warbond step is now owned is not blocked when the Warbond leaves the store', () => {
+  const sh = new Map([[1, { id: 1, name: 'A', msrp: 10000 }], [2, { id: 2, name: 'B', msrp: 20000 }], [3, { id: 3, name: 'C', msrp: 30000 }]]);
+  const wb = { from: 1, to: 2, kind: 'warbond', cash: 1000, skuId: 1 };
+  const std = { from: 2, to: 3, kind: 'standard', cash: 1000, skuId: 2 };
+  const [r] = planRoutes(buildGraph({ offers: [wb, std], owned: [], ships: sh }), { base: 1, target: 3 }, 1);
+  const state = newState();
+  const c = addChain(state, { name: 'g', base: 1, target: 3, mode: 'finish' });
+  acceptRoute(state, c.id, r, {});
+  const owned = [{ copyId: '99', from: 1, to: 2, paid: 1000 }];
+  const ev = evaluateAccepted(state, c.id, { offers: [std], owned, lti: [] });
+  assert.deepEqual(ev.issues, []);
+  assert.notEqual(ev.status, 'blocked');
+  // Still blocked when the copy is not there (or another goal holds it).
+  assert.equal(evaluateAccepted(state, c.id, { offers: [std], owned: [], lti: [] }).status, 'blocked');
 });
