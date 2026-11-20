@@ -247,3 +247,19 @@ test('the snapshots reach the app data: mapping passes them through, [] without 
   assert.deepEqual(buildPlannerData({ ...raw, planSnapshots: { version: 1, snapshots } }, { items: {} }).planSnapshots, snapshots);
   assert.deepEqual(buildPlannerData({ ...raw, planSnapshots: { bad: true } }, { items: {} }).planSnapshots, []);
 });
+
+test('a goal with many causes is still one line: taken CCUs grouped by goal, more than two of a kind counted', () => {
+  const name = (id) => ({ 1: 'Alpha', 2: 'Beta', 3: 'Gamma', 4: 'Delta' })[id];
+  const taken = (by, from, to) => ({ kind: 'taken', from, to, by });
+  const g = { name: 'Liberator', delta: -6500, causes: [
+    ...Array.from({ length: 12 }, () => taken('Constellation Mk V Centaurus', 1, 2)),
+    taken('Endeavor', 2, 3), taken('Endeavor', 3, 4), taken('Odyssey', 1, 3),
+    { kind: 'new-warbond', from: 1, to: 2, cash: 1000 }, { kind: 'new-warbond', from: 2, to: 3, cash: 1000 }, { kind: 'new-warbond', from: 3, to: 4, cash: 1000 },
+    { kind: 'step-gone', step: 'standard', from: 2, to: 4 },
+  ] };
+  assert.equal(goalChangeLine(g, { name }),
+    'Liberator -$65: now uses 3 new Warbonds; Beta → Delta is no longer sold; its CCUs now go to Constellation Mk V Centaurus (12), Endeavor (2), Odyssey (1)');
+  // One taken CCU keeps its full wording; two of a kind are still listed.
+  const few = { name: 'Orion', delta: 500, causes: [taken('Carrack', 1, 2), { kind: 'copy-new', from: 2, to: 3 }, { kind: 'copy-new', from: 3, to: 4 }] };
+  assert.equal(goalChangeLine(few, { name }), 'Orion +$5: now uses your new Beta → Gamma CCU; now uses your new Gamma → Delta CCU; Carrack took your Alpha → Beta CCU');
+});

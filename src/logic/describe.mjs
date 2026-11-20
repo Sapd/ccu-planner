@@ -345,10 +345,40 @@ export function changeCauseText(c, { name, arrow = '→' }) {
   }
 }
 
-/** One goal's line: "Orion +$90: Prospector went from $155 to $175; Prospector → SRV is no longer sold". */
+// More than this many causes of one kind are counted instead of listed, so a goal stays one line.
+const LIST_AT_MOST = 2;
+const COUNTED = {
+  msrp: (n) => `${n} ship prices changed`,
+  'step-gone': (n) => `${n} steps are no longer offered`,
+  'step-repriced': (n) => `${n} steps changed price`,
+  'new-warbond': (n) => `now uses ${n} new Warbonds`,
+  'copy-gone': (n) => `${n} of your CCUs left your hangar`,
+  'copy-new': (n) => `now uses ${n} new CCUs of yours`,
+};
+
+/**
+ * One goal's line: "Orion +$90: Prospector went from $155 to $175; Prospector → SRV is no longer sold". One line however much changed:
+ * CCUs other goals took are one phrase grouped by goal ("its CCUs now go to Endeavor (12), Carrack (2)"), and more than two causes of
+ * another kind are counted ("now uses 5 new Warbonds").
+ */
 export function goalChangeLine(g, opts) {
   const head = g.delta != null ? `${g.name} ${signedUsd(g.delta)}` : g.now == null ? `${g.name} has no route now` : `${g.name} has a route now (${usd(g.now)})`;
-  return `${head}: ${g.causes.map((c) => changeCauseText(c, opts)).join('; ')}`;
+  const byKind = new Map();
+  for (const c of g.causes) byKind.set(c.kind, [...(byKind.get(c.kind) ?? []), c]);
+  const parts = [];
+  for (const [kind, list] of byKind) {
+    if (kind === 'taken') continue;
+    if (list.length > LIST_AT_MOST && COUNTED[kind]) parts.push(COUNTED[kind](list.length));
+    else parts.push(...list.map((c) => changeCauseText(c, opts)));
+  }
+  const taken = byKind.get('taken') ?? [];
+  if (taken.length === 1) parts.push(changeCauseText(taken[0], opts));
+  else if (taken.length > 1) {
+    const to = new Map();
+    for (const c of taken) to.set(c.by ?? 'other goals', (to.get(c.by ?? 'other goals') ?? 0) + 1);
+    parts.push(`its CCUs now go to ${[...to].sort((a, b) => b[1] - a[1]).map(([by, n]) => `${by} (${n})`).join(', ')}`);
+  }
+  return `${head}: ${parts.join('; ')}`;
 }
 
 /** "+$215 since 18 Nov 20:34" or "unchanged since ...": the total's change, as a tail of a sentence. */
