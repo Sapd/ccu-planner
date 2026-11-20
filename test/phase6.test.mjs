@@ -63,7 +63,9 @@ test('unsupported accounts: other currency, no currency, taxed USD; a plain USD 
   assert.match(currencyProblem(undefined), /Sync the store again/);
   assert.match(currencyProblem({}), /Sync the store again/);
   assert.match(currencyProblem({ ...USD, taxRate: 0.2, isTaxInclusive: false }), /tax added on top/);
-  assert.equal(currencyProblem({ ...USD, taxRate: 0.2, isTaxInclusive: true }), null);
+  // The store sync saves no upgrade prices with any tax rate, so tax-inclusive prices are refused too, not a silent empty plan.
+  assert.match(currencyProblem({ ...USD, taxRate: 0.2, isTaxInclusive: true }), /include tax/);
+  assert.equal(currencyProblem({ ...USD, taxRate: 0, isTaxInclusive: true }), null);
   assert.equal(currencyProblem(USD), null);
   assert.equal(currencyProblem(normalizePricing(USD)), null);
   assert.equal(buildPlannerData(withPricing(USD), aliases).pricing.currencyCode, 'USD');

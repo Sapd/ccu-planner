@@ -39,8 +39,12 @@ export function currencyProblem(pricing) {
   if (p.currencyCode !== 'USD') {
     return `This planner currently supports USD store accounts only; your account uses ${p.currencyCode}. Its prices and Warbond logic are not checked for other currencies, so no plan is shown.`;
   }
+  // The store sync keeps only pre-tax USD upgrade prices (src/sync/core.mjs): with any tax rate it saves none, so say so here.
   if (p.taxRate && !p.isTaxInclusive) {
     return 'This planner currently supports USD store accounts only, and your store prices have tax added on top, which the planner does not account for, so no plan is shown.';
+  }
+  if (p.taxRate) {
+    return 'This planner currently supports USD store accounts without tax only. Your store prices include tax, and the planner does not read tax-inclusive prices yet, so no plan is shown.';
   }
   return null;
 }
