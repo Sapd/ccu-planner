@@ -331,14 +331,23 @@ fn now_secs() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
-fn read_checked_at(data: &Path) -> Option<u64> {
+/// This app's version (Cargo.toml, kept equal to tauri.conf.json by scripts/version.mjs).
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The last successful check: when, and by which app version.
+fn read_state(data: &Path) -> Option<(u64, Option<String>)> {
     let doc: Value = serde_json::from_slice(&read_regular(&feed_dir(data).join("state.json"))?).ok()?;
-    doc["checkedAt"].as_u64()
+    Some((doc["checkedAt"].as_u64()?, doc["app"].as_str().map(str::to_owned)))
 }
 
-/// True when the last successful check was less than 6 hours ago (a stamp in the future counts as none).
+/// True when this app version checked successfully less than 6 hours ago (a stamp in the future counts as none). After an update the
+/// first start checks at once: a new version may read feed content the old one ignored.
 fn recently_checked(data: &Path, key: &[u8], now: u64) -> bool {
-    cached_manifest(data, key).is_some() && read_checked_at(data).is_some_and(|t| t <= now && now - t < REFRESH_SECS)
+    recently_checked_by(data, key, now, APP_VERSION)
+}
+fn recently_checked_by(data: &Path, key: &[u8], now: u64, version: &str) -> bool {
+    cached_manifest(data, key).is_some()
+        && read_state(data).is_some_and(|(t, app)| app.as_deref() == Some(version) && t <= now && now - t < REFRESH_SECS)
 }
 
 /// The JSON files of the manifest that are missing or damaged locally.
@@ -368,7 +377,7 @@ fn store_file(data: &Path, manifest: &Manifest, name: &str, bytes: &[u8]) -> Res
 fn commit(data: &Path, manifest_bytes: &[u8], sig_text: &str, now: u64) -> Result<(), String> {
     write_atomic(&feed_dir(data).join("manifest.json"), manifest_bytes)?;
     write_atomic(&feed_dir(data).join("manifest.json.sig"), sig_text.as_bytes())?;
-    write_atomic(&feed_dir(data).join("state.json"), json!({ "checkedAt": now }).to_string().as_bytes())
+    write_atomic(&feed_dir(data).join("state.json"), json!({ "checkedAt": now, "app": APP_VERSION }).to_string().as_bytes())
 }
 
 /// The pictures the manifest lists and the cache lacks, ship pictures first (`ships_only`: no catalog pictures at all).
@@ -835,6 +844,19 @@ mod tests {
         assert!(recently_checked(dir.path(), &key, 1000 + REFRESH_SECS - 1));
         assert!(!recently_checked(dir.path(), &key, 1000 + REFRESH_SECS));
         assert!(!recently_checked(dir.path(), &key, 999), "a stamp from the future is no stamp");
+    }
+
+    #[test]
+    fn an_updated_app_checks_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = pair(17);
+        let key = k.public_key().as_ref().to_vec();
+        feed_on_disk(dir.path(), &k, "2026-11-20T10:00:00Z", b"{}"); // checked at 1000 by this version
+        assert!(recently_checked_by(dir.path(), &key, 1001, APP_VERSION));
+        assert!(!recently_checked_by(dir.path(), &key, 1001, "99.0.0"), "another version checks again");
+        // A state written before versions were recorded counts as another version.
+        fs::write(dir.path().join("feed/state.json"), br#"{"checkedAt":1000}"#).unwrap();
+        assert!(!recently_checked_by(dir.path(), &key, 1001, APP_VERSION));
     }
 
     #[test]

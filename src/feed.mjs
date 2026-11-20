@@ -99,6 +99,8 @@ const stamp = (s) => (s == null ? -Infinity : Date.parse(s));
 const floorStamp = (dir, cached, minGeneratedAt) => Math.max(stamp(minGeneratedAt), stamp(readSeen(dir)), stamp(cached?.manifest.generatedAt));
 const recordSeen = (dir, generatedAt) => { if (stamp(generatedAt) > stamp(readSeen(dir))) writeAtomic(seenFile(dir), JSON.stringify({ highestGeneratedAt: generatedAt })); };
 
+// The app's version (app/package.json, kept equal to the desktop app's by scripts/version.mjs): a new version checks the feed at once.
+export const APP_VERSION = (() => { try { return JSON.parse(fs.readFileSync(new URL('../app/package.json', import.meta.url), 'utf8')).version ?? null; } catch { return null; } })();
 const readState = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(feedDir(dir), 'state.json'), 'utf8')); } catch { return {}; } };
 const writeState = (dir, state) => writeAtomic(path.join(feedDir(dir), 'state.json'), JSON.stringify(state));
 
@@ -150,11 +152,12 @@ export const feedBase = (env = process.env, { dev = false } = {}) => {
  * @returns {Promise<{ status: 'updated'|'unchanged'|'skipped'|'offline'|'rejected', generatedAt: string|null, stale: boolean, error?: string }>}
  *   stale: the feed we now hold is older than 30 days (the publisher stopped); its data is still used
  */
-export async function refreshFeed({ dir, force = false, fetch: fetchFn = fetch, base = feedBase(), publicKey = FEED_PUBLIC_KEY, now = () => Date.now(), timeoutMs = 20000, minGeneratedAt = FEED_MIN_GENERATED_AT, clock = Date.now }) {
+export async function refreshFeed({ dir, force = false, fetch: fetchFn = fetch, base = feedBase(), publicKey = FEED_PUBLIC_KEY, now = () => Date.now(), timeoutMs = 20000, minGeneratedAt = FEED_MIN_GENERATED_AT, clock = Date.now, appVersion = APP_VERSION }) {
   const cached = cachedManifest(dir, publicKey);
   const staleAt = (at) => feedIsStale(at, clock());
-  const last = Number(readState(dir).checkedAt);
-  if (!force && cached && Number.isFinite(last) && now() - last < FEED_REFRESH_MS && now() >= last) return { status: 'skipped', generatedAt: cached.manifest.generatedAt, stale: staleAt(cached.manifest.generatedAt) };
+  const state = readState(dir);
+  const last = Number(state.checkedAt);
+  if (!force && cached && state.app === appVersion && Number.isFinite(last) && now() - last < FEED_REFRESH_MS && now() >= last) return { status: 'skipped', generatedAt: cached.manifest.generatedAt, stale: staleAt(cached.manifest.generatedAt) };
   try {
     const bytes = await get(fetchFn, `${base}manifest.json`, FEED_MAX_BYTES.manifest, timeoutMs);
     const sig = await get(fetchFn, `${base}manifest.json.sig`, 1024, timeoutMs);
@@ -176,7 +179,7 @@ export async function refreshFeed({ dir, force = false, fetch: fetchFn = fetch, 
     recordSeen(dir, manifest.generatedAt); // before the manifest, so a crash in between can only make this machine stricter
     writeAtomic(path.join(feedDir(dir), 'manifest.json'), bytes);
     writeAtomic(path.join(feedDir(dir), 'manifest.json.sig'), sig);
-    writeState(dir, { checkedAt: now() });
+    writeState(dir, { checkedAt: now(), app: appVersion });
     return { status: changed ? 'updated' : 'unchanged', generatedAt: manifest.generatedAt, stale: staleAt(manifest.generatedAt) };
   } catch (e) {
     const kind = e instanceof FeedError ? e.kind : 'offline';

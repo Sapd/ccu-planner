@@ -111,6 +111,12 @@ test('a refresh verifies the manifest, saves the files and reads back; the secon
   assert.equal(again.status, 'unchanged');
   assert.deepEqual(log, ['manifest.json', 'manifest.json.sig'], 'files the manifest says are unchanged are not downloaded again');
   assert.equal((await refreshFeed({ ...opts(dir, files, { log }), force: true, now: () => 1001 })).status, 'unchanged');
+  // After an app update the first start checks at once, though the last check was a minute ago.
+  log.length = 0;
+  assert.equal((await refreshFeed({ ...opts(dir, files, { log }), now: () => 1002 })).status, 'skipped');
+  assert.equal((await refreshFeed({ ...opts(dir, files, { log }), now: () => 1003, appVersion: '99.0.0' })).status, 'unchanged');
+  assert.deepEqual(log, ['manifest.json', 'manifest.json.sig']);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'feed', 'state.json'), 'utf8')).app, '99.0.0');
 });
 
 test('a tampered manifest or the wrong key is rejected and the last good copy stays', async () => {
