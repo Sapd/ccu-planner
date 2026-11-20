@@ -157,6 +157,67 @@ jobs:
           updaterJsonPreferNsis: true
           uploadWorkflowArtifacts: ${{ github.ref_type != 'tag' }}
 
+      - name: Package Windows portable zip
+        if: runner.os == 'Windows'
+        id: portable
+        shell: pwsh
+        run: |
+          $config = Get-Content -Raw app/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $version = $config.version
+          $stage = Join-Path $env:RUNNER_TEMP 'ccu-planner-portable'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $exe = Join-Path $stage 'CCU Planner.exe'
+          $marker = Join-Path $stage 'portable.txt'
+          $zip = Join-Path $env:RUNNER_TEMP "CCU.Planner_${version}_x64-portable.zip"
+          $installer = "app/src-tauri/target/release/bundle/nsis/$($config.productName)_${version}_x64-setup.exe"
+          # Tauri restores the unpatched target/release exe after bundling. Use the exact NSIS payload.
+          & "$env:ProgramFiles\7-Zip\7z.exe" e $installer 'ccu-planner-desktop.exe' "-o$stage" -y
+          $payload = Join-Path $stage 'ccu-planner-desktop.exe'
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $payload -PathType Leaf)) {
+            throw "Could not extract ccu-planner-desktop.exe from $installer."
+          }
+          Move-Item -LiteralPath $payload -Destination $exe -Force
+          @'
+          CCU Planner portable for Windows
+
+          Extract both files to a folder you can write to and run CCU Planner.exe.
+          Keep this file beside the executable to use portable mode. Planner data is
+          saved to the data folder beside it, unless you set CCU_DATA.
+
+          The app checks for updates and links to the releases page so you can
+          download a new zip yourself. Keep your data folder when updating.
+
+          The WebView2 runtime is required and is normally present on Windows 10/11.
+          WebView2 keeps its cache in %LOCALAPPDATA%. Your RSI sign-in stays in
+          Windows Credential Manager and is shared with the installed app.
+          '@ | Set-Content -LiteralPath $marker -Encoding utf8
+          Compress-Archive -LiteralPath @($exe, $marker) -DestinationPath $zip -Force
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Upload portable zip to the existing draft
+        if: runner.os == 'Windows' && github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+          PORTABLE_ZIP: ${{ steps.portable.outputs.zip }}
+        run: |
+          $draftTag = gh api "repos/$env:REPO/releases/$env:RELEASE_ID" --jq 'select(.draft) | .tag_name'
+          if ($LASTEXITCODE -ne 0 -or $draftTag -cne $env:TAG) {
+            throw "Release $env:RELEASE_ID is not the draft for $env:TAG."
+          }
+          gh release upload $env:TAG --repo $env:REPO --clobber $env:PORTABLE_ZIP
+
+      - name: Upload portable zip as a workflow artifact
+        if: runner.os == 'Windows' && github.ref_type != 'tag'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-x64-portable
+          path: ${{ steps.portable.outputs.zip }}
+          if-no-files-found: error
+
   build-mcp:
     name: Build and test MCP packages
     needs: check-version

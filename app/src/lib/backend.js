@@ -3,6 +3,7 @@
 import { syncBackend } from './sync-backend.js';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { isRsiUrl } from '../../../src/logic/links.mjs';
+import { RELEASES_URL } from './view/updater.mjs';
 
 // The Tauri data dir, filled by load() so imageSrc can stay synchronous.
 let cachedDataDir = null;
@@ -52,15 +53,16 @@ export const backend = {
   savePending: async (doc) => (inTauri() ? viaTauri('sync_write', { name: 'pending-import.json', value: doc, append: false }) : viaHttp('pending-save', { doc })),
   /** Copies a legacy checkout's data folder; resolves to { copied, skipped }. */
   importLegacy: async (dir) => (inTauri() ? viaTauri('import_legacy', { dir: await expandHome(dir) }) : viaHttp('import', { dir })),
-  /** Opens an RSI page in the system browser. Refuses any other URL. */
+  /** Opens an allowed RSI page or the planner's latest release in the system browser. */
   openExternal: async (url) => {
-    if (!isRsiUrl(url)) throw new Error('Refusing to open a non-RSI URL');
+    if (url !== RELEASES_URL && !isRsiUrl(url)) throw new Error('Refusing to open this URL');
     if (inTauri()) {
       const { openUrl } = await import('@tauri-apps/plugin-opener');
       return openUrl(url);
     }
     window.open(url, '_blank', 'noopener');
   },
+  portableMode: () => viaTauri('portable_mode'),
   /** The store catalog (store-catalog.json), or null when it has not been synced. Tauri: the sync read path; dev: the Vite plugin. */
   loadCatalog: async () => {
     if (!inTauri()) return viaHttp('catalog');

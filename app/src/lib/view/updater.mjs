@@ -1,6 +1,7 @@
 // Plain-language texts for the update check (no Tauri imports, so tests can run it).
 export const CHECK_FIRST_DELAY_MS = 10_000;
 export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+export const RELEASES_URL = 'https://github.com/Sapd/ccu-planner/releases/latest';
 
 export function plainUpdateError(error) {
   const text = String(error?.message ?? error ?? '');
@@ -13,6 +14,7 @@ export function checkLine(status, current, version, error) {
   if (status === 'checking') return 'Checking…';
   if (status === 'downloading') return `Downloading ${version}…`;
   if (status === 'ready') return `${version} is ready. Use the Restart button in the top bar.`;
+  if (status === 'available') return `Version ${version} is available`;
   if (status === 'uptodate') return `You're up to date (${current}).`;
   if (status === 'error') return error;
   return current ? `You have ${current}.` : 'Looks for a newer version.';

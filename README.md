@@ -46,6 +46,12 @@ Linux). The installers are not signed yet, so your system may warn you the first
 right-click the app and choose Open, on Windows choose "More info", then "Run anyway". The steps for
 building the installers yourself are in [docs/RELEASING.md](docs/RELEASING.md).
 
+**Windows portable.** Extract `CCU.Planner_<version>_x64-portable.zip` anywhere you can write and run
+`CCU Planner.exe`. Keep `portable.txt` next to it so the planner uses the adjacent `data` folder.
+It needs the WebView2 runtime normally included with Windows 10/11. WebView2 keeps its cache in
+`%LOCALAPPDATA%`, and your RSI sign-in stays in Windows Credential Manager, shared with the installed
+app. When an update is available, the app links to the releases page so you can download it yourself.
+
 ## First start
 
 The first screen leads you through three steps:
@@ -88,7 +94,7 @@ which requests are made. The planner currently supports store accounts that pay 
 
 ## Ask Claude about your plan (MCP)
 
-**Claude Desktop.** Download `ccu-planner.mcpb` from the [latest release](https://github.com/Sapd/ccu-planner/releases/latest) and open it. Turn on **Let Claude change my plan** if you want Claude to edit goals or settings. Leave **Data folder** empty to use the planner app’s data.
+**Claude Desktop.** Download `ccu-planner.mcpb` from the [latest release](https://github.com/Sapd/ccu-planner/releases/latest) and open it. Turn on **Let Claude change my plan** if you want Claude to edit goals or settings. Leave **Data folder** empty to use the installed app’s data, or choose the `data` folder next to your portable copy.
 
 **Claude Code.** Download the executable for your system from the same release and save it somewhere permanent. Choose `macos-arm64` for Apple silicon, `macos-x64` for an Intel Mac, `windows-x64.exe` for Windows, or `linux-x64` for Linux. On macOS and Linux, run `chmod +x <file>` with the path to the download. The executable is unsigned. If macOS blocks your download from the release, run `xattr -d com.apple.quarantine <file>`. Windows SmartScreen may show an unknown-publisher warning.
 

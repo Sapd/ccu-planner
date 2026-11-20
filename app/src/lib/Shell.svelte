@@ -26,7 +26,8 @@
   import { startFeed } from './state.svelte.js';
   import { shouldShowExplainer } from './view/firstRun.mjs';
   import { updater, startUpdater, checkForUpdate, restartToUpdate } from './updater.svelte.js';
-  import { checkLine } from './view/updater.mjs';
+  import { checkLine, RELEASES_URL } from './view/updater.mjs';
+  import { backend } from './backend.js';
   import { hangarHealth } from './view/health.mjs';
   import { todayView } from './view/today.mjs';
   import { openNeedsReview } from './state.svelte.js';
@@ -43,6 +44,11 @@
   let helpEl = $state(null);
   let helpOpen = $state(false);
   let notesOpen = $state(false);
+  async function openRelease() {
+    updater.error = '';
+    try { await backend.openExternal(RELEASES_URL); }
+    catch { updater.error = 'Could not open the releases page in your browser.'; }
+  }
   // First open (after the import's Continue or with existing data): show it unless already seen.
   onMount(() => {
     let st = null;
@@ -125,6 +131,12 @@
         {#if updater.notes}<button type="button" class="linkbtn" aria-expanded={notesOpen} onclick={() => { notesOpen = !notesOpen; }}>What's new</button>{/if}
         {#if notesOpen && updater.notes}<div class="notes">{updater.notes}</div>{/if}
       </span>
+    {:else if updater.status === 'available'}
+      <span class="upd">
+        <span role="status">{checkLine(updater.status, updater.current, updater.version, updater.error)}</span>
+        <button type="button" class="linkbtn" onclick={openRelease}>Open releases ↗</button>
+        {#if updater.error}<span class="uperr" role="alert">{updater.error}</span>{/if}
+      </span>
     {/if}
     <small class="stamps" class:stale>Store: {stamp(meta.catalogAt)} · Hangar: {stamp(meta.hangarAt)}</small>
     {#if !ui.sample}<button type="button" class="reload" disabled={reloading} aria-label="Reload the saved data" title="Reads the saved store and hangar data again. To get fresh prices, run Sync, then Store." onclick={reload}>{reloading ? '…' : '↻'}</button>{/if}
@@ -137,7 +149,7 @@
           <li><button type="button" onclick={(e) => { helpOpen = false; openGlossary('', helpBtn); }}><span class="lbl">Look up a term</span><span class="hintline">What the words in the planner mean</span></button></li>
           {#if updater.desktop}
             <li><button type="button" disabled={updater.status === 'checking' || updater.status === 'downloading'} onclick={() => checkForUpdate(true)}><span class="lbl">Check for updates</span><span class="hintline" role="status">{checkLine(updater.status, updater.current, updater.version, updater.error)}</span></button></li>
-            {#if updater.current}<li class="ver">CCU Planner {updater.current}</li>{/if}
+            {#if updater.current || updater.portable}<li class="ver">CCU Planner {updater.current}{updater.portable ? ' · Portable' : ''}</li>{/if}
           {/if}
         </ul>
       {/if}

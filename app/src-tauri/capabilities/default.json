@@ -9,7 +9,10 @@
     "process:allow-restart",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://robertsspaceindustries.com/*" }]
+      "allow": [
+        { "url": "https://robertsspaceindustries.com/*" },
+        { "url": "https://github.com/Sapd/ccu-planner/releases/latest" }
+      ]
     }
   ]
 }

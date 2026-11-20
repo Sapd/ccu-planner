@@ -2,6 +2,7 @@ pub mod feed;
 pub mod lock;
 pub mod rsi;
 pub mod migrate;
+mod portable;
 mod session_store;
 pub mod store;
 
@@ -14,6 +15,11 @@ use tauri::Manager;
 // Keep revision checks and replacements together, including overlapping IPC calls.
 #[derive(Default)]
 struct StoreAccess(Mutex<()>);
+
+struct DataLocation {
+    portable: bool,
+    dir: Result<PathBuf, String>,
+}
 
 // Remote RSI pages receive no planner commands, even if they try to invoke custom IPC.
 fn main_only(window: &tauri::WebviewWindow) -> Result<(), String> {
@@ -62,31 +68,25 @@ mod tests {
 // The bundle identifier changed from com.ccuplanner.desktop to eu.sapd.ccuplanner; it names the
 // data folder and the keychain service. Failures are logged, never fatal: the old data stays in place.
 // Once every step ran cleanly a marker in the new folder skips the whole thing (and the two keychain reads).
-fn migrate_legacy_install(app: &tauri::AppHandle) {
-    let explicit = std::env::var_os("CCU_DATA").is_some();
-    let app_dir = app.path().app_data_dir().ok();
-    if !explicit && app_dir.as_ref().is_some_and(|d| d.join(migrate::DONE).exists()) {
+fn migrate_legacy_install(app_dir: Option<&Path>) {
+    if app_dir.is_some_and(|d| d.join(migrate::DONE).exists()) {
         return;
     }
     let mut clean = true;
-    if !explicit {
-        if let Some(new) = &app_dir {
-            if let Some(parent) = new.parent() {
-                let old = parent.join(migrate::LEGACY_IDENTIFIER);
-                match migrate::move_data_dir(&old, new) {
-                    Ok(migrate::DirMove::Both) => {
-                        let note = migrate::both_note(&old, new);
-                        if !new.join(migrate::WARNED).exists() {
-                            eprintln!("{note}");
-                            let _ = std::fs::write(new.join(migrate::WARNED), note);
-                        }
-                    }
-                    Ok(moved) => eprintln!("Data folder migration: {moved:?}"),
-                    Err(e) => {
-                        clean = false;
-                        eprintln!("Data folder migration failed, old data kept: {e}");
-                    }
+    if let Some((new, parent)) = app_dir.and_then(|new| Some((new, new.parent()?))) {
+        let old = parent.join(migrate::LEGACY_IDENTIFIER);
+        match migrate::move_data_dir(&old, new) {
+            Ok(migrate::DirMove::Both) => {
+                let note = migrate::both_note(&old, new);
+                if !new.join(migrate::WARNED).exists() {
+                    eprintln!("{note}");
+                    let _ = std::fs::write(new.join(migrate::WARNED), note);
                 }
+            }
+            Ok(moved) => eprintln!("Data folder migration: {moved:?}"),
+            Err(e) => {
+                clean = false;
+                eprintln!("Data folder migration failed, old data kept: {e}");
             }
         }
     }
@@ -97,21 +97,20 @@ fn migrate_legacy_install(app: &tauri::AppHandle) {
             eprintln!("Keychain migration failed, old entry kept: {e}");
         }
     }
-    if clean && !explicit {
-        if let Some(dir) = &app_dir {
-            let _ = std::fs::create_dir_all(dir).and_then(|_| std::fs::write(dir.join(migrate::DONE), b""));
-        }
+    if let Some(dir) = app_dir.filter(|_| clean) {
+        let _ =
+            std::fs::create_dir_all(dir).and_then(|_| std::fs::write(dir.join(migrate::DONE), b""));
     }
 }
 
 fn resolve_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    if let Some(dir) = std::env::var_os("CCU_DATA") {
-        return Ok(PathBuf::from(dir));
-    }
-    app.path()
-        .app_data_dir()
-        .map(|path| path.join("data"))
-        .map_err(|error| error.to_string())
+    app.state::<DataLocation>().dir.clone()
+}
+
+#[tauri::command]
+async fn portable_mode(window: tauri::WebviewWindow, app: tauri::AppHandle) -> Result<bool, String> {
+    main_only(&window)?;
+    Ok(app.state::<DataLocation>().portable)
 }
 
 #[tauri::command]
@@ -208,11 +207,28 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     builder
         .setup(|app| {
-            migrate_legacy_install(app.handle());
-            app.asset_protocol_scope()
-                .allow_directory(resolve_data_dir(app.handle())?.join("images"), true)?;
-            app.asset_protocol_scope()
-                .allow_directory(feed::images_dir(app.handle())?, true)?;
+            let exe = std::env::current_exe()?;
+            let portable_dir = portable::exe_dir(&exe)?;
+            let explicit = std::env::var_os("CCU_DATA");
+            if portable_dir.is_some() || explicit.is_some() {
+                migrate_legacy_install(None);
+            }
+            let dir = portable::data_dir(portable_dir, explicit, || {
+                let installed_dir = app.path().app_data_dir().map_err(|e| e.to_string());
+                migrate_legacy_install(installed_dir.as_deref().ok());
+                installed_dir.map(|dir| dir.join("data"))
+            });
+            app.manage(DataLocation {
+                portable: portable_dir.is_some(),
+                dir,
+            });
+            // If the data folder could not be opened, the load command reports it on the startup screen.
+            if let Ok(dir) = resolve_data_dir(app.handle()) {
+                app.asset_protocol_scope()
+                    .allow_directory(dir.join("images"), true)?;
+                app.asset_protocol_scope()
+                    .allow_directory(feed::images_dir(app.handle())?, true)?;
+            }
             Ok(())
         })
         // A reloaded, crashed or closed main webview never reaches its sync's end: release the sync lock and cancel then.
@@ -236,6 +252,7 @@ pub fn run() {
             save_doc,
             import_legacy,
             data_dir,
+            portable_mode,
             sync_read,
             sync_write,
             sync_progress,

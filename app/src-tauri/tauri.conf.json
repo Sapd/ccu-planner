@@ -19,7 +19,7 @@
       "minHeight": 700
     }],
     "security": {
-      "assetProtocol": { "enable": true, "scope": ["$APPDATA/data/images/**"] },
+      "assetProtocol": { "enable": true, "scope": [] },
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; connect-src ipc: http://ipc.localhost; worker-src 'self'; base-uri 'self'; form-action 'none'",
       "devCsp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost http://localhost:1420; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; worker-src 'self' http://localhost:1420; base-uri 'self'; form-action 'none'"
     }

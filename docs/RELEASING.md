@@ -34,7 +34,8 @@ To build locally, install Bun 1.4.2, then run `npm ci`, `npm run build:mcp` and 
    builds both platforms without a key and without update artifacts and uploads the bundles as workflow
    artifacts only; no release is created and nothing needs approval.
 5. **Check the draft's assets**: `latest.json`; the macOS `.app.tar.gz` and its `.sig`; the `.dmg`;
-   the Windows `-setup.exe` and its `.sig`. Also check for the MCP bundle and the Windows x64, macOS arm64, macOS x64 and Linux x64 MCP executables. Open `latest.json`: `version` is right and `platforms` lists
+   the Windows `-setup.exe` and its `.sig`; and `CCU.Planner_<version>_x64-portable.zip` containing
+   `CCU Planner.exe` and `portable.txt`. Also check for the MCP bundle and the Windows x64, macOS arm64, macOS x64 and Linux x64 MCP executables. Open `latest.json`: `version` is right and `platforms` lists
    `darwin-aarch64`, `darwin-x86_64` and `windows-x86_64`. Edit the release notes if you like.
 6. **Publish the draft.** This is the point of no return: the moment it is published (and not marked
    pre-release) it is the "latest" release, and every installed app picks it up within hours (10 seconds

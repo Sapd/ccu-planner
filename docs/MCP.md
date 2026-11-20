@@ -12,9 +12,13 @@ reads it when it connects, so no separate agents file is needed.
 
 ## Install
 
-For Claude Desktop, open `ccu-planner.mcpb` from the latest release. Claude Desktop supplies Node. Leave **Data folder** empty to use the app’s own folder, or choose the folder that contains your `catalog.json`. Turn on **Let Claude change my plan** to enable edits.
+For Claude Desktop, open `ccu-planner.mcpb` from the latest release. Claude Desktop supplies Node. Leave **Data folder** empty to use the installed app’s folder, or choose the folder that contains your `catalog.json`. Turn on **Let Claude change my plan** to enable edits.
 
 For Claude Code, download the executable for your platform and register its full path with `claude mcp add -s user ccu-planner -- /path/to/executable`. Append `--allow-writes` to enable edits. The [README](../README.md#ask-claude-about-your-plan-mcp) lists the downloads and first-run steps for macOS, Windows and Linux.
+
+For Windows portable, point the MCP server to the `data` folder next to `CCU Planner.exe`.
+Set it as **Data folder** in the Claude Desktop bundle or set `CCU_DATA` in the server’s environment.
+The MCP server defaults to the installed app’s data folder.
 
 Sync from RSI in the planner app when using either release package. The packages read the saved planner data and skip the checkout’s legacy data, browser profile and session file. Their sync tools report that there is no stored session.
 
