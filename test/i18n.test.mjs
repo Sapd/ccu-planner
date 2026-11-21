@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   t, tn, setLocale, getLocale, withLocale, localeOf, listBuilders, listTwins, listTexts, hasText, addTranslations,
 } from '../src/logic/i18n.mjs';
@@ -91,9 +91,9 @@ const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1
 // Load every German table, and every module that defines builders (the app's view modules included).
 await import('../app/src/lib/i18n/de/index.js');
 const logicDir = path.join(root, 'src/logic');
-for (const f of fs.readdirSync(logicDir).filter((n) => n.endsWith('.mjs'))) await import(path.join(logicDir, f));
+for (const f of fs.readdirSync(logicDir).filter((n) => n.endsWith('.mjs'))) await import(pathToFileURL(path.join(logicDir, f)).href);
 const viewDir = path.join(root, 'app/src/lib/view');
-for (const f of fs.readdirSync(viewDir).filter((n) => n.endsWith('.mjs'))) await import(path.join(viewDir, f));
+for (const f of fs.readdirSync(viewDir).filter((n) => n.endsWith('.mjs'))) await import(pathToFileURL(path.join(viewDir, f)).href);
 
 test('English is the default and t() returns the English text with its placeholders filled', () => {
   assert.equal(getLocale(), 'en');
