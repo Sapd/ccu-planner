@@ -48,7 +48,9 @@ const serve = (files, log = []) => async (url, init) => {
   return new Response(body, { status: 200, headers: { 'content-length': String(body.length) } });
 };
 const BASE = 'https://feed.test/feed/';
-const opts = (dir, files, extra = {}) => ({ dir, fetch: serve(files, extra.log), base: BASE, publicKey: KEY.pub, ...extra });
+// A fixed floor, so the tests do not depend on src/feed-floor.json, which `npm run version` moves on every release.
+const TEST_FLOOR = '2026-01-01T00:00:00Z';
+const opts = (dir, files, extra = {}) => ({ dir, fetch: serve(files, extra.log), base: BASE, publicKey: KEY.pub, minGeneratedAt: TEST_FLOOR, ...extra });
 
 test('the embedded public key is 32 raw ed25519 bytes and a key of the app can be rebuilt from base64', () => {
   assert.equal(FEED_PUBLIC_KEY.asymmetricKeyType, 'ed25519');
@@ -327,7 +329,7 @@ test('the floor of this build and the highest feed ever accepted survive a wiped
 
 test('a brand new install refuses a manifest older than the floor built into the app', async () => {
   const dir = tmp();
-  const r = await refreshFeed({ ...opts(dir, site({ at: '2026-01-01T00:00:00.000Z' })), now: () => 1 });
+  const r = await refreshFeed({ ...opts(dir, site({ at: '2026-01-01T00:00:00.000Z' })), now: () => 1, minGeneratedAt: FEED_MIN_GENERATED_AT });
   assert.equal(r.status, 'rejected');
   assert.ok(Date.parse('2026-01-01T00:00:00.000Z') < Date.parse(FEED_MIN_GENERATED_AT));
   assert.equal(fs.existsSync(path.join(dir, 'feed', 'manifest.json')), false);
