@@ -2,13 +2,15 @@
 import { t } from '../../i18n.mjs';
 import { isDay } from '../../availability.mjs';
 import { PROPOSED_LABEL, RESERVED_LABEL, RESERVED_STAYS } from '../../chainChoice.mjs';
-import { BEST_DIFFERS_LABEL, eventLockWhy, eventLockDecision, routeLine } from '../../describe.mjs';
+import { BEST_DIFFERS_LABEL, routeLine } from '../../describe.mjs';
 import { normalizePricing, usd } from '../../format.mjs';
 import { edgeKey } from '../../planner.mjs';
 import { buyRowText, otherGoalsText, signed } from '../../whatifText.mjs';
 
 /** English text -> German text (string with the same {placeholders}, or (params) => string). */
 export const texts = {
+  'Confirmed seen in the store outside sales.': 'Sichtung im Store außerhalb von Sales bestätigt.',
+  'Using store sync history.': 'Der Store-Sync-Verlauf wird verwendet.',
   "Proposed chain": "Vorgeschlagene Kette",
   "Reserved chain": "Reservierte Kette",
   "Your reserved chain stays in place until you switch.": "Deine reservierte Kette bleibt bestehen, bis du wechselst.",
@@ -53,6 +55,7 @@ export const texts = {
   "CCU Game plans each chain separately; ours share your CCUs (on its own this goal costs {alone} here, {shared} shared)": "CCU Game plant jede Kette einzeln. Hier teilen sich deine Ziele die verfügbaren CCUs. Das Ziel kostet einzeln {alone}, im gemeinsamen Plan {shared}",
   "Not in CCU Game: {name}": "Fehlt in CCU Game: {name}",
   "the item IDs and the title name different ships": "Artikel-IDs und Titel verweisen auf unterschiedliche Schiffe",
+  "RSI’s upgrade tool does not sell {name}. Plans cannot use this upgrade.": "RSI verkauft {name} nicht im Upgrade-Tool. Deine Pläne können dieses Upgrade nicht verwenden.",
   "from matches {from}, ship targets {to}": "Treffer fürs Ausgangsschiff: {from}, fürs Zielschiff: {to}",
   "another goal": "ein anderes Ziel",
   "a goal": "ein Ziel",
@@ -106,7 +109,6 @@ export const texts = {
   "higher all-in (paid {price})": "höhere Gesamtkosten ({price} bereits bezahlt)",
   "costs {price} more": "kostet {price} mehr",
   "cheaper by {price}": "{price} günstiger",
-  "Buy Standard {price} before the sale ends: {reason}.": "Kauf Standard für {price} vor Ende des Sale-Events ({reason}).",
   "Buy Standard {price} before the price rises to {expected}.": "Kauf Standard für {price}, bevor der Preis auf {expected} steigt.",
   "Buy Standard {price}: the chain is in finish mode.": "Kauf Standard für {price}, damit du die Kette so bald wie möglich abschließen kannst.",
   "a Warbond {from} → {to} below {price} would switch the plan": "Ein Warbond {from} → {to} unter {price} würde den Plan ändern",
@@ -352,8 +354,7 @@ export const builders = {
     if (n) return `${lead}, ${count(Math.abs(n), 'Kauf', 'Käufe')} ${n > 0 ? 'weniger' : 'mehr'}`;
     return `${lead} und gleicher Aufwand. Bei Gleichstand entscheidet eine feste Reihenfolge`;
   },
-  'decision.lockText'(why, event, expected) {
-    if (why === 'event') return eventLockWhy(event);
+  'decision.lockText'(why, expected) {
     if (why === 'concept') return 'Konzeptschiff: Sichere dir den Preis jetzt';
     if (why === 'expected') return `Preis steigt voraussichtlich${expected ? ` auf ${usd(expected.cash)}` : ''}`;
     return 'Preis jetzt sichern: Preissicherung ist eingeschaltet';
@@ -362,10 +363,9 @@ export const builders = {
   'decision.warbondText'(cash, standard) {
     const vs = standard == null ? 'Ein Standard-Upgrade ist gerade nicht im Angebot.'
       : standard > cash ? `Das sind ${usd(standard - cash)} weniger als für Standard.` : 'Standard kostet höchstens genauso viel.';
-    return `Kauf Warbond jetzt für ${usd(cash)}. ${vs} Warbond-Angebote können wieder verschwinden.`;
+    return `Kauf Warbond jetzt für ${usd(cash)}. ${vs}`;
   },
-  'decision.standardLockText'(cash, why, event) {
-    if (why === 'event') return eventLockDecision(cash, event);
+  'decision.standardLockText'(cash, why) {
     const reason = { concept: 'Das Ziel ist ein Konzeptschiff.', expected: 'Du erwartest einen Preisanstieg.', on: 'Die Preissicherung ist eingeschaltet.' }[why];
     return `Kauf Standard später oder sichere dir jetzt den Preis von ${usd(cash)}. ${reason ?? ''}`.trimEnd();
   },

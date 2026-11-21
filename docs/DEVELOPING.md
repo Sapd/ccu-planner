@@ -101,8 +101,8 @@ node scripts/chain.mjs refresh          # what changed per chain since the last 
 node scripts/chain.mjs warbonds [--hours 24] [--gone]   # new Warbonds and which chains use them
 ```
 
-Warbonds are sale offers and disappear; Standard upgrades stay available at
-the msrp difference. So a `watch` chain splits its best route into "buy now"
+Warbonds are sale offers. Standard upgrades cost the MSRP difference when offered.
+A `watch` chain splits its best route into "buy now"
 (the Warbond steps of that route) and "later" (Standard bridges a future
 Warbond may replace). Each upgrades sync appends to
 `<data>/offer-history.jsonl` and fetches titles only for available SKUs with a new
@@ -110,15 +110,12 @@ appeared event and no known title. History uses whole-line O_APPEND writes and
 fsync before recording a resume checkpoint. A crash can leave a torn final line;
 the loader skips it, and the next append separates it from new complete lines.
 
-Most Warbonds stay on sale for weeks, so "buy now" is split by urgency
-(`src/logic/urgency.mjs`). **Buy now** is a step whose offer may end soon: the
-SKU is a limited-time offer (ignored while RSI flags half of all offers or more,
-which it does during event sales), it first appeared today or yesterday during a sale
-event, the sale event ends within 2 days, or waiting would cost money (a "buy
-before the price changes" alert with a saving). **On sale** (no rush) is every
-other Warbond; it shows "on sale since" (first seen in the offer history) and
-the sale's end when an event is entered. **Optional** is a price lock: a bet,
-shown with its trade. Tell the planner what you know about one offer with
+The planner groups purchases by urgency (`src/logic/urgency.mjs`). **Buy now** can
+reflect a limited-time SKU flag (ignored when at least half of offers of its kind
+carry it), a Warbond first seen today or yesterday during an event, or a Warbond
+whose event banner gives an end date within 2 days. A price-change alert with a
+saving can also move a step to Buy now. **On sale** shows the first observation
+and, when available, the banner's date. **Optional** is a price lock. Tell the planner what you know about one offer with
 `chain offer <from> <to> <YYYY-MM-DD|soon|clear>` (or on Today): a day more than
 2 days ahead moves it to no rush, "soon" to Buy now; it is stored per pair in
 `price-overrides.json` (`pairs`). `chain list` prints the three groups per goal.
@@ -139,8 +136,7 @@ Warbonds against this list. Each threshold is exact for the chain as planned
 the pair added at $0. A Dijkstra estimate only picks which pairs get checked.
 
 It also lists Warbonds on sale today that are not on the best route but on one
-costing at most `--slack` more. They vanish when the sale ends; an unused one
-melts back to its price as store credit, which the chain's later Standard
+costing at most `--slack` more. An unused one can be melted for store credit, which the chain's later Standard
 steps can use, so holding one mostly costs flexibility, not money.
 
 ### Concept ships
@@ -388,10 +384,12 @@ host as `<id>-original.<format>`, without sharp or image conversion. These large
 files are cached once and used for both picture sizes. Public image requests
 carry no session cookies and refuse redirects to other hosts.
 
-**Sale events.** Melt suggestions and "buy later" steps treat a ship as
-regularly on sale only after syncs saw it on sale on at least 2 days, 7 or
-more days apart, outside every sale event you entered on the Store page (for
-example IAE). Enter the current event, or mark ships regular yourself.
+**Sale events.** These dates label store syncs. Ship availability shows the last
+sync, the current streak of sync days that saw the ship, its last sighting, and
+whether a sighting falls outside all recorded events. Melt suggestions require
+a Standard offer for the same pair and a sighting outside sales, which can also
+be confirmed manually. Ship observations do not change purchase urgency or
+price locks.
 
 **Sample data.** "See an example first" runs the planner on `app/src/lib/sample-data.json` through an in-memory
 backend (`view/sample.mjs`); it never reads or writes the data folder. Rebuild the file from the test fixture with

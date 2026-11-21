@@ -213,7 +213,7 @@ test('desktop sync snapshot: same shape as the CLI, replaced for the same data, 
   const doc = s.files['plan-snapshots.json'];
   assert.deepEqual(Object.keys(doc), ['version', 'snapshots']);
   assert.equal(doc.version, 1);
-  assert.deepEqual(Object.keys(doc.snapshots[0]).sort(), ['at', 'copies', 'goals', 'hangarAt', 'msrp', 'offersAt', 'revs', 'storeAt', 'total']);
+  assert.deepEqual(Object.keys(doc.snapshots[0]).sort(), ['at', 'copies', 'goals', 'hangarAt', 'inStore', 'msrp', 'offersAt', 'revs', 'storeAt', 'total']);
   assert.equal(await recordPlanSnapshot(s.invoke, aliases, 'T2'), false, 'same data and plan: nothing written');
   // Older snapshots of other data are kept up to the limit.
   s.files['plan-snapshots.json'] = { version: 1, snapshots: Array.from({ length: 40 }, (_, i) => ({ at: `t${i}`, storeAt: `S${i}`, hangarAt: 'H', offersAt: null, revs: null })) };

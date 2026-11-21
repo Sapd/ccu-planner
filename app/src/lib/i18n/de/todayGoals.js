@@ -119,7 +119,6 @@ export const texts = {
   "Runs until, for {from} to {to}": "Läuft bis, für {from} → {to}",
   "Save": "Speichern",
   "Welcome": "Willkommen",
-  "{event} ends {day}": "{event} endet {day}",
   "Show fewer": "Weniger anzeigen",
   "Show {n} more": "{n} weitere anzeigen",
   "Your goals": "Deine Ziele",

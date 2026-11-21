@@ -217,7 +217,7 @@
               {#key ui.sample}<BrowseStore app={ui.app} />{/key}
             {:else}
             {#if feedRunning}
-              <p class="feednote" role="status" data-sale-feed>{t('{name} is on until {date}. The planner counts it as a sale event; it comes from the CCU Planner feed.', { name: feedRunning.name, date: shortDay(feedRunning.to) })}</p>
+              <p class="feednote" role="status" data-sale-feed>{t("RSI's banner says {name} ends {date}. Event dates from the CCU Planner feed.", { name: feedRunning.name, date: shortDay(feedRunning.to) })}</p>
             {/if}
             {#if ui.store.checkOpen}
               <div id="store-check" bind:this={checkEl}>

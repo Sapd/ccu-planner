@@ -2,7 +2,7 @@
 //
 // Warbonds are sale offers, but most of them stay for weeks. A step is worth buying TODAY when its
 // offer may end soon: the SKU is a limited-time offer, it only just appeared during a sale event, the
-// sale event ends within SOON_DAYS days, or waiting would cost money (a buy-before alert with `saves`).
+// RSI banner dates the event end within SOON_DAYS days, or waiting would cost money (a buy-before alert with `saves`).
 // Your own note on an offer ("runs until <day>" or "ends soon", price-overrides.json `pairs`) beats the
 // first three signals. A step that only locks a price is optional: a bet, not a deadline.
 //
@@ -11,7 +11,7 @@
 // offer-history.jsonl).
 //
 // "On sale", "new during the sale" and "the event ends" describe Warbonds, which are the sale offers. A Standard
-// upgrade is always available, so it only says "available now, no rush".
+// upgrade gets no urgency from a sale event.
 
 import { localToday, isDay, ongoingEvent } from './availability.mjs';
 
@@ -67,7 +67,7 @@ export function offerNote(overrides, from, to, today) {
  *   limitedUseful: false when the limitedTimeOffer flag is on nearly every offer and so tells nothing (see LIMITED_SATURATED); historyFrom: the day the offer history begins (offers first seen then were not new); avail: an availCtx (today, saleEvents); alert: the step's buy-before alert (routeAdvice); lock: the step only locks the target price.
  * @returns {{ bucket: 'today'|'norush'|'optional', reasons: Array<{ code: string, event?: object, until?: string }>, since: string|null, until: string|null, untilBy: 'event'|'note'|null, note: object|null }}
  * reasons codes: 'limited', 'new', 'event-ends', 'price', 'note-soon', 'note-ends', 'finish'. `since` = the day the offer first
- * appeared; `until` = when it is expected to end (your note, else the ongoing sale event's last day).
+ * appeared; `until` = the end date from your note or the RSI sale banner.
  */
 export function classifyPurchase(step, { avail = null, overrides = null, alert = null, lock = false, limitedUseful = true, historyFrom = null, finish = false } = {}) {
   const today = avail?.today ?? localToday();
@@ -101,16 +101,7 @@ export function classifyPurchase(step, { avail = null, overrides = null, alert =
   return { bucket: reasons.length ? 'today' : 'norush', reasons, ...base };
 }
 
-/**
- * Whether a later Standard step with a buy-before alert should be bought today after all: waiting costs
- * money, or it is only known on sale during an event that ends within SOON_DAYS days.
- * @returns {{ code: string, event?: object }|null} the reason, or null
- */
-export function promotingAlert(alert, avail = null) {
-  if (['pricier', 'gone'].includes(alert.reason) && alert.saves > 0) return { code: 'price' };
-  if (alert.reason === 'event' && alert.event) {
-    const today = avail?.today ?? localToday();
-    if (daysBetween(today, alert.event.to) <= SOON_DAYS) return { code: 'event-ends', event: { name: alert.event.name, to: alert.event.to } };
-  }
-  return null;
+/** Promote a later Standard step when waiting costs money. */
+export function promotingAlert(alert) {
+  return ['pricier', 'gone'].includes(alert.reason) && alert.saves > 0 ? { code: 'price' } : null;
 }

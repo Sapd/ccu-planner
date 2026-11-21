@@ -104,18 +104,16 @@ test('with nothing urgent the list ends with the explicit "nothing else" sentenc
   assert.equal(v.goals[0].noRushCount, 1);
 });
 
-test('a sale event ending within two days moves every on-sale row to Buy today; farther away it only says when it ends', () => {
+test('a sale event ending within two days promotes Warbond rows with the banner wording', () => {
   const offers = [wb(1, 2, 1500, { firstSeen: iso(2026, 11, 14) }), std(2, 4, 7500)];
   const goals = [{ name: 'Liberator', base: 1, target: 4, lock: 'off' }];
   const ev = (to) => ({ rev: 1, events: [{ id: 'e1', name: 'IAE 2956', from: '2026-11-14', to }] });
   const soon = todayView(world({ offers, goals, saleEvents: ev('2026-11-20') }), DAY);
-  // The later Standard step into Liberator is not bought: it is not proven to be sold only during events, and a Warbond
-  // can still fill its price range, so it waits for one.
   assert.deepEqual(rowsOf(soon).today, ['warbond:1-2']);
-  assert.deepEqual(soon.buyList.today[0].reasonTexts, ['IAE 2956 ends Nov 20']);
+  assert.deepEqual(soon.buyList.today[0].reasonTexts, ["RSI's banner says IAE 2956 ends Nov 20"]);
   const later = todayView(world({ offers, goals, saleEvents: ev('2026-12-02') }), DAY);
   assert.deepEqual(rowsOf(later).norush, ['warbond:1-2']);
-  assert.equal(later.buyList.norush[0].onSale, 'on sale since Nov 14 · sale ends Dec 2');
+  assert.equal(later.buyList.norush[0].onSale, "on sale since Nov 14 · RSI's banner: event ends Dec 2");
 });
 
 test('an offer that just appeared during a sale event is bought today', () => {

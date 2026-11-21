@@ -2,8 +2,7 @@
   import { t, tn } from '$logic/i18n.mjs';
   import { todayView } from './view/today.mjs';
   import { usd } from '$logic/format.mjs';
-  import { shortDay } from '$logic/availability.mjs';
-  import { noRouteMessage, eventRiskText, heroBuyTitle, heroGoalsLine, nothingWhyText, todayNothingHeadline, onlyOptionalText, BUY_GROUPS, waitingHeadline, meltTipText } from '$logic/describe.mjs';
+  import { noRouteMessage, heroBuyTitle, heroGoalsLine, nothingWhyText, todayNothingHeadline, onlyOptionalText, BUY_GROUPS, waitingHeadline, meltTipText } from '$logic/describe.mjs';
   import { incomingCount } from '$logic/planner.mjs';
   import { ui, goSection, openGoal } from './state.svelte.js';
   import GlassPanel from './ui/GlassPanel.svelte';
@@ -28,7 +27,6 @@
   const anyNoToken = $derived(v.goals.some((g) => g.status === 'no-token'));
   const noRouteTitle = (g) => noRouteMessage(name(g.targetId), incomingCount(app.graph, g.targetId));
 
-  const riskCount = $derived(v.waiting.notices.filter((n) => n.eventOnly).length);
   const NOTICE_LIMIT = 3;
   let showAllNotices = $state(false);
   const shownNotices = $derived(showAllNotices ? v.waiting.notices : v.waiting.notices.slice(0, NOTICE_LIMIT));
@@ -50,7 +48,7 @@
     <ShipHero ship={hero} height={110}>
         {#if v.hero.nothing}
           <h2 class="headline">{todayNothingHeadline(v.hero.nothingWhy)}</h2>
-          <p class="sub">{#if v.hero.nothingWhy === 'no-rush' && v.hero.otherCount > 0}{onlyOptionalText(v.hero.otherCount, usd(v.hero.otherCash))}{#if riskCount > 0 && v.waiting.event}{' '}{eventRiskText(riskCount, v.waiting.event)}{/if}{:else}{riskCount > 0 && v.waiting.event ? eventRiskText(riskCount, v.waiting.event) : nothingWhyText(v.hero.nothingWhy, { waitCount: v.waiting.count, anyNoRoute, anyNoToken })}{#if v.hero.otherLine}{' '}{v.hero.otherLine}{/if}{/if}</p>
+          <p class="sub">{#if v.hero.nothingWhy === 'no-rush' && v.hero.otherCount > 0}{onlyOptionalText(v.hero.otherCount, usd(v.hero.otherCash))}{:else}{nothingWhyText(v.hero.nothingWhy, { waitCount: v.waiting.count, anyNoRoute, anyNoToken })}{#if v.hero.otherLine}{` ${v.hero.otherLine}`}{/if}{/if}</p>
         {:else}
           <h2 class="headline">{heroBuyTitle(v.hero.buyCount, usd(v.hero.buyCash))}</h2>
           <p class="sub">{heroGoalsLine(v.hero.goalsTouched.map(goalName))}{#if v.hero.otherLine} · {v.hero.otherLine}{/if}</p>
@@ -72,7 +70,6 @@
     {#if v.waiting.count > 0}
       <GlassPanel class="waiting">
         <h2><button type="button" class="foldbtn" aria-expanded={goalsOpen} aria-controls="today-goals" onclick={() => { goalsOpen = !goalsOpen; }}><StateChip state="wait" /> {waitingHeadline(v.waiting.count, v.waiting.goals.length)} <span class="chev" aria-hidden="true">{goalsOpen ? '▾' : '▸'}</span></button></h2>
-        {#if v.waiting.event}<p class="event">{t('{event} ends {day}', { event: v.waiting.event.name, day: shortDay(v.waiting.event.to) })}</p>{/if}
         {#each shownNotices as n (n.from + '>' + n.to)}
           <p class="line">{name(n.from)} → {name(n.to)}: {n.text}</p>
         {/each}
@@ -103,7 +100,6 @@
   .more { margin-top: 6px; background: rgba(76, 194, 255, 0.14); border-color: rgba(76, 194, 255, 0.4); padding: 4px 14px; }
   .credit { color: var(--muted); font-size: 13px; }
   .buys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-  .event { font-weight: 600; margin-bottom: 4px; }
   .line { color: var(--muted); font-size: 13px; margin-top: 2px; }
   :global(.melt) { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   :global(.empty) { text-align: center; padding: 48px 16px; }

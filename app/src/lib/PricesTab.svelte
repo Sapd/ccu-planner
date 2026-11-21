@@ -79,25 +79,23 @@
   </GlassPanel>
 
   {#snippet availRow(r)}
-    <div class="row" data-avail={r.shipId} data-status={r.status}>
+    <div class="row" data-avail={r.shipId}>
       <span class="lbl"><ShipThumb ship={ships.get(r.shipId) ?? null} size="s" /><span>{r.name}: {availabilityText(r)}</span></span>
-      <select value={r.mark} onchange={(e) => markAvailability(r.shipId, e.currentTarget.value)} aria-label={t('Availability of {name}', { name: r.name })}>
-        <option value="auto">{t('auto')}</option>
-        <option value="regular">{t('regular')}</option>
-        <option value="event-only">{t('event-only')}</option>
+      <select value={r.confirmedOutsideEvents ? 'regular' : 'auto'} onchange={(e) => markAvailability(r.shipId, e.currentTarget.value)} aria-label={t('Melt confirmation for {name}', { name: r.name })}>
+        <option value="auto">{t('Use sync history')}</option>
+        <option value="regular">{t('Confirm seen outside sales')}</option>
       </select>
     </div>
   {/snippet}
 
   <GlassPanel>
     <h2>{t('Ship availability ({count})', { count: searching ? t('{shown} of {total}', { shown: availShown.length, total: avail.length }) : avail.length })}</h2>
-    <p class="muted">{t('Whether a ship is on sale all year (regular) or only during sales events. The planner learns this from your syncs; set it by hand only if it is wrong.')}</p>
+    <p class="muted">{t('Store sync observations. For melt suggestions, you can also confirm that you saw a ship in the store outside sales.')}</p>
     {#each split.known as r (r.shipId)}{@render availRow(r)}{:else}
-      <p class="muted">{searching && avail.length ? noMatchesText(query) : t('No ship has a verdict yet.')}</p>
+      <p class="muted">{searching && avail.length ? noMatchesText(query) : t('No ships seen in the store yet.')}</p>
     {/each}
     {#if split.unknown.length}
-      <Fold title={tn(split.unknown.length, '{n} ship not seen on sale often enough yet', '{n} ships not seen on sale often enough yet')} bind:open={unknownOpen}>
-        <p class="muted">{t('The planner treats these as unknown until a sync sees them on sale on several days. You can still mark one by hand.')}</p>
+      <Fold title={tn(split.unknown.length, '{n} ship not yet seen in the store', '{n} ships not yet seen in the store')} bind:open={unknownOpen}>
         {#each split.unknown as r (r.shipId)}{@render availRow(r)}{/each}
       </Fold>
     {/if}

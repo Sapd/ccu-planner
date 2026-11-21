@@ -1,6 +1,8 @@
 // What changed since the last sync: a snapshot of the shared plan is stored with every sync (plan-snapshots.json),
 // and the current plan is compared with the latest snapshot of older data. Pure: the CLI sync script writes the file.
 import { goalLabel } from './ships.mjs';
+import { hasSaleSync } from './availability.mjs';
+import { dayOfIso } from './urgency.mjs';
 
 export const SNAPSHOT_MAX = 30;
 
@@ -29,7 +31,11 @@ export function buildSnapshot(session, at = new Date().toISOString()) {
   }
   const msrp = {};
   for (const [id, s] of data?.ships ?? []) if (s.msrp != null) msrp[id] = s.msrp;
-  return { at, ...snapshotKey(session), total, goals, msrp, copies: (data?.owned ?? []).map((o) => o.copyId) };
+  // Ships with a Standard SKU on sale: lets a later comparison tell that a ship came back into the store, even the same day.
+  // Left out when the ships carry no store flag (then the sale history of the snapshot's day is used instead).
+  const flagged = [...(data?.ships ?? [])].filter(([, s]) => typeof s.standard === 'boolean');
+  const inStore = flagged.length ? flagged.filter(([, s]) => s.standard).map(([id]) => id) : undefined;
+  return { at, ...snapshotKey(session), total, goals, msrp, copies: (data?.owned ?? []).map((o) => o.copyId), ...(inStore ? { inStore } : {}) };
 }
 
 /**
@@ -66,7 +72,8 @@ export function withSnapshot(list, session, at = new Date().toISOString()) {
  * added and removed goals are listed apart with their cash. Only common goals with a different cash are in `goals`.
  * Causes, in this order: msrp { shipId, was, now } (a ship of a Standard step whose price changed), step-gone { step, from, to },
  * step-repriced { step, from, to, was, now } (the same offer at another price, no msrp change explains it), new-warbond { from, to, cash },
- * copy-gone / copy-new { from, to }, taken { from, to, by }, and when none applies order {} (the planning order changed) or none {}.
+ * in-store { shipId } (the target of a new Standard step returned), copy-gone / copy-new { from, to }, taken { from, to, by }.
+ * Fallbacks: order {} (planning order changed), shared {} (other goals have causes), or none {}.
  */
 export function changesSinceSync(session, snapshots) {
   const cur = stampsOf(session.data);
@@ -83,6 +90,17 @@ export function changesSinceSync(session, snapshots) {
   const common = Object.keys(now.goals).filter((id) => id in prev.goals);
   const prevOrder = Object.keys(prev.goals).filter((id) => id in now.goals);
   const orderChanged = JSON.stringify(prevOrder) !== JSON.stringify(common);
+  const history = session.data?.saleHistory;
+  const oldDay = dayOfIso(prev.storeAt);
+  const newDay = dayOfIso(cur.storeAt);
+  // Which ships were in the store at the old snapshot: its own record, else (older snapshots) the sale history of its day.
+  const prevInStore = Array.isArray(prev.inStore) ? new Set(prev.inStore) : null;
+  const canCheckArrival = prevInStore || (oldDay && newDay && oldDay < newDay && hasSaleSync(history, (day) => day === oldDay));
+  const cameBack = (shipId) => {
+    if (prevInStore) return !prevInStore.has(shipId) && session.data?.ships?.get(shipId)?.standard === true;
+    const days = history?.ships?.[shipId]?.onSaleDays ?? [];
+    return days.includes(newDay) && !days.includes(oldDay);
+  };
   // owned copy -> goal that uses it now
   const usedNow = new Map();
   for (const [id, g] of Object.entries(now.goals)) for (const s of g.route ?? []) if (s[4]) usedNow.set(s[4], id);
@@ -119,6 +137,16 @@ export function changesSinceSync(session, snapshots) {
     }
     const oldKeys = new Set(oldSteps.map(([from, to, kind]) => key(kind, from, to)));
     for (const [from, to, kind, cash] of newSteps) if (kind === 'warbond' && !oldKeys.has(key(kind, from, to))) causes.push({ kind: 'new-warbond', from, to, cash });
+    if (canCheckArrival) {
+      const arrived = new Set();
+      for (const [from, to, kind] of newSteps) {
+        if (kind !== 'standard' || oldStd.has(key(kind, from, to)) || arrived.has(to)) continue;
+        if (cameBack(to)) {
+          causes.push({ kind: 'in-store', shipId: to });
+          arrived.add(to);
+        }
+      }
+    }
     for (const [from, to, kind, , copyId] of oldSteps) if (kind === 'owned' && copyId && !inHangar.has(copyId)) causes.push({ kind: 'copy-gone', from, to });
     if (hadCopies) for (const [from, to, kind, , copyId] of newSteps) if (kind === 'owned' && copyId && !hadCopies.has(copyId)) causes.push({ kind: 'copy-new', from, to });
     if (!causes.length) {
@@ -127,8 +155,11 @@ export function changesSinceSync(session, snapshots) {
         if (by && by !== id) causes.push({ kind: 'taken', from, to, by: now.goals[by].name });
       }
     }
-    if (!causes.length) causes.push({ kind: orderChanged ? 'order' : 'none' });
     goals.push({ goalId: id, name: b.name, was: a.cash, now: b.cash, delta, causes });
+  }
+  const hasCause = goals.some((g) => g.causes.length > 0);
+  for (const g of goals) {
+    if (!g.causes.length) g.causes.push({ kind: orderChanged ? 'order' : hasCause ? 'shared' : 'none' });
   }
   const sum = (src, ids) => ids.reduce((n, id) => n + (src[id].cash ?? 0), 0);
   const was = sum(prev.goals, common);

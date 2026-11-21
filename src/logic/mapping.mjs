@@ -109,6 +109,10 @@ export function buildPlannerData(raw, aliases) {
     const byName = shipByName.get(norm(item.name));
     return byName ? { shipId: byName, method: 'name' } : null;
   };
+  const unknownItem = (items) => {
+    if (items.some((it) => shipByName.get(norm(it.name)) === null || (owners.get(it.id)?.length ?? 0) > 1)) return null;
+    return items[0]?.name;
+  };
 
   // Store offers.
   const offers = [];
@@ -142,10 +146,13 @@ export function buildPlannerData(raw, aliases) {
     const p = e.data;
     const u = p.upgrade;
     if (!u || u.parseError) continue;
-    const resolveOf = (items) => items.filter((it) => !EXTRA.test(it.name)).map((it) => ({ it, r: resolveItem(it) })).filter((x) => x.r);
+    const shipItems = (items) => items.filter((it) => !EXTRA.test(it.name));
+    const resolveOf = (items) => items.map((it) => ({ it, r: resolveItem(it) })).filter((x) => x.r);
     const uniqueShips = (list) => [...new Map(list.map((x) => [x.r.shipId, x])).values()];
-    const from = uniqueShips(resolveOf(u.match_items)).map((x) => x.r);
-    const to = uniqueShips(resolveOf(u.target_items));
+    const matchItems = shipItems(u.match_items);
+    const targetItems = shipItems(u.target_items);
+    const from = uniqueShips(resolveOf(matchItems)).map((x) => x.r);
+    const to = uniqueShips(resolveOf(targetItems));
     // RSI names hangar items its own way ("Hercules Starlifter M2"), but the pledge title uses the store's names
     // ("Upgrade - M2 Hercules to Liberator Warbond Edition"). A side the items cannot resolve takes the title's ship;
     // a side they resolve must agree with it.
@@ -158,11 +165,17 @@ export function buildPlannerData(raw, aliases) {
     if (fromTitle) fromId = title.from;
     if (toTitle) toId = title.to;
     if (fromId == null || toId == null || conflict) {
+      const unknownShip = !conflict && from.length <= 1 && to.length <= 1
+        ? (fromId == null ? unknownItem(matchItems) : null) ?? (toId == null ? unknownItem(targetItems) : null)
+        : null;
       review.push({
         pledgeId: p.pledgeId, name: p.name,
+        ...(unknownShip ? { unknownShip } : {}),
         // Review entries survive language switches with the mapped Hangar data.
         get reason() {
-          return conflict ? t('the item IDs and the title name different ships') : t('from matches {from}, ship targets {to}', { from: from.length, to: to.length });
+          if (conflict) return t('the item IDs and the title name different ships');
+          if (unknownShip) return t('RSI’s upgrade tool does not sell {name}. Plans cannot use this upgrade.', { name: unknownShip });
+          return t('from matches {from}, ship targets {to}', { from: from.length, to: to.length });
         },
         match: u.match_items, target: u.target_items,
         // The side that did resolve, so a plan can say which goal an unreadable upgrade may belong to.

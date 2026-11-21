@@ -1,19 +1,13 @@
-// Is a ship's Standard upgrade bought outside sale events too? Pure.
-//
-// During a sale event (e.g. IAE) many upgrades are buyable only because of it,
-// and stock flags do not tell (every on-sale ship has an unlimited-stock
-// Standard SKU). So availability is learned from the days a sync saw the ship
-// on sale (sale-history.json) against the sale events you maintain
-// (sale-events.json), and your own override wins.
-//
-// Dates are local calendar days 'YYYY-MM-DD'; ranges are inclusive. Callers pass
-// `today` in so results are deterministic.
+// Store observations from Standard SKUs, grouped by local sync day.
+// Sale event date ranges are inclusive and label observations on those days.
 
 import { loc, t } from './i18n.mjs';
-export const REGULAR_MIN_DAYS = 2; // distinct on-sale days outside every event ...
-export const REGULAR_MIN_GAP = 7; // ... whose earliest and latest are this many days apart
 export const MAX_HISTORY_DAYS = 365;
-export const AVAILABILITY = ['regular', 'event-only'];
+export const MELT_MIN_CLEAR_DAYS = 2; // sync days clear of every sale event before a melt is suggested
+
+/** 'YYYY-MM-DD' moved by n days. */
+const shiftDay = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+export const AVAILABILITY = ['regular'];
 
 /** The local calendar day of a Date as YYYY-MM-DD. */
 export function localToday(date = new Date()) {
@@ -29,7 +23,6 @@ export function isDay(s) {
   const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
   return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
 }
-const dayNumber = (s) => Date.parse(`${s}T00:00:00Z`) / 86400000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** '2026-11-27' -> 'Nov 27'. */
 export const shortDay = loc('shortDay', (s) => (isDay(s) ? `${MONTHS[+s.slice(5, 7) - 1]} ${+s.slice(8, 10)}` : String(s)));
@@ -42,60 +35,92 @@ const covers = (e, day) => e.from <= day && day <= e.to;
 /** The sale event that covers `today`, or null. */
 export const ongoingEvent = (saleEvents, today) => eventList(saleEvents).find((e) => covers(e, today)) ?? null;
 
+// Older histories recorded only positive observations, so their known sync days
+// are the union of those observations. New histories also record empty syncs.
+function syncDays(history) {
+  return [...new Set([
+    ...Object.keys(history?.syncs ?? {}),
+    ...Object.values(history?.ships ?? {}).flatMap((ship) => ship?.onSaleDays ?? []),
+  ])].filter(isDay).sort();
+}
+
+export const hasSaleSync = (history, matchesDay) => syncDays(history).some(matchesDay);
+
 /** The Standard SKU of a catalog ship is on sale (no title: any SKU that is not a Warbond). */
 export const hasStandardSku = (catalogShip) => (catalogShip?.skus ?? []).some((s) => s.available !== false && (s.title ? /standard/i.test(s.title) : true));
 
-/**
- * @param {number|string} shipId
- * @param {{ saleHistory?: object|null, saleEvents?: object|null, overrides?: object|null, today: string, standardNow?: boolean }} ctx
- *   standardNow false = no Standard SKU today (off-sale); leave it out when unknown.
- * @returns {{ status: 'regular'|'event-only'|'unknown'|'off-sale', override: boolean, daysOutside: number, firstSeen: string|null, lastSeen: string|null, event: object|null, sawIn: object|null }}
- */
-export function availability(shipId, { saleHistory = null, saleEvents = null, overrides = null, today, standardNow } = {}) {
+/** Observations for one ship. An unobserved last-sync state is null. */
+export function availability(shipId, { saleHistory, saleEvents, overrides, days = syncDays(saleHistory) } = {}) {
   const events = eventList(saleEvents);
-  const days = [...new Set(saleHistory?.ships?.[shipId]?.onSaleDays ?? [])].filter(isDay).sort();
-  const outside = days.filter((d) => !events.some((e) => covers(e, d)));
-  const base = {
-    daysOutside: outside.length, firstSeen: days[0] ?? null, lastSeen: days.at(-1) ?? null,
-    event: ongoingEvent(saleEvents, today),
-    sawIn: events.find((e) => days.length && covers(e, days.at(-1))) ?? null, // the event of the latest sale day
+  const seen = [...new Set(saleHistory?.ships?.[shipId]?.onSaleDays ?? [])].filter(isDay).sort();
+  const seenSet = new Set(seen);
+  const lastSyncDay = days.at(-1) ?? null;
+  const lastSyncAt = saleHistory?.syncs?.[lastSyncDay] ?? null;
+  // A ship can be seen earlier on a day and missing at that day's last sync.
+  const latestIds = Object.hasOwn(saleHistory?.syncs ?? {}, lastSyncDay) ? saleHistory.lastSyncShipIds : null;
+  const inStore = lastSyncDay == null ? null : latestIds ? latestIds.some((id) => String(id) === String(shipId)) : seenSet.has(lastSyncDay);
+  let sinceIndex = days.length - 1;
+  if (inStore) while (sinceIndex > 0 && seenSet.has(days[sinceIndex - 1])) sinceIndex--;
+  const seenOutsideEvents = seen.some((day) => !events.some((e) => covers(e, day)));
+  // For melting (irreversible) only: sync days clear of every event by a day on each side, since RSI's banner dates
+  // have no time zone. Needs recorded events at all, at least two such days, and the ship in the store at the last sync.
+  const clearDays = seen.filter((day) => !events.some((e) => shiftDay(e.from, -1) <= day && day <= shiftDay(e.to, 1))).length;
+  const meltSafe = events.length > 0 && inStore === true && clearDays >= MELT_MIN_CLEAR_DAYS;
+  return {
+    inStore, lastSyncDay, lastSyncAt,
+    since: inStore ? days[sinceIndex] : null,
+    previousMiss: inStore ? days[sinceIndex - 1] ?? null : null,
+    lastSeen: seen.at(-1) ?? null,
+    seenDays: seen.length,
+    seenOutsideEvents,
+    // A label for the observations when a single event covers all of them.
+    seenIn: seen.length && !seenOutsideEvents ? events.find((e) => seen.every((day) => covers(e, day))) ?? null : null,
+    confirmedOutsideEvents: overrides?.ships?.[shipId]?.availability === 'regular',
+    meltSafe,
   };
-  const ov = overrides?.ships?.[shipId]?.availability;
-  if (AVAILABILITY.includes(ov)) return { ...base, status: ov, override: true };
-  if (standardNow === false) return { ...base, status: 'off-sale', override: false };
-  if (outside.length >= REGULAR_MIN_DAYS && dayNumber(outside.at(-1)) - dayNumber(outside[0]) >= REGULAR_MIN_GAP) return { ...base, status: 'regular', override: false };
-  // Only ever seen on event days, and one of those events is over: it did not stay on sale.
-  if (days.length && !outside.length && events.some((e) => e.to < today && days.some((d) => covers(e, d)))) return { ...base, status: 'event-only', override: false };
-  return { ...base, status: 'unknown', override: false };
 }
 
-/**
- * The inputs availability() needs, from an app/CLI state: sale history lives in
- * the data, the events document and overrides may be newer than that data.
- */
+/** The history and event dates may come from different revisions of app state. */
 export function availCtx({ data, saleEvents, overrides }, today = localToday()) {
-  return { saleHistory: data?.saleHistory ?? null, saleEvents: saleEvents ?? data?.saleEvents ?? null, overrides: overrides ?? null, today, ships: data?.ships ?? null };
+  let saleHistory = data?.saleHistory ?? null;
+  let days = syncDays(saleHistory);
+  // The catalog also records an observation. Use it if a legacy or interrupted
+  // sync wrote the catalog without recording its timestamp in sale history.
+  const catalogAt = data?.meta?.catalogAt;
+  const catalogTime = Date.parse(catalogAt);
+  if (data?.ships && Number.isFinite(catalogTime)) {
+    const day = localToday(new Date(catalogTime));
+    const latestDay = days.at(-1);
+    const recordedAt = saleHistory?.syncs?.[latestDay];
+    if ((!latestDay || day >= latestDay) && (!recordedAt || catalogTime > Date.parse(recordedAt))) {
+      const shipIds = [...data.ships].filter(([, ship]) => ship.standard).map(([id]) => id);
+      saleHistory = appendSaleHistory(saleHistory, shipIds, day, catalogAt);
+      days = syncDays(saleHistory);
+    }
+  }
+  return { saleHistory, saleEvents: saleEvents ?? data?.saleEvents ?? null, overrides, today, days };
 }
 
-/** availability() for a ship id through an availCtx (adds standardNow from the ships map). With no ctx the ship is unknown. */
-export function shipAvailability(ctx, shipId) {
-  if (!ctx) return { status: 'unknown', override: false, daysOutside: 0, firstSeen: null, lastSeen: null, event: null };
-  const ship = ctx.ships?.get(shipId);
-  return availability(shipId, { ...ctx, standardNow: ship ? ship.standard : undefined });
-}
+export const shipAvailability = (ctx, shipId) => availability(shipId, ctx ?? undefined);
 
 /** Ids of the catalog ships with a Standard SKU on sale: the set one sync records for today. */
 export const onSaleShipIds = (catalogShips) => (catalogShips ?? []).filter(hasStandardSku).map((s) => s.id);
 
-/** Sale history with today's date added for every ship id in `shipIds`; at most MAX_HISTORY_DAYS newest days per ship. */
-export function appendSaleHistory(history, shipIds, today) {
+/** Record positive observations for the day and the full set at the latest sync. */
+export function appendSaleHistory(history, shipIds, today, at = null) {
   const ships = { ...(history?.ships ?? {}) };
   for (const id of shipIds) {
     const days = new Set(ships[id]?.onSaleDays ?? []);
     days.add(today);
     ships[id] = { ...ships[id], onSaleDays: [...days].sort().slice(-MAX_HISTORY_DAYS) };
   }
-  return { ...history, ships };
+  const syncs = { ...history?.syncs, [today]: at };
+  const latest = Object.keys(syncs).sort().slice(-MAX_HISTORY_DAYS);
+  return {
+    ...history, ships,
+    syncs: Object.fromEntries(latest.map((day) => [day, syncs[day]])),
+    lastSyncShipIds: [...shipIds],
+  };
 }
 
 // ----- sale events (pure edits; the caller saves the document) -----

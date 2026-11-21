@@ -5,7 +5,7 @@
   import { BarChart } from 'echarts/charts';
   import { GridComponent, TooltipComponent } from 'echarts/components';
   import { CanvasRenderer } from 'echarts/renderers';
-  import { meltHeadline, meltHeadlinePlain, meltEventHint, noEventsNoticeApp, meltWithoutNote, MELT_IDLE_APP, MELT_NOTE, meltPlanLinesApp, meltPickLineApp, meltReasonPlain, MELT_CANDIDATE_PLAIN, noMatchesText } from '$logic/describe.mjs';
+  import { meltHeadline, meltHeadlinePlain, noEventsNoticeApp, meltWithoutNote, MELT_IDLE_APP, MELT_NOTE, meltPlanLinesApp, meltPickLineApp, meltReasonPlain, MELT_CANDIDATE_PLAIN, noMatchesText } from '$logic/describe.mjs';
   import { shipName, goalLabel } from '$logic/ships.mjs';
   import { parseCreditUsd } from './view/explorer.mjs';
   import { candidateBars, meltView } from './view/hangar.mjs';
@@ -92,7 +92,6 @@
   <p class="head">{meltHeadlinePlain({ count: p.candidates.length, credit: p.candidateCredit })}</p>
   <div class="how"><Fold title={t('How we decide')}><p class="muted">{meltHeadline(p, view.hasOverrides)}</p></Fold></div>
   {#if noEventsNoticeApp(app.saleEvents)}<p class="warn" data-hint="no-events">{noEventsNoticeApp(app.saleEvents)} <button type="button" onclick={() => { ui.storeTab = 'upgrades'; goSection('store'); }}>{t('Open Store')}</button></p>{/if}
-  {#if view.hintEvent}<p class="muted" data-hint="event">{meltEventHint(view.hintEvent)}</p>{/if}
   {#if meltWithoutNote(view.without)}<p class="muted">{meltWithoutNote(view.without)}</p>{/if}
 
   <label class="credit">{t('Store credit available $')}

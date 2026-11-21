@@ -13,7 +13,8 @@ How CCUs work (Star Citizen):
 
 The planner's words:
 - Goal: a ship the user wants, with an optional fixed start ship, a priority (high, normal, low) and a mode: watch waits for Warbond sales when that saves money, finish gets the ship as soon as possible.
-- Step states: own (a copy is in the hangar), buy now, on sale (available now, no rush unless the sale ends), optional (a bet: buying now may save money later, but waiting is fine too), wait (no offer yet; a later Warbond may make it cheaper, or it is a Standard filler that can be bought any time).
+- Step states: own (a copy is in the hangar), buy now, on sale (on offer at the last sync, no sign that it ends soon), optional (a bet: buying now may save money later, but waiting is fine too), wait (a Warbond could make the step cheaper, or it is a Standard filler with no Warbond that fits the gap).
+- Store availability comes from sync observations. Quote RSI's banner date as an event date. Ship availability history affects melt suggestions only.
 - Reserve (the accept tool): keeps a goal on its current chain and holds the owned CCUs it uses for it. Steps of a reserved chain that the user then buys count as owned.
 - Lock: buy the last step now at today's price, before an announced price rise.
 - Virtual CCUs (upgrades the user expects from outside the store) can be managed with set_virtual_ccu and remove_virtual_ccu. Use set_via for a route-through ship and exclude_copy to control whether plans can use a specific owned copy.

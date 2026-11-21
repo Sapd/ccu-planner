@@ -95,7 +95,7 @@ With plan changes enabled:
 | `set_mode` | Set a goal to watch for savings or finish as soon as possible. |
 | `set_objective` | Rank routes by least new money (cash) or total purchase cost plus the cost of consumed owned CCUs (allin). |
 | `set_priority` | Set a goal’s planning priority to high, normal or low. |
-| `set_availability` | Mark a ship as regular or event-only, or clear the mark to use observed availability. |
+| `set_availability` | Confirm a ship was seen in the store outside sales (`regular`), or clear the confirmation. This affects melt suggestions. |
 | `set_offer_end` | Record when a pair’s offer ends. Give a calendar day, soon, or clear to remove the note. |
 | `add_sale_event` | Add a named store sale with inclusive start and end dates. |
 | `remove_sale_event` | Remove a user-created store sale event by ID. |

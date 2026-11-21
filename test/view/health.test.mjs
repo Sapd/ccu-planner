@@ -3,18 +3,24 @@ import assert from 'node:assert/strict';
 import { hangarHealth } from '../../app/src/lib/view/health.mjs';
 
 const goal = (name, targetId, steps = []) => ({ goalId: name, name, targetId, journey: { steps: steps.map(([from, to, state]) => ({ state, step: { from, to } })) } });
+const reward = { pledgeId: 3918, fromShip: 270, toShip: null, unknownShip: 'F7A Hornet Mk II' };
 
 test('no banner when every hangar upgrade was read', () => {
   assert.equal(hangarHealth({ review: [], owned: [{}] }, [goal('Liberator', 224)]), null);
   assert.equal(hangarHealth(null, []), null);
 });
 
+test('no banner when the review entries only involve ships outside the upgrade tool', () => {
+  assert.equal(hangarHealth({ review: [reward], owned: [{}] }, [goal('Hornet', 270)]), null);
+});
+
 test('names the goals that buy into or out of a ship an unreadable upgrade touches, or target it', () => {
-  const data = { review: [{ pledgeId: 9, fromShip: null, toShip: 224 }, { pledgeId: 10, fromShip: 50, toShip: null }], owned: [{}, {}, {}] };
+  const data = { review: [{ pledgeId: 9, fromShip: null, toShip: 224 }, { pledgeId: 10, fromShip: 50, toShip: null }, reward], owned: [{}, {}, {}] };
   const h = hangarHealth(data, [
     goal('Liberator', 224),
     goal('Carrack', 176, [[50, 60, 'now']]),
     goal('Polaris', 300, [[50, 60, 'own'], [60, 300, 'wait']]), // only an owned step touches ship 50
+    goal('Hornet', 270),
   ]);
   assert.deepEqual(h.goals, ['Liberator', 'Carrack']);
   assert.equal(h.key, '10,9'); // the same set of upgrades gives the same key, so a dismissal holds until it changes

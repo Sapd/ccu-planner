@@ -6,7 +6,6 @@
 import { t } from './i18n.mjs';
 import { splitRoute, lockDecision } from './lock.mjs';
 import { expectedChanges } from './priceChange.mjs';
-import { shipAvailability } from './availability.mjs';
 import { buyBeforeText, lockCoveredText } from './describe.mjs';
 import { classifyPurchase, promotingAlert, isSaturated, dayOfIso } from './urgency.mjs';
 
@@ -21,11 +20,11 @@ const NO_LOCK = Object.freeze({ reason: null, cover: null, covered: false, cover
  * @returns {{
  *   finish: boolean,
  *   dec: { reason: string|null, cover: object|null, covered: boolean, coveredStep: object|null, lock: boolean },
- *   lockCode: string|null, lockEvent: object|null, coverText: string|null,
+ *   lockCode: string|null, coverText: string|null,
  *   split: ReturnType<typeof splitRoute>,
  *   skip: object[],
  *   groups: { buyNow: object[], lockNow: object[], later: object[], owned: object[] },
- *   alerts: Array<{ step: object, reason: string, now: number, expected: number|null, saves?: number, together?: boolean, event?: object, text: string }>,
+ *   alerts: Array<{ step: object, reason: string, now: number, expected: number|null, saves?: number, together?: boolean, text: string }>,
  *   buys: Array<{ step: object, bucket: 'today'|'norush'|'optional', lock: boolean, promoted: boolean, reasons: object[], since: string|null, until: string|null, untilBy: string|null, note: object|null }>,
  *   cheaper: object[], changes: object, laterExpected: number,
  * }}
@@ -43,7 +42,7 @@ const NO_LOCK = Object.freeze({ reason: null, cover: null, covered: false, cover
  */
 export function routeAdvice(session, chain, route, { ships = null, overrides = null, expected = [], avail = null, limitedShare = null, historyStart = null } = {}) {
   const finish = chain?.mode === 'finish';
-  const dec = chain && !finish ? lockDecision(session, chain, route, { ships, overrides, avail }) : NO_LOCK;
+  const dec = chain && !finish ? lockDecision(session, chain, route, { ships, overrides }) : NO_LOCK;
   const split = splitRoute(route, { lock: dec.lock });
   const skip = [...split.lockNow, ...(dec.coveredStep ? [dec.coveredStep] : [])];
   const groups = finish
@@ -63,9 +62,8 @@ export function routeAdvice(session, chain, route, { ships = null, overrides = n
   const historyFrom = dayOfIso(historyStart ?? session?.data?.meta?.historyFrom ?? null);
   return {
     finish, dec, lockCode, split, skip, groups,
-    lockEvent: lockCode === 'event' ? shipAvailability(avail, chain.target).event : null,
     coverText: dec.covered ? lockCoveredText(name(dec.cover.from), name(chain.target), dec.cover.extraCash) : null,
-    get changes() { return (changes ??= expectedChanges(route, expected, ships, avail, waitCtx)); },
+    get changes() { return (changes ??= expectedChanges(route, expected, ships, waitCtx)); },
     get alerts() {
       return (alerts ??= this.changes.buyBefore.filter((a) => !skip.includes(a.step)).map((a) => ({ ...a, text: buyBeforeText(a, { name }) })));
     },
@@ -75,7 +73,7 @@ export function routeAdvice(session, chain, route, { ships = null, overrides = n
         const alert = this.alerts.find((a) => a.step === s) ?? null;
         const c = () => classifyPurchase(s, { avail, overrides, alert, lock, limitedUseful: limitedUseful(s.kind), historyFrom, finish });
         if (lock || groups.buyNow.includes(s)) return [{ step: s, lock, promoted: false, ...c() }];
-        const why = s.kind === 'standard' && alert ? promotingAlert(alert, avail) : null;
+        const why = s.kind === 'standard' && alert ? promotingAlert(alert) : null;
         return why ? [{ step: s, lock: false, promoted: true, ...c(), bucket: 'today', reasons: [why] }] : [];
       }));
     },

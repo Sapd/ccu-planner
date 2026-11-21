@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildGraph } from '../src/logic/planner.mjs';
 import { newState, addChain } from '../src/logic/chains.mjs';
 import { decisionGraph, decisionMemo, versusText } from '../src/logic/decision.mjs';
-import { noRouteMessage, eventLockWhy } from '../src/logic/describe.mjs';
+import { noRouteMessage } from '../src/logic/describe.mjs';
 
 const TODAY = '2026-11-20';
 const ships = (concepts = []) => new Map([[1, 5000], [2, 7500], [3, 10000], [4, 15000]].map(([id, msrp]) => [id, { id, name: 'ABCD'[id - 1], msrp, concept: concepts.includes(id) }]));
@@ -33,7 +33,7 @@ test('routes sharing their first step merge into one edge; alternatives carry th
   assert.equal(alt.delta, 3500);
   assert.deepEqual(g.steps.map((s) => [s.from, s.to, s.chosen.kind]), [[1, 2, 'owned'], [2, 4, 'warbond']]);
   assert.equal(g.steps[0].decision, 'Use your owned CCU (paid $5): free now.');
-  assert.match(g.steps[1].decision, /^Buy Warbond \$40 now: \$35 less than Standard; Warbonds can vanish\.$/);
+  assert.match(g.steps[1].decision, /^Buy Warbond \$40 now: \$35 less than Standard\.$/);
   assert.deepEqual(g.nodes.filter((n) => n.onBest).map((n) => [n.id, n.layer]), [[1, 0], [2, 1], [4, 2]]);
 });
 
@@ -76,18 +76,18 @@ test('a concept target with lock auto locks the last step', () => {
   assert.equal(step.options.find((o) => o.chosen).why, 'concept: lock now');
 });
 
-test('a Standard step into a ship sold only during events locks now during the ongoing event', () => {
-  const event = { id: 'e1', name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' };
-  const app = build({ offers: [std(1, 2)], target: 2, saleEvents: { rev: 1, events: [event] }, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-15'] } } }, availability: { 2: { availability: 'event-only' } } });
-  const [step] = run(app).steps;
-  assert.equal(step.options.find((o) => o.chosen).why, eventLockWhy(event));
-  assert.match(step.decision, /IAE 2956/);
-  assert.match(step.decision, /saves waiting for the next event/);
-  // Only seen during this event so far (not proven event-only): nothing is locked.
-  const unknown = build({ offers: [std(1, 2)], target: 2, saleEvents: { rev: 1, events: [event] }, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-15'] } } } });
-  assert.doesNotMatch(run(unknown).steps[0].decision, /lock/i);
-  // Outside the event nothing is locked.
-  assert.doesNotMatch(run(app, { today: '2026-12-05' }).steps[0].decision, /lock/i);
+test('a Standard step describes the store observations before and after the event', () => {
+  const app = build({
+    offers: [std(1, 2)], target: 2,
+    saleEvents: { events: [{ id: 'e1', name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' }] },
+    saleHistory: { ships: { 1: { onSaleDays: ['2026-11-20'] }, 2: { onSaleDays: ['2026-11-21'] } } },
+  });
+  for (const today of ['2026-11-26', '2026-11-28']) {
+    const [step] = run(app, { today }).steps;
+    assert.match(step.decision, /^Buy Standard .* later\. Store credit works\./);
+    assert.match(step.decision, /In the store since Nov 21; not there at the Nov 20 sync/);
+    assert.equal(step.options.find((o) => o.chosen).why, 'chosen');
+  }
 });
 
 test('no route: verdict carries the no-route wording and the graph is empty', () => {
@@ -129,11 +129,12 @@ test('all-in objective: a free owned copy that lost says its paid basis made it 
   assert.equal(run(app).steps[0].chosen.kind, 'owned');
 });
 
-test('a Standard step bought later only claims it stays on sale for a regular ship', () => {
+test('a manual melt confirmation does not change the Standard decision', () => {
   const app = build({ offers: [std(1, 2), std(2, 3)], target: 3 });
-  assert.match(run(app).steps[0].decision, /^Buy Standard \$25 later: a Warbond may replace it; not yet known to stay on sale outside sale events\.$/);
+  const before = run(app).steps[0].decision;
+  assert.equal(before, 'Buy Standard $25 later. Store credit works.');
   app.overrides = { ships: { 2: { availability: 'regular' } } };
-  assert.equal(run(app).steps[0].decision, 'Buy Standard $25 later: it stays on sale and a Warbond may replace it.');
+  assert.equal(run(app).steps[0].decision, before);
 });
 
 test('the memo key follows plans, overrides and sale-event revisions and the graph', () => {

@@ -5,8 +5,7 @@
 //   - not reserved by an accepted chain and not protected by you
 //   - meltable on RSI and its paid value is known
 //   - a Standard offer for the exact same pair exists today (rebuyable)
-//   - its target ship is known to be on sale outside sale events (availability
-//     'regular'): during an event many upgrades are buyable only because of it
+//   - its target was seen or manually confirmed in the store outside sale events
 //   - that Standard price <= what the copy cost (saving <= 0)
 //   - it carries no extras (insurance, paint, ...)
 //   - it does not lead into a concept ship (those rise in price before release)
@@ -28,24 +27,13 @@ export const KEEP = {
   PROTECTED: 'protected',
   NOT_MELTABLE: 'not meltable',
   UNKNOWN_PRICE: 'paid value unknown',
-  NOT_REBUYABLE: 'no Standard offer today (cannot be bought again)',
-  EVENT_ONLY: 'buyable only during sale events (e.g. IAE 2956) as far as we know',
-  UNKNOWN_AVAIL: 'not known to stay on sale after <event> (seen on sale only during it)',
-  UNKNOWN_HISTORY: 'not known to stay on sale outside sale events (too little sale history)',
+  NOT_REBUYABLE: 'no Standard offer for this upgrade at the last sync',
+  NO_OUTSIDE_OBSERVATION: 'not yet seen in the store on two syncs clear of any sale',
   SAVES: 'cheaper than the store today',
   SAVES_LATER: 'will save after an expected price change',
   CONCEPT: 'into a concept ship (its price rises before release)',
   EXTRAS: 'carries extras',
 };
-
-/** Keep reason for a target whose availability is not 'regular', or null when it is. */
-export function availabilityKeep(a) {
-  if (a.status === 'regular') return null;
-  if (a.status === 'off-sale') return KEEP.NOT_REBUYABLE;
-  if (a.status === 'event-only') return KEEP.EVENT_ONLY;
-  const event = a.event ?? a.sawIn ?? null;
-  return event ? KEEP.UNKNOWN_AVAIL.replace('<event>', event.name) : KEEP.UNKNOWN_HISTORY;
-}
 
 /** The cheapest Standard price per pair, Map 'from-to' -> cents: what the same upgrade costs today. */
 export const standardPrices = (offers) => {
@@ -76,19 +64,18 @@ export function classifyCopies({ owned, offers, ships = null }, state, { protect
     const stdExp = standardExp.get(k) ?? null;
     const savingExp = stdExp != null && paid != null ? stdExp - paid : null;
     const targetAvail = shipAvailability(avail, c.to);
-    const gate = availabilityKeep(targetAvail);
     let keep = null;
     if (reserved.has(c.copyId)) keep = `${KEEP.RESERVED} ${goalName(reserved.get(c.copyId))}`;
     else if (protect.has(c.copyId)) keep = KEEP.PROTECTED;
     else if (!c.meltable) keep = KEEP.NOT_MELTABLE;
     else if (paid == null) keep = KEEP.UNKNOWN_PRICE;
     else if (std == null) keep = KEEP.NOT_REBUYABLE;
-    else if (gate) keep = gate;
+    else if (!targetAvail.meltSafe && !targetAvail.confirmedOutsideEvents) keep = KEEP.NO_OUTSIDE_OBSERVATION;
     else if (saving > 0) keep = `${KEEP.SAVES} (${usd(saving)})`;
     else if (savingExp > 0) keep = `${KEEP.SAVES_LATER} (${usd(savingExp)})`;
     else if (ships?.get(c.to)?.concept) keep = KEEP.CONCEPT;
     else if ((c.extras ?? []).length) keep = `${KEEP.EXTRAS}: ${c.extras.join(', ')}`;
-    return { copy: c, paid, standardNow: std, saving, standardExpected: stdExp, savingExpected: savingExp, candidate: keep == null, keep, availability: targetAvail.status };
+    return { copy: c, paid, standardNow: std, saving, standardExpected: stdExp, savingExpected: savingExp, candidate: keep == null, keep };
   });
 }
 

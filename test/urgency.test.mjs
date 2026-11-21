@@ -48,14 +48,14 @@ test('an old Warbond seen 5 days ago with no event end is on sale with no rush, 
   assert.equal(c.until, null);
 });
 
-test('(c) a sale event that ends within two days makes its offers urgent; three days is no rush', () => {
+test('(c) a sale event that ends within two days makes its Warbond offers urgent; three days is no rush', () => {
   const c = classifyPurchase(step(), { avail: { today: TODAY, saleEvents: event('2026-11-20') } });
   assert.equal(c.bucket, 'today');
   assert.deepEqual(c.reasons, [{ code: 'event-ends', event: { name: 'IAE 2956', to: '2026-11-20' } }]);
   assert.equal(classifyPurchase(step(), { avail: { today: TODAY, saleEvents: event('2026-11-21') } }).bucket, 'today');
   const far = classifyPurchase(step(), { avail: { today: TODAY, saleEvents: event('2026-11-22') } });
   assert.equal(far.bucket, 'norush');
-  assert.equal(far.until, '2026-11-22', 'the event end is shown as "sale ends"');
+  assert.equal(far.until, '2026-11-22');
   assert.equal(far.untilBy, 'event');
 });
 

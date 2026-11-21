@@ -27,8 +27,12 @@
 </script>
 
 <div class="saleevents">
-  <p class="muted">{t('Upgrades bought only because of an event may disappear after it. Events marked "CCU Planner feed" are kept up to date for you; an event you add with the same name or dates replaces the feed\'s.')}</p>
-  <div class="how"><Fold title={t('How we decide')}><p class="muted">{t('Melt and buy-later treat a ship as regular only once a sync saw it on sale on at least 2 days, 7 or more days apart, outside every event.')}</p></Fold></div>
+  <p class="muted">{t('Sale dates label store observations. Events marked "CCU Planner feed" are kept up to date for you; an event you add with the same name or dates replaces the feed\'s.')}</p>
+  <div class="how">
+    <Fold title={t('How we decide')}>
+      <p class="muted">{t('Melt suggestions require a Standard offer for the same upgrade and the target ship in the store at the last sync and on two sync days clear of all recorded sales (a day around each sale counts as part of it). You can also confirm it in Price assumptions.')}</p>
+    </Fold>
+  </div>
   {#if feedStale}<p class="note" data-hint="feed-stale">{t('The CCU Planner feed has not been updated since {date}, so its sale events may be out of date. Add events yourself if you know of one.', { date: ui.feed.generatedAt.slice(0, 10) })}</p>{/if}
   {#if noEventsNoticeStore(app.saleEvents)}<p class="note" data-hint="no-events">{noEventsNoticeStore(app.saleEvents)}</p>{/if}
   {#each events as ev (ev.id)}

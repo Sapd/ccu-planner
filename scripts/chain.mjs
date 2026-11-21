@@ -12,7 +12,7 @@
 //   chain melt [--protect id,id]    which unused CCUs to melt to cover finish chains
 //   chain event | chain event add "<name>" <from> <to> | chain event rm <id>
 //                                   sale events (dates YYYY-MM-DD, inclusive); upgrades bought only during one may vanish after it
-//   chain avail <ship> [regular|event-only|clear]   is the ship's Standard upgrade bought outside sale events? (no value: show it)
+//   chain avail <ship> [regular|clear]   show store observations or confirm a sighting outside sales for melt
 //   chain changes                   what changed since the last sync (needs plan-snapshots.json, written by scripts/sync.mjs)
 //   chain warbonds [--hours 24]     Warbonds that appeared recently and which chains use them
 //   chain wanted [<id>] [--top 12] [--slack 10]   which new Warbonds would help, and below what price
@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { meltPlan } from '../src/logic/melt.mjs';
+import { t } from '../src/logic/i18n.mjs';
 import { availCtx, localToday, shipAvailability } from '../src/logic/availability.mjs';
 import { hasPriceOverrides } from '../src/logic/prices.mjs';
 import { buildGraph } from '../src/logic/planner.mjs';
@@ -182,7 +183,7 @@ switch (cmd) {
           const later = hasOverrides ? adv.laterExpected : sp.standardLater;
           console.log(`    waiting: later ${usd(sp.standardLater)} Standard${later !== sp.standardLater ? ` (${usd(later)} at your expected prices)` : ''} (${sp.later.length} bridge(s) a future Warbond could replace)`);
           if (why) {
-            const because = why === 'expected' ? `you expect ${usd(overrides.ships[c.target].msrp)}` : why === 'on' ? 'lock on' : why === 'event' ? `${shipAvailability(avail(), c.target).event.name} is on and ${name(c.target)} is not known to stay on sale after it` : 'concept ship, price rises before release';
+            const because = why === 'expected' ? `you expect ${usd(overrides.ships[c.target].msrp)}` : why === 'on' ? 'lock on' : 'concept ship, price rises before release';
             if (dec.covered) console.log(`    ${adv.coverText}`);
             else if (sp.lockNow.length) console.log(`    lock now: ${name(sp.lockNow[0].from)} -> ${name(c.target)} ${usd(sp.lockCash)} Standard (store credit can pay it; ${because})`);
             else if (sp.lockedBy) console.log(`    target locked: ${sp.lockedBy.kind === 'owned' ? `owned CCU` : `Warbond ${usd(sp.lockedBy.cash)} in buy now`} into ${name(c.target)} (${because})`);
@@ -214,7 +215,7 @@ switch (cmd) {
     run({ type: 'setLock', chainId: getChain(id).id, value: args[2] });
     // The same lock decision every page uses; a goal without a route has none, so its lock reason alone says it.
     const adv = sess().advice(id, { day: today });
-    const why = adv ? adv.dec.reason : lockReason(state.chains[id], ships, overrides, avail());
+    const why = adv ? adv.dec.reason : lockReason(state.chains[id], ships, overrides);
     console.log(`${id} lock ${args[2]}: ${why ? 'buys its last step into the target now while waiting' : 'keeps its last step for later'}`);
     break;
   }
@@ -245,7 +246,7 @@ switch (cmd) {
     }
     for (const e of planning().events) console.log(`sale event ${e.id}: ${e.name} ${e.from} to ${e.to}${e.source === 'feed' ? ' (from the feed)' : ''}`);
     for (const [sid, o] of Object.entries(overrides.ships)) {
-      if (o.availability) console.log(`${name(Number(sid))}: ${availabilityText(shipAvailability(avail(), Number(sid)))}`);
+      if (o.availability === 'regular') console.log(`${name(Number(sid))}: ${t('Confirmed seen in the store outside sales.')}`);
     }
     break;
   }
@@ -276,15 +277,16 @@ switch (cmd) {
     break;
   }
   case 'avail': {
-    if (!id) { console.error('usage: chain avail <ship> [regular|event-only|clear]'); process.exit(2); }
+    if (!id) { console.error('usage: chain avail <ship> [regular|clear]'); process.exit(2); }
     const ship = findShip(ships, id);
     if (!ship) { console.error(`unknown ship ${id}`); process.exit(2); }
     const value = args[2];
     if (value === 'clear') run({ type: 'clearAvailability', shipId: ship.id });
     else if (value) {
-      try { run({ type: 'setAvailability', shipId: ship.id, value, note: opt('note', undefined) }); } catch (e) { console.error(`${e.message}\nusage: chain avail <ship> regular|event-only|clear`); process.exit(2); }
+      try { run({ type: 'setAvailability', shipId: ship.id, value, note: opt('note', undefined) }); } catch (e) { console.error(`${e.message}\nusage: chain avail <ship> regular|clear`); process.exit(2); }
     }
-    console.log(`${ship.name}: ${availabilityText(shipAvailability(avail(), ship.id))}`);
+    const facts = shipAvailability(avail(), ship.id);
+    console.log(`${ship.name}: ${availabilityText(facts)}${facts.confirmedOutsideEvents ? ` ${t('Confirmed seen in the store outside sales.')}` : ''}`);
     break;
   }
   case 'melt': {
@@ -342,7 +344,7 @@ switch (cmd) {
       }
       if (w.holding.length) {
         const sp = w.best ? routeAdvice(null, null, w.best).split : { standardLater: 0 };
-        console.log(`  On sale today, not on the best route but at most ${usd(slack)} more (they vanish when the sale ends; an unused one melts back to its price as store credit, which this chain's ${usd(sp.standardLater)} of later Standard steps could use):`);
+        console.log(`  On sale today, not on the best route but at most ${usd(slack)} more (an unused one melts back to its price as store credit, which this chain's ${usd(sp.standardLater)} of later Standard steps could use):`);
         for (const h of w.holding) console.log(`    ${name(h.from)} -> ${name(h.to)}: WB ${usd(h.cash)} (Standard ${usd(h.standard)}) · route ${usd(h.extra)} more today`);
       }
     }

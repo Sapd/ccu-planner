@@ -62,7 +62,32 @@ test('a title that names other ships than the resolved items goes to review, wit
   assert.ok(!data.owned.some((o) => o.copyId === '9101'));
   const r = data.review.find((x) => x.pledgeId === 9101);
   assert.match(r.reason, /title name different ships/);
+  assert.equal(r.unknownShip, undefined);
   assert.deepEqual([r.fromShip, r.toShip], [1, null]);
+});
+
+test('an upgrade reward into a ship absent from the upgrade tool stays in review with its ship name', () => {
+  const reward = withEntry(9102, 'F7A Hornet Mk II Upgrade',
+    [{ id: 3900, name: 'F7C Hornet Mk II' }],
+    [{ id: 11437, name: '120 Month Insurance' }, { id: 3918, name: 'F7A Hornet Mk II' }]);
+  const f7c = { id: 270, name: 'F7C Hornet Mk II', msrp: 17500, skus: [] };
+  const data = buildPlannerData({ ...reward, catalog: { ...reward.catalog, ships: [...reward.catalog.ships, f7c] } }, aliases);
+  const r = data.review.find((item) => item.pledgeId === 9102);
+  assert.deepEqual([r.fromShip, r.toShip, r.unknownShip], [270, null, 'F7A Hornet Mk II']);
+  assert.equal(r.reason, 'RSI’s upgrade tool does not sell F7A Hornet Mk II. Plans cannot use this upgrade.');
+  assert.ok(!data.owned.some((o) => o.copyId === '9102'));
+});
+
+test('review keeps the usual warning reason for multiple matches or a side with extras only', () => {
+  const multi = withEntry(9103, 'Other Upgrade',
+    [{ id: 1001, name: 'Alpha Module' }, { id: 2001, name: 'Beta Module' }], [{ id: 3918, name: 'F7A Hornet Mk II' }]);
+  const extras = withEntry(9104, 'Other Upgrade',
+    [{ id: 1001, name: 'Alpha Module' }], [{ id: 11437, name: '120 Month Insurance' }]);
+  for (const [id, fixture] of [[9103, multi], [9104, extras]]) {
+    const r = buildPlannerData(fixture, aliases).review.find((item) => item.pledgeId === id);
+    assert.equal(r.unknownShip, undefined);
+    assert.match(r.reason, /^from matches/);
+  }
 });
 
 test('titleShips accepts only one exact split and never a similar name', () => {

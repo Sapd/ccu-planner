@@ -31,10 +31,11 @@ import { copyUsers } from '../../app/src/lib/view/copyUse.mjs';
 import { parseSavedChains, importRows } from '../logic/ccugame.mjs';
 import { tokenSettings } from '../logic/tokens.mjs';
 import { OBJECTIVES } from '../logic/goals.mjs';
+import { t } from '../logic/i18n.mjs';
 import { localToday, AVAILABILITY, isDay } from '../logic/availability.mjs';
 import { usd } from '../logic/format.mjs';
 import {
-  heroBuyTitle, NOTHING_TODAY, BUY_GROUPS, nothingWhyText, eventRiskText, goalStatusText, goalCostText,
+  heroBuyTitle, NOTHING_TODAY, BUY_GROUPS, nothingWhyText, goalStatusText, goalCostText,
   sharedEffectLine, changesHeadline, changesGoalLines, goalChangeLine, storeDataAge, hangarDataAge, meltTipText,
   waitingHeadline, MODE_CHOICE,
 } from '../logic/describe.mjs';
@@ -105,10 +106,9 @@ function today(deps) {
   } else {
     const names = new Map(v.goals.map((g) => [g.goalId, g.targetName]));
     if (v.hero.nothing) {
-      const risk = v.waiting.notices.filter((n) => n.eventOnly).length;
       const anyNoRoute = v.goals.some((g) => g.status === 'no-route');
       const anyNoToken = v.goals.some((g) => g.status === 'no-token');
-      lines.push(`${NOTHING_TODAY}. ${risk > 0 && v.waiting.event ? eventRiskText(risk, v.waiting.event) : nothingWhyText(v.hero.nothingWhy, { waitCount: v.waiting.count, anyNoRoute, anyNoToken })}`);
+      lines.push(`${NOTHING_TODAY}. ${nothingWhyText(v.hero.nothingWhy, { waitCount: v.waiting.count, anyNoRoute, anyNoToken })}`);
     } else {
       lines.push(`${heroBuyTitle(v.hero.buyCount, usd(v.hero.buyCash))} (for ${v.hero.goalsTouched.map((id) => names.get(id)).join(', ')})`);
     }
@@ -490,12 +490,16 @@ function settingsTool(deps) {
   const app = deps.load();
   const credit = app.plans.profile.credit ?? 0;
   const tokens = tokenSettings(app.plans);
-  const ships = Object.entries(app.overrides.ships).map(([id, o]) => ({ ...o, ship: Number(id), name: nameOf(app)(Number(id)) }));
+  const ships = Object.entries(app.overrides.ships).flatMap(([id, { availability, availabilityNote, ...price }]) => {
+    const confirmedOutsideEvents = availability === 'regular';
+    if (!confirmedOutsideEvents && price.msrp == null) return [];
+    return [{ ...price, ...(confirmedOutsideEvents ? { availability, availabilityNote } : {}), ship: Number(id), name: nameOf(app)(Number(id)) }];
+  });
   const offers = Object.entries(app.overrides.pairs ?? {}).map(([key, note]) => ({ ...pairData(app, ...key.split('-').map(Number)), ...note }));
   const lines = [`Store credit ${usd(credit)}. Token limit ${usd(tokens.limitCents)}. Use: ${tokens.use.join(', ') || 'none'}. Never: ${tokens.never.join(', ') || 'none'}.`];
   for (const s of ships) {
     if (s.msrp != null) lines.push(`${s.name} expected price ${usd(s.msrp)} ${s.note ?? ''}`.trim());
-    if (s.availability) lines.push(`${s.name} availability ${s.availability} ${s.availabilityNote ?? ''}`.trim());
+    if (s.availability) lines.push(`${s.name}: ${t('Confirmed seen in the store outside sales.')} ${s.availabilityNote ?? ''}`.trim());
   }
   for (const o of offers) lines.push(`${o.fromName} → ${o.toName} ends ${o.until ?? 'soon'}`);
   return { text: lines.join('\n'), data: { credit, tokens, ships, offers } };
@@ -612,7 +616,7 @@ function availabilityTool(deps, { ship, value, note }) {
   const app = deps.load();
   const s = shipOf(app, ship);
   commit(deps, app, { type: value === 'clear' ? 'clearAvailability' : 'setAvailability', shipId: s.id, value, note });
-  return { text: `${s.name} availability: ${value}.`, data: { shipId: s.id, value } };
+  return { text: `${s.name}: ${value === 'clear' ? t('Using store sync history.') : t('Confirmed seen in the store outside sales.')}`, data: { shipId: s.id, value } };
 }
 
 function offerEndTool(deps, { from, to, end }) {
@@ -726,7 +730,7 @@ const DEFINITIONS = [
     schema: z.strictObject({ goal: goalArg, objective: z.enum(OBJECTIVES) }), handler: goalSetting('setObjective', 'objective') },
   { name: 'set_priority', group: 'write', description: 'Set a goal’s planning priority to high, normal or low.',
     schema: z.strictObject({ goal: goalArg, priority: priority.unwrap() }), handler: goalSetting('setPriority', 'priority') },
-  { name: 'set_availability', group: 'write', description: 'Mark a ship as regular or event-only, or clear the mark to use observed availability.',
+  { name: 'set_availability', group: 'write', description: 'Confirm a ship was seen in the store outside sales (regular), or clear the confirmation. This affects melt suggestions.',
     schema: z.strictObject({ ship: shipArg, value: z.enum([...AVAILABILITY, 'clear']), note: z.string().max(200).optional() }), handler: availabilityTool },
   { name: 'set_offer_end', group: 'write', description: 'Record when a pair’s offer ends. Give a calendar day, soon, or clear to remove the note.',
     schema: z.strictObject({ from: shipArg, to: shipArg, end: z.union([day, z.enum(['soon', 'clear'])]) }), handler: offerEndTool },

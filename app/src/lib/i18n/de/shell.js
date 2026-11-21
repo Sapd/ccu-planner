@@ -41,7 +41,7 @@ export const texts = {
   "Browse offers": "Angebote ansehen",
   "Check a deal": "Angebot prüfen",
   "Store view": "Store-Ansicht",
-  "{name} is on until {date}. The planner counts it as a sale event; it comes from the CCU Planner feed.": "{name} läuft bis {date}. Der Planer zählt es als Sale-Event; es stammt aus dem CCU-Planner-Feed.",
+  "RSI's banner says {name} ends {date}. Event dates from the CCU Planner feed.": "Laut RSI-Banner endet {name} am {date}. Die Event-Daten stammen aus dem CCU-Planner-Feed.",
   "Sale events ({n})": "Sale-Events ({n})",
   "Price assumptions → Advanced": "Preisannahmen → Erweitert",
   "hangar": "Hangar",

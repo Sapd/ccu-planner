@@ -18,14 +18,14 @@ const copy = (copyId, from, to) => ({ copyId, from, to, paid: { cents: 100 } });
 const name = (id) => NAMES[id];
 
 /** A session for one state of the world: msrp by ship, offers, owned copies, the sync stamps, goals. */
-function world({ msrp = { 1: 5000, 2: 10000, 3: 15000, 4: 25000 }, offers, owned = [], store = 'S1', hangar = 'H1', offersAt, credit = 0, rev = 0, goals }) {
+function world({ msrp = { 1: 5000, 2: 10000, 3: 15000, 4: 25000 }, offers, owned = [], store = 'S1', hangar = 'H1', offersAt, credit = 0, rev = 0, goals, saleHistory = null }) {
   const ships = new Map(Object.entries(msrp).map(([id, m]) => [Number(id), { id: Number(id), name: NAMES[id], msrp: m, concept: false }]));
   const plans = newState();
   plans.profile.credit = credit;
   plans.rev = rev;
   for (const g of goals) addChain(plans, g);
   if (offersAt) offers = offers.map((o) => ({ ...o, fetchedAt: offersAt }));
-  return createSession({ plans, graph: buildGraph({ offers, owned, ships }), data: { ships, offers, owned, meta: { catalogAt: store, hangarAt: hangar } } });
+  return createSession({ plans, graph: buildGraph({ offers, owned, ships }), data: { ships, offers, owned, saleHistory, meta: { catalogAt: store, hangarAt: hangar } } });
 }
 const snap = (session, at) => buildSnapshot(session, at);
 const only = (c) => { assert.equal(c.goals.length, 1); return c.goals[0]; };
@@ -85,6 +85,39 @@ test('a Warbond that ended, and a new Warbond on the new route', () => {
   assert.equal(fresh.delta, -4000);
   assert.deepEqual(fresh.causes, [{ kind: 'new-warbond', from: 1, to: 2, cash: 1000 }]);
   assert.equal(goalChangeLine(fresh, { name }), 'Carrack -$40: now uses Warbond Alpha → Prospector for $10');
+});
+
+test('a newly available Standard step explains its goal and the store credit freed for another goal', () => {
+  const setup = {
+    offers: [std(1, 3, 10000), std(1, 4, 20000)], owned: [copy('x', 2, 3)], credit: 8000,
+    goals: [{ base: 1, target: 3, priority: 'high' }, { base: 1, target: 4 }],
+  };
+  const before = world({ ...setup, store: '2026-11-20T12:00:00' });
+  const compare = (saleHistory) => changesSinceSync(world({
+    ...setup, store: '2026-11-21T12:00:00', offers: [...setup.offers, std(1, 2, 5000)], saleHistory,
+  }), [snap(before)]);
+  const target = { onSaleDays: ['2026-11-21'] };
+  const [direct, shared] = compare({ ships: { 2: target, 3: { onSaleDays: ['2026-11-20'] } } }).goals;
+  assert.deepEqual(direct.causes, [{ kind: 'in-store', shipId: 2 }]);
+  assert.equal(goalChangeLine(direct, { name }), 'Carrack -$20: Prospector is in the store again, so a route through it is possible today');
+  assert.deepEqual(shared.causes, [{ kind: 'shared' }]);
+  assert.equal(goalChangeLine(shared, { name }), 'Orion -$30: follows from changes to other goals. The shared plan reassigned your CCUs or store credit');
+  assert.deepEqual(compare({ ships: { 2: target } }).goals.map((g) => g.causes), [[{ kind: 'none' }], [{ kind: 'none' }]], 'no earlier sync was recorded');
+  const alreadyThere = compare({ ships: { 2: { onSaleDays: ['2026-11-20', '2026-11-21'] } } });
+  assert.deepEqual(alreadyThere.goals[0].causes, [{ kind: 'none' }]);
+});
+
+test('a ship back in the store the same day: the snapshot records which ships were in the store', () => {
+  const offers = [std(1, 3, 10000)];
+  const goals = [{ base: 1, target: 3 }];
+  const flag = (session, inStore) => { for (const [id, s] of session.data.ships) s.standard = inStore.includes(id); return session; };
+  const before = flag(world({ offers, goals, store: '2026-11-21T10:00:00' }), [1, 3]);
+  const after = flag(world({ offers: [...offers, std(1, 2, 5000)], owned: [copy('x', 2, 3)], goals, store: '2026-11-21T17:00:00' }), [1, 2, 3]);
+  const sn = snap(before);
+  assert.deepEqual(sn.inStore, [1, 3]);
+  assert.deepEqual(only(changesSinceSync(after, [sn])).causes.filter((c) => c.kind === 'in-store'), [{ kind: 'in-store', shipId: 2 }]);
+  const was = flag(world({ offers, goals, store: '2026-11-21T10:00:00' }), [1, 2, 3]);
+  assert.deepEqual(only(changesSinceSync(after, [snap(was)])).causes.filter((c) => c.kind === 'in-store'), [], 'already in the store before');
 });
 
 test('a hangar change: a new CCU appears, an old one is used up', () => {

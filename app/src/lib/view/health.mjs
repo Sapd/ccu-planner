@@ -3,12 +3,12 @@
 import { t } from '../../../../src/logic/i18n.mjs';
 
 /**
- * @param {{ review?: Array<{ pledgeId: number, fromShip?: number|null, toShip?: number|null }>, owned?: Array<unknown> }} data app.data
+ * @param {{ review?: Array<{ pledgeId: number, fromShip?: number|null, toShip?: number|null, unknownShip?: string }>, owned?: Array<unknown> }} data app.data
  * @param {Array<{ goalId: string, name: string, targetId?: number, journey?: { steps?: Array<{ state: string, step: { from: number, to: number } }> } }>} goals todayView(app).goals
  * @returns {null | { count: number, total: number, goals: string[], key: string, text: string }}
  */
 export function hangarHealth(data, goals) {
-  const review = data?.review ?? [];
+  const review = (data?.review ?? []).filter((r) => !r.unknownShip);
   if (!review.length) return null;
   const total = review.length + (data.owned?.length ?? 0);
   // A goal may be affected when it plans to buy into, or out of, a ship an unreadable upgrade starts or ends at.

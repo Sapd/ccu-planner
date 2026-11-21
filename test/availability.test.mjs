@@ -1,13 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGraph } from '../src/logic/planner.mjs';
-import { newState, addChain, proposeChain, acceptRoute, splitRoute, lockReason, expectedChanges } from '../src/logic/chains.mjs';
+import { newState, addChain, acceptRoute } from '../src/logic/chains.mjs';
 import { classifyCopies, meltPlan, KEEP } from '../src/logic/melt.mjs';
 import { applyAction } from '../src/logic/state.mjs';
-import { eventAlertText, meltEventHint, meltHeadline, noEventsNotice, NO_EVENTS_NOTICE } from '../src/logic/describe.mjs';
+import { availabilityText, meltReasonPlain, meltHeadline, noEventsNotice, NO_EVENTS_NOTICE } from '../src/logic/describe.mjs';
 import {
   availability, availCtx, appendSaleHistory, onSaleShipIds, addSaleEvent, removeSaleEvent, emptySaleEvents, localToday, hasStandardSku, shortDay, MAX_HISTORY_DAYS,
 } from '../src/logic/availability.mjs';
+import { withLocale } from '../src/logic/i18n.mjs';
+import '../src/logic/i18n/de/index.mjs';
 import { expectedOffers } from '../src/logic/prices.mjs';
 import { buildPlannerData } from '../src/logic/mapping.mjs';
 import { deriveAppState } from '../app/src/lib/view/derive.mjs';
@@ -16,54 +18,66 @@ import { meltView, availabilityRows } from '../app/src/lib/view/hangar.mjs';
 
 const IAE = { rev: 1, events: [{ id: 'e1', name: 'IAE 2956', from: '2026-11-14', to: '2026-11-27' }] };
 const hist = (...days) => ({ ships: { 2: { onSaleDays: days } } });
-const at = (today, days, extra = {}) => availability(2, { saleHistory: hist(...days), saleEvents: IAE, today, ...extra });
+test('store facts use recorded sync days, including days that missed the ship', () => {
+  let history = appendSaleHistory(null, [1, 2], '2026-11-18', '2026-11-18T11:00:00Z');
+  history = appendSaleHistory(history, [], '2026-11-20', '2026-11-20T11:00:00Z');
+  history = appendSaleHistory(history, [2], '2026-11-21', '2026-11-21T11:00:00Z');
+  history = appendSaleHistory(history, [2], '2026-11-24', '2026-11-24T11:00:00Z');
+  const facts = (id) => availability(id, { saleHistory: history, saleEvents: IAE });
+  assert.deepEqual(facts(2), {
+    inStore: true, lastSyncDay: '2026-11-24', lastSyncAt: '2026-11-24T11:00:00Z',
+    since: '2026-11-21', previousMiss: '2026-11-20', lastSeen: '2026-11-24', seenDays: 3,
+    seenOutsideEvents: false, seenIn: IAE.events[0], confirmedOutsideEvents: false, meltSafe: false,
+  });
+  assert.equal(facts(1).since, null);
+  assert.equal(facts(1).lastSeen, '2026-11-18');
 
-test('availability: seen only during the ongoing event is unknown and names the event', () => {
-  const a = at('2026-11-18', ['2026-11-18']);
-  assert.equal(a.status, 'unknown');
-  assert.equal(a.event.name, 'IAE 2956');
-  assert.deepEqual([a.daysOutside, a.firstSeen, a.lastSeen], [0, '2026-11-18', '2026-11-18']);
+  history = appendSaleHistory(history, [], '2026-11-24', '2026-11-24T12:00:00Z');
+  assert.equal(facts(2).inStore, false);
+  assert.equal(facts(2).lastSeen, '2026-11-24');
+  assert.equal(facts(2).lastSyncAt, '2026-11-24T12:00:00Z');
 });
 
-test('availability: two days outside events, a week apart, is regular', () => {
-  const a = at('2026-11-18', ['2026-10-01', '2026-10-20']);
-  assert.equal(a.status, 'regular');
-  assert.equal(a.daysOutside, 2);
-  assert.equal(a.event.id, 'e1', 'the ongoing event is reported either way');
+test('legacy history has day-level facts and event dates include both endpoints', () => {
+  const get = (...days) => availability(2, { saleHistory: hist(...days), saleEvents: IAE });
+  assert.equal(get('2026-11-14', '2026-11-27').seenOutsideEvents, false);
+  assert.equal(get('2026-11-27', '2026-11-28').seenOutsideEvents, true);
+  assert.equal(get('2026-11-13').seenOutsideEvents, true);
+  assert.equal(get('2026-11-27').lastSyncAt, null);
+  assert.equal(availability(2).inStore, null);
 });
 
-test('availability: outside days under 7 days apart, or one day, stay unknown; exactly 7 is regular', () => {
-  assert.equal(at('2026-11-18', ['2026-10-01', '2026-10-03']).status, 'unknown');
-  assert.equal(at('2026-11-18', ['2026-10-01']).status, 'unknown');
-  assert.equal(at('2026-11-18', ['2026-10-01', '2026-10-08']).status, 'regular');
-  assert.equal(at('2026-11-18', ['2026-10-01', '2026-10-01', '2026-10-02']).status, 'unknown', 'distinct days only');
+test('a legacy catalog supplies the latest store observation and timestamp', () => {
+  const catalogAt = new Date(2026, 10, 22, 12).toISOString();
+  const ctx = availCtx({
+    data: { saleHistory: hist('2026-11-21'), meta: { catalogAt }, ships: new Map([
+      [1, { id: 1, standard: true }], [2, { id: 2, standard: false }],
+    ]) },
+    saleEvents: IAE,
+  }, '2026-11-28');
+  assert.equal(availability(1, ctx).inStore, true);
+  const gone = availability(2, ctx);
+  assert.equal(gone.inStore, false);
+  assert.equal(gone.lastSyncAt, catalogAt);
+  assert.equal(gone.lastSeen, '2026-11-21');
 });
 
-test('availability: event dates are inclusive and do not count as outside', () => {
-  assert.equal(at('2026-11-18', ['2026-11-14', '2026-11-27']).daysOutside, 0);
-  assert.equal(at('2026-12-05', ['2026-11-13', '2026-11-28']).status, 'regular');
-});
-
-test('availability: seen only on event days after the event ended is event-only', () => {
-  assert.equal(at('2026-12-05', ['2026-11-15', '2026-11-20', '2026-11-27']).status, 'event-only');
-  const ongoing = at('2026-11-27', ['2026-11-15', '2026-11-20']);
-  assert.equal(ongoing.status, 'unknown', 'the event has not ended yet');
-  assert.equal(at('2026-12-05', []).status, 'unknown', 'no history');
-});
-
-test('availability: no Standard SKU today is off-sale whatever the history says; overrides win', () => {
-  const days = ['2026-10-01', '2026-10-20'];
-  assert.equal(at('2026-11-18', days, { standardNow: false }).status, 'off-sale');
-  const ov = (v) => ({ ships: { 2: { availability: v } } });
-  assert.equal(at('2026-11-18', ['2026-11-18'], { overrides: ov('regular') }).status, 'regular');
-  assert.equal(at('2026-11-18', days, { overrides: ov('event-only') }).status, 'event-only');
-  assert.equal(at('2026-11-18', days, { overrides: ov('event-only') }).override, true);
-  assert.equal(at('2026-11-18', ['2026-11-18'], { overrides: { ships: { 2: { msrp: 100 } } } }).status, 'unknown', 'a price override alone is no availability mark');
-});
-
-test('availability: missing documents are no history', () => {
-  assert.equal(availability(2, { today: '2026-11-18' }).status, 'unknown');
-  assert.equal(availability(2, { saleHistory: { ships: {} }, saleEvents: { events: [] }, today: '2026-11-18' }).event, null);
+test('availability and melt wording describes observations in English and German', () => {
+  const saleHistory = { ships: { 1: { onSaleDays: ['2026-11-20'] }, 2: { onSaleDays: ['2026-11-21', '2026-11-22'] } } };
+  const get = (id) => availability(id, { saleHistory, saleEvents: IAE });
+  const texts = () => [availabilityText(get(2)), availabilityText(get(1)), meltReasonPlain(KEEP.NO_OUTSIDE_OBSERVATION)];
+  assert.deepEqual(texts(), [
+    "In the store since Nov 21; not there at the Nov 20 sync. Seen in the store on 2 sync days, all during IAE 2956 (RSI's banner: until Nov 27).",
+    'Not in the store at the last sync (Nov 22). Last seen Nov 20.',
+    'Kept: not yet seen in the store on two syncs clear of any sale.',
+  ]);
+  const german = withLocale('de', texts);
+  assert.match(german[0], /Seit 21\. Nov.*2 Sync-Tagen.*während IAE 2956/);
+  assert.match(german[1], /Beim letzten Sync.*nicht im Store/);
+  assert.match(german[2], /noch nicht bei zwei Syncs außerhalb aller Sales/);
+  for (const line of [...texts(), ...german]) {
+    assert.doesNotMatch(line, /usually|next event|return|may leave|meist|nächste[ns]?\s+Event|zurück|verschwinden/i);
+  }
 });
 
 test('localToday formats the local calendar day; shortDay and hasStandardSku', () => {
@@ -134,7 +148,7 @@ test('applyAction: availability marks live beside the expected price and clear i
   assert.deepEqual(d.overrides.ships[4], { availability: 'regular', availabilityNote: 'always there' }, 'clearing the price keeps the mark');
   d = applyAction(d, { type: 'clearAvailability', shipId: 4 });
   assert.equal(Object.hasOwn(d.overrides.ships, 4), false, 'nothing left, entry removed');
-  d = applyAction(d, { type: 'setAvailability', shipId: 5, value: 'event-only' });
+  d = applyAction(d, { type: 'setAvailability', shipId: 5, value: 'regular' });
   d = applyAction(d, { type: 'setPrice', shipId: 5, cents: 100 });
   d = applyAction(d, { type: 'clearAvailability', shipId: 5 });
   assert.equal(d.overrides.ships[5].msrp, 100, 'clearing the mark keeps the price');
@@ -161,29 +175,27 @@ const copy = (copyId, from, to, paid) => ({ copyId, from, to, paid: { cents: pai
 const owned = [copy('m', 1, 2, 2500)]; // meets every old rule: saving 0, rebuyable
 const ctx = (over = {}) => ({ data: { ships, saleHistory: hist('2026-11-18'), saleEvents: IAE }, overrides: { ships: {} }, ...over });
 
-test('melt: a copy that met every old rule keeps with UNKNOWN_AVAIL while its target is only seen during the event', () => {
-  const avail = availCtx({ data: { ships, saleHistory: { ships: { 2: { onSaleDays: ['2026-11-18'] } } }, saleEvents: IAE }, overrides: { ships: {} } }, '2026-11-18');
-  const [r] = classifyCopies({ owned, offers, ships }, newState(), { avail });
-  assert.equal(r.candidate, false);
-  assert.equal(r.keep, 'not known to stay on sale after IAE 2956 (seen on sale only during it)');
-  assert.equal(KEEP.UNKNOWN_AVAIL.includes('<event>'), true);
-  assert.equal(r.availability, 'unknown');
-});
-
-test('melt: the same copy with the target overridden to regular is a candidate', () => {
-  const avail = availCtx({ data: ctx().data, overrides: { ships: { 2: { availability: 'regular' } } } }, '2026-11-18');
-  const [r] = classifyCopies({ owned, offers, ships }, newState(), { avail });
-  assert.equal(r.candidate, true);
-  assert.equal(r.availability, 'regular');
-});
-
-test('melt: regular by history is a candidate; event-only, no history and off-sale keep with their reasons', () => {
-  const run = (saleHistory, shipMap = ships) => classifyCopies({ owned, offers, ships: shipMap }, newState(), { avail: availCtx({ data: { ships: shipMap, saleHistory, saleEvents: IAE }, overrides: { ships: {} } }, '2026-12-05') })[0];
-  assert.equal(run(hist('2026-10-01', '2026-10-20')).candidate, true);
-  assert.equal(run(hist('2026-11-15', '2026-11-20')).keep, KEEP.EVENT_ONLY);
-  assert.equal(run(null).keep, KEEP.UNKNOWN_HISTORY);
-  const off = new Map(ships).set(2, { ...ships.get(2), standard: false });
-  assert.equal(run(hist('2026-10-01', '2026-10-20'), off).keep, KEEP.NOT_REBUYABLE);
+test('melt requires an exact Standard offer, the ship in the store, and two sync days clear of every event', () => {
+  let saleHistory = hist('2026-11-18');
+  const run = (currentOffers = offers, availability) => classifyCopies({ owned, offers: currentOffers, ships }, newState(), {
+    avail: availCtx({ data: { ships, saleHistory, saleEvents: IAE }, overrides: { ships: { 2: { availability } } } }, '2026-11-28'),
+  })[0];
+  assert.equal(run().keep, KEEP.NO_OUTSIDE_OBSERVATION);
+  assert.equal(run(offers, 'regular').candidate, true);
+  saleHistory = appendSaleHistory(saleHistory, [1], '2026-11-28');
+  assert.equal(run().keep, KEEP.NO_OUTSIDE_OBSERVATION, 'a post-event miss does not qualify');
+  saleHistory = appendSaleHistory(saleHistory, [2], '2026-11-28');
+  assert.equal(run().keep, KEEP.NO_OUTSIDE_OBSERVATION, 'the day after the banner date may still be the sale (no time zone)');
+  saleHistory = appendSaleHistory(saleHistory, [2], '2026-11-30');
+  assert.equal(run().keep, KEEP.NO_OUTSIDE_OBSERVATION, 'one clear day is not enough');
+  saleHistory = appendSaleHistory(saleHistory, [1], '2026-12-02');
+  assert.equal(run().keep, KEEP.NO_OUTSIDE_OBSERVATION, 'not in the store at the last sync');
+  saleHistory = appendSaleHistory(saleHistory, [2], '2026-12-02');
+  assert.equal(run().candidate, true);
+  assert.equal(run(offers, 'event-only').candidate, true, 'legacy verdicts are ignored');
+  const noEvents = classifyCopies({ owned, offers, ships }, newState(), { avail: availCtx({ data: { ships, saleHistory, saleEvents: { rev: 0, events: [] } } }, '2026-12-02') })[0];
+  assert.equal(noEvents.keep, KEEP.NO_OUTSIDE_OBSERVATION, 'without any recorded sale event no day counts as clear');
+  assert.equal(run(offers.slice(1)).keep, KEEP.NOT_REBUYABLE);
 });
 
 test('melt: without an availability context nothing is a candidate', () => {
@@ -202,72 +214,29 @@ test('melt plan passes availability to its candidates', () => {
   assert.equal(some.melt.length, 1);
 });
 
-test('melt wording: the headline no longer says rebuyable today', () => {
-  const h = meltHeadline({ candidates: [], candidateCredit: 0 }, false);
-  assert.equal(h.includes('same Standard price today'), false);
-  assert.ok(h.includes('rebuyable outside sale events (seen on sale on ≥2 days outside events, or marked regular by you)'));
-  assert.equal(meltEventHint({ name: 'IAE 2956' }), 'Melt suggestions stay conservative until a sync has run after IAE 2956 ends.');
-  assert.equal(meltEventHint(null), null);
+test('melt headline describes the current offer and the outside-sale observation', () => {
+  assert.match(meltHeadline({ candidates: [], candidateCredit: 0 }, false),
+    /Standard offer at the last sync, target seen in the store on two syncs clear of any sale, or confirmed/);
 });
 
-// ----- buy later -----
-
-// A watch chain 1 -> 2 -> 3 whose last (Standard) step is into 3, and 2 -> 3 Standard bridge.
-function watchChain(target = 3) {
-  const s = newState();
-  const c = addChain(s, { base: 1, target });
-  const route = proposeChain(s, c.id, buildGraph({ offers, owned: [] })).routes[0];
-  return { s, c, route };
-}
-const eventAvail = (over = {}) => availCtx({ data: { ships, saleHistory: hist('2026-11-18'), saleEvents: IAE }, overrides: { ships: over } }, '2026-11-18');
-
-test('buy later: during the event a Standard last step into an event-only target is locked now; an unknown one is not', () => {
-  const { c, route } = watchChain();
-  // A target the history has not seen outside an event yet may be new to it: no lock.
-  assert.equal(lockReason(c, ships, null, eventAvail()), null);
-  const avail = eventAvail({ 3: { availability: 'event-only' } });
-  assert.equal(lockReason(c, ships, null, avail), 'event');
-  const sp = splitRoute(route, { lock: !!lockReason(c, ships, null, avail) });
-  assert.equal(sp.lockNow.length, 1);
-  assert.equal(sp.lockNow[0].to, 3);
-});
-
-test('buy later: the same step outside any event with a regular target stays Later', () => {
-  const { c, route } = watchChain();
-  const regular = availCtx({ data: { ships, saleHistory: { ships: { 3: { onSaleDays: ['2026-10-01', '2026-10-20'] } } }, saleEvents: IAE }, overrides: { ships: {} } }, '2026-12-05');
-  assert.equal(lockReason(c, ships, null, regular), null);
-  assert.equal(splitRoute(route, { lock: !!lockReason(c, ships, null, regular) }).lockNow.length, 0);
-  // Still inside the event but marked regular by you: no lock either.
-  assert.equal(lockReason(c, ships, null, eventAvail({ 3: { availability: 'regular' } })), null);
-  // No event ongoing, history short: unknown but nothing to lose right now.
-  assert.equal(lockReason(c, ships, null, availCtx({ data: { ships, saleHistory: null, saleEvents: IAE }, overrides: { ships: {} } }, '2026-12-05')), null);
-  // lock off wins, no ctx means no event.
-  assert.equal(lockReason({ ...c, lock: 'off' }, ships, null, eventAvail()), null);
-  assert.equal(lockReason(c, ships, null), null);
-});
-
-// The same ids priced $5 apart: every step is a filler no Warbond fits.
-const fillerShips = new Map([1, 2, 3].map((id) => [id, { ...ships.get(id), msrp: 9000 + id * 500 }]));
-const eventOnly = { 2: { availability: 'event-only' }, 3: { availability: 'event-only' } };
-
-test('buy later: expectedChanges alerts event only for filler steps into event-only targets', () => {
-  const { route } = watchChain();
-  const alerts = expectedChanges(route, offers, fillerShips, eventAvail(eventOnly)).alerts.filter((a) => a.reason === 'event');
-  assert.ok(alerts.length >= 1);
-  assert.equal(alerts[0].event.name, 'IAE 2956');
-  assert.equal(eventAlertText(alerts[0]), 'sold only during events so far (IAE 2956 until Nov 27); no Warbond fits this step, so buying it now saves waiting for the next event');
-  assert.equal(expectedChanges(route, offers, fillerShips, eventAvail({ 2: { availability: 'regular' }, 3: { availability: 'regular' } })).alerts.length, 0);
-  assert.equal(expectedChanges(route, offers, fillerShips).alerts.length, 0, 'without a context nothing changes');
-  assert.equal(expectedChanges(route, offers, fillerShips, eventAvail(eventOnly)).buyBefore.some((a) => a.reason === 'event'), true);
-  // Not seen outside an event yet (unknown): no alert. A gap a Warbond can fill: the goal waits for one, no alert.
-  assert.equal(expectedChanges(route, offers, fillerShips, eventAvail()).alerts.some((a) => a.reason === 'event'), false);
-  assert.equal(expectedChanges(route, offers, ships, eventAvail(eventOnly)).alerts.some((a) => a.reason === 'event'), false);
-});
-
-test('buy later: a price rise still wins over the event reason', () => {
-  const route = { steps: [{ kind: 'standard', from: 1, to: 2, cash: 2500 }] };
-  const higher = [{ from: 1, to: 2, kind: 'standard', cash: 3000 }];
-  assert.equal(expectedChanges(route, higher, ships, eventAvail()).alerts[0].reason, 'pricier');
+test('event-only history produces the same store facts before and after the banner date without another sync', () => {
+  const saleHistory = { ships: { 1: { onSaleDays: ['2026-11-20'] }, 2: { onSaleDays: ['2026-11-21'] } } };
+  const step = { from: 1, to: 2, kind: 'standard', cash: 500 };
+  const fillerShips = new Map(ships).set(2, { ...ships.get(2), msrp: 5500 });
+  const chain = { target: 2, mode: 'watch' };
+  const observations = [];
+  for (const today of ['2026-11-26', '2026-11-28']) {
+    const avail = availCtx({ data: { saleHistory, saleEvents: IAE } }, today);
+    observations.push([1, 2].map((id) => availability(id, avail)));
+    const advice = routeAdvice(null, chain, { steps: [step] }, { avail, ships: fillerShips, expected: [step] });
+    assert.equal(advice.lockCode, null);
+    assert.deepEqual(advice.groups.later, [step]);
+    assert.deepEqual(advice.buys, []);
+    assert.deepEqual(advice.alerts, []);
+  }
+  assert.deepEqual(observations[0], observations[1]);
+  assert.equal(observations[1][1].inStore, true);
+  assert.equal(observations[1][1].seenOutsideEvents, false);
 });
 
 // ----- app state -----
@@ -290,15 +259,6 @@ function appFor(raw) {
   return deriveAppState({ ...raw, offers: undefined }, { items: {} });
 }
 
-test('routeAdvice moves the Standard last step into the lock group through the event reason', () => {
-  const { c, route } = watchChain();
-  const locked = routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: eventAvail({ 3: { availability: 'event-only' } }) });
-  assert.equal(routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: eventAvail() }).groups.lockNow.length, 0, 'an unknown target is not locked');
-  assert.equal(locked.groups.lockNow.length, 1);
-  assert.equal(locked.lockCode, 'event');
-  assert.equal(routeAdvice(null, { ...c, mode: 'watch' }, route, { ships, avail: null }).groups.lockNow.length, 0);
-});
-
 test('meltView recomputes when the day or the sale events rev changes; availabilityRows lists Standard ships', () => {
   const app = appFor(rawSmall({ saleHistory: hist('2026-11-18'), saleEvents: IAE }));
   const calls = [];
@@ -311,8 +271,8 @@ test('meltView recomputes when the day or the sale events rev changes; availabil
   assert.equal(calls.length, 3);
   const rows = availabilityRows(app, '2026-11-18');
   assert.deepEqual(rows.map((r) => r.name), ['S1', 'S2', 'S3']);
-  assert.equal(rows.find((r) => r.shipId === 2).status, 'unknown');
-  assert.equal(rows.find((r) => r.shipId === 2).mark, 'auto');
+  assert.equal(rows.find((r) => r.shipId === 2).inStore, true);
+  assert.equal(rows.find((r) => r.shipId === 2).seenOutsideEvents, false);
 });
 
 test('onSaleShipIds picks the ships with an available Standard SKU', () => {
@@ -325,15 +285,15 @@ test('onSaleShipIds picks the ships with an available Standard SKU', () => {
   ];
   assert.deepEqual(onSaleShipIds(list), [1, 5]);
   assert.deepEqual(onSaleShipIds(null), []);
-  // Two syncs on different days make a ship regular once they are a week apart and outside events.
+  // One observed day outside any event is enough.
   let h = appendSaleHistory(null, onSaleShipIds(list), '2026-10-01');
   h = appendSaleHistory(h, onSaleShipIds(list), '2026-10-09');
-  assert.equal(availability(1, { saleHistory: h, saleEvents: emptySaleEvents(), today: '2026-10-10' }).status, 'regular');
+  assert.equal(availability(1, { saleHistory: h, saleEvents: emptySaleEvents(), today: '2026-10-10' }).seenOutsideEvents, true);
 });
 
 test('the no-sale-events notice shows with zero events and not with one', () => {
   assert.equal(noEventsNotice(emptySaleEvents()), NO_EVENTS_NOTICE);
   assert.equal(noEventsNotice(null), NO_EVENTS_NOTICE);
-  assert.ok(NO_EVENTS_NOTICE.startsWith('No sale events entered — days during sales like IAE count as normal on-sale days.'));
+  assert.ok(NO_EVENTS_NOTICE.startsWith('No sale events recorded. All sync days count as outside sale events.'));
   assert.equal(noEventsNotice(IAE), null);
 });

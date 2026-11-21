@@ -80,8 +80,8 @@ test('melt and price wording is pinned', () => {
     candidates: [1, 2], candidateCredit: 11500, finishChains: ['c1', 'c2'], locks: [{ chainId: 'c3', step: { from: 1, to: 2, cash: 5000 } }],
     warbond: 2500, standard: 11000, pool: 1000, newMoneyBefore: 12500, newMoneyAfter: 2500, melt: [{}], meltCredit: 11000, creditLeftAfter: 500,
   };
-  assert.equal(meltHeadline(p, false), 'Melt candidates: 2 unused CCU(s), $115 credit (no saving, rebuyable outside sale events (seen on sale on ≥2 days outside events, or marked regular by you), not into a concept ship, no extras, not reserved)');
-  assert.ok(meltHeadline(p, true).includes('marked regular by you) and at your expected prices, not into'));
+  assert.equal(meltHeadline(p, false), 'Melt candidates: 2 unused CCU(s), $115 credit (no saving, Standard offer at the last sync, target seen in the store on two syncs clear of any sale, or confirmed, not into a concept ship, no extras, not reserved)');
+  assert.ok(meltHeadline(p, true).includes('no saving at current or expected prices'));
   assert.deepEqual(meltPlanLines(p, name), [
     'Lock c3: A -> B $50 Standard now (counted below)',
     'Finish chains c1, c2: Warbond $25 (always new money) + Standard $110 - credit pool $10 = $125 new money',
@@ -98,8 +98,8 @@ test('melt and price wording is pinned', () => {
 
 import { splitAvailability, PLEDGE_CHIPS, plural } from '../../app/src/lib/view/hangar.mjs';
 
-test('splitAvailability keeps unknown, unmarked ships apart; the Hangar chip list starts with ships and ends with All', () => {
-  const s = splitAvailability([{ status: 'unknown', mark: 'auto' }, { status: 'unknown', mark: 'regular' }, { status: 'regular', mark: 'auto' }]);
+test('splitAvailability keeps ships with no sightings or confirmations apart; the Hangar chip list starts with ships and ends with All', () => {
+  const s = splitAvailability([{}, { confirmedOutsideEvents: true }, { lastSeen: '2026-11-18' }]);
   assert.equal(s.unknown.length, 1);
   assert.equal(s.known.length, 2);
   assert.equal(PLEDGE_CHIPS[0].id, 'ships');

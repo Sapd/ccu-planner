@@ -10,7 +10,8 @@ import { edgeKey, incomingCount } from './planner.mjs';
 import { localToday, shipAvailability } from './availability.mjs';
 import { shipName, goalNamer } from './ships.mjs';
 import { usd } from './format.mjs';
-import { conceptTieText, noRouteMessage, NO_TOKEN_TEXT, routeLine, eventLockWhy, eventBuyWhy, eventLockDecision, eventAlertText, standardLaterText, bestDiffers, BEST_DIFFERS_LABEL } from './describe.mjs';
+import { warbondCanFit } from './warbondFit.mjs';
+import { conceptTieText, noRouteMessage, NO_TOKEN_TEXT, routeLine, availabilityNote, standardLaterText, waitReasonText, bestDiffers, BEST_DIFFERS_LABEL } from './describe.mjs';
 
 const metricOf = (objective) => (objective === 'allin' ? (r) => r.allIn : (r) => r.cash);
 const optionOrder = (a, b) => Number(!!b.chosen) - Number(!!a.chosen) || Number(b.available) - Number(a.available) || a.cash - b.cash || String(a.copyId ?? '').localeCompare(String(b.copyId ?? ''));
@@ -95,7 +96,6 @@ export function decisionGraph(app, chainId, { k = 5, wanted, avail, today = loca
   const lockStep = adv.groups.lockNow[0] ?? null;
   const alertFor = (s) => adv.alerts.find((a) => a.step === s) ?? null;
   const coverText = adv.coverText;
-  const targetEvent = adv.lockEvent;
 
   const ties = conceptTieNotes(best, routes, { concept: graph.concept, name, objective });
   const steps = best.steps.map((s, index) => {
@@ -115,7 +115,7 @@ export function decisionGraph(app, chainId, { k = 5, wanted, avail, today = loca
     if (exp) raw.push({ kind: 'expected', cash: exp.cash });
 
     const isChosen = (o) => o.kind === s.kind && !!o.virtual === !!s.virtual && (!s.virtual || o.virtualId === s.virtualId) && (s.kind !== 'owned' || o.copyId === s.copyId);
-    const lockText = isLock ? decisionLockText(lockWhy, targetEvent, exp) : null;
+    const lockText = isLock ? decisionLockText(lockWhy, exp) : null;
     // Compare with what the objective counts: all-in includes the paid basis of an owned copy.
     const val = (o) => (objective === 'allin' && o.kind === 'owned' ? o.paid ?? 0 : o.cash);
     const chosenVal = val(raw.find(isChosen) ?? { cash: s.cash });
@@ -124,7 +124,6 @@ export function decisionGraph(app, chainId, { k = 5, wanted, avail, today = loca
       let why; let available = true;
       if (chosen) {
         why = isLock ? lockText
-          : alert?.reason === 'event' ? eventBuyWhy(alert.event)
           : alert?.reason === 'pricier' ? t('price will rise (expected {price})', { price: usd(alert.expected) })
           : alert?.reason === 'concept' ? decisionLockText('concept')
           : t('chosen');
@@ -155,15 +154,18 @@ export function decisionGraph(app, chainId, { k = 5, wanted, avail, today = loca
     } else if (s.kind === 'warbond') {
       decision = warbondDecisionText(s.cash, stdCash);
     } else if (isLock) {
-      decision = standardLockDecisionText(s.cash, lockWhy, targetEvent);
-    } else if (alert?.reason === 'event') {
-      decision = t('Buy Standard {price} before the sale ends: {reason}.', { price: usd(s.cash), reason: eventAlertText(alert) });
+      decision = standardLockDecisionText(s.cash, lockWhy);
     } else if (alert?.reason === 'pricier') {
       decision = t('Buy Standard {price} before the price rises to {expected}.', { price: usd(s.cash), expected: usd(alert.expected) });
     } else if (finish) {
       decision = t('Buy Standard {price}: the chain is in finish mode.', { price: usd(s.cash) });
     } else {
-      decision = standardLaterText(s.cash, shipAvailability(ctx, s.to).status);
+      const from = msrp(s.from);
+      const to = msrp(s.to);
+      decision = warbondCanFit(from, to) === false
+        ? waitReasonText('filler', { gap: to - from })
+        : standardLaterText(s.cash);
+      decision += availabilityNote(shipAvailability(ctx, s.to));
     }
     const cover = dec.covered && last ? coverText : null;
     if (cover) decision += ` ${cover}`;
@@ -252,8 +254,8 @@ export function decisionMemo(app, chainId, k = 5, today = localToday()) {
   return session.memo('decision', `${chainId}|${k}|${today}`, () => decisionGraph(app, chainId, { k, wanted: session.wanted(chainId), today }));
 }
 
-const decisionLockText = loc('decision.lockText', (lockWhy, targetEvent, exp) =>
-  lockWhy === 'event' ? eventLockWhy(targetEvent) : lockWhy === 'concept' ? 'concept: lock now'
+const decisionLockText = loc('decision.lockText', (lockWhy, exp) =>
+  lockWhy === 'concept' ? 'concept: lock now'
     : lockWhy === 'expected' ? `price will rise (expected${exp ? ` ${usd(exp.cash)}` : ''})` : 'lock now: lock is set to on');
 
 const ownedDecisionText = loc('decision.ownedText', (c) =>
@@ -261,12 +263,11 @@ const ownedDecisionText = loc('decision.ownedText', (c) =>
 
 const warbondDecisionText = loc('decision.warbondText', (cash, stdCash) => {
   const vs = stdCash == null ? 'no Standard upgrade is on sale' : stdCash > cash ? `${usd(stdCash - cash)} less than Standard` : 'not cheaper than Standard';
-  return `Buy Warbond ${usd(cash)} now: ${vs}; Warbonds can vanish.`;
+  return `Buy Warbond ${usd(cash)} now: ${vs}.`;
 });
 
-const standardLockDecisionText = loc('decision.standardLockText', (cash, lockWhy, targetEvent) =>
-  lockWhy === 'event' ? eventLockDecision(cash, targetEvent)
-    : `Buy Standard ${usd(cash)} later, or lock now: ${{ concept: 'target is a concept ship', expected: 'you expect its price to rise', on: 'lock is set to on' }[lockWhy]}.`);
+const standardLockDecisionText = loc('decision.standardLockText', (cash, lockWhy) =>
+  `Buy Standard ${usd(cash)} later, or lock now: ${{ concept: 'target is a concept ship', expected: 'you expect its price to rise', on: 'lock is set to on' }[lockWhy]}.`);
 
 const decisionVerdictText = loc('decision.verdictText', (differsFromAccepted, objective, best) =>
   `${differsFromAccepted ? `${BEST_DIFFERS_LABEL}: ` : ''}${objective === 'allin' ? 'Lowest all-in' : 'Least new money'}: ${routeLine(best)}`);

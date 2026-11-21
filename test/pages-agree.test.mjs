@@ -9,7 +9,7 @@ import { emptySaleEvents } from '../src/logic/availability.mjs';
 import { sessionOf } from '../src/logic/session.mjs';
 import { journey } from '../src/logic/journey.mjs';
 import { decisionGraph } from '../src/logic/decision.mjs';
-import { buyBeforeText, eventAlertText, eventLockDecision, standardLaterText, buyGroupLines, goalStatusText, heroBuyTitle } from '../src/logic/describe.mjs';
+import { buyBeforeText, availabilityNote, standardLaterText, waitReasonText, buyGroupLines, goalStatusText, heroBuyTitle } from '../src/logic/describe.mjs';
 import { shipAvailability } from '../src/logic/availability.mjs';
 import { usd } from '../src/logic/format.mjs';
 import { todayView } from '../app/src/lib/view/today.mjs';
@@ -29,7 +29,7 @@ const FIXTURES = {
   'concept target locks by itself': { offers: [std(1, 2, 5000), std(2, 4, 10000)], concept: [4], goal: {} },
   'finish mode buys everything now': { offers: [wb(1, 2, 1000), std(2, 4, 10000)], expected: [std(2, 4, 12000)], goal: { mode: 'finish' } },
   'a step that goes away': { offers: [std(1, 2, 1000), std(2, 4, 1000), std(1, 3, 4000), std(3, 4, 1000)], expected: [std(2, 4, 1000), std(1, 3, 4000), std(3, 4, 1000)], goal: { lock: 'off' } },
-  'an ongoing sale event makes an event-only target lock now': { offers: [std(1, 2, 5000), std(2, 4, 10000)], event: true, goal: {} },
+  'a target seen during the event stays in the waiting group': { offers: [std(1, 2, 5000), std(2, 4, 10000)], event: true, goal: {} },
   'a saturated limited flag is ignored': { offers: [{ ...wb(1, 2, 1000), limited: true }, std(2, 4, 10000)], meta: { limitedShare: { warbond: 1, standard: 0 } }, goal: {} },
   'a buy-before alert that saves money is promoted to buy today': { offers: [std(1, 2, 5000), std(2, 4, 10000)], expected: [std(1, 2, 5000), std(2, 4, 12000)], promoted: true, goal: { lock: 'off' } },
   'a limited-time Warbond is bought today': { offers: [{ ...wb(1, 2, 1000), limited: true }, std(2, 4, 10000)], goal: {} },
@@ -46,8 +46,7 @@ function appFor(f) {
   if (f.goal.lock) plans.chains.c1.lock = f.goal.lock;
   return {
     data: { ships, offers: f.offers, owned, meta: { catalogAt: 'C', hangarAt: 'H', ...f.meta }, warbondPrices: null, saleHistory: f.event ? { ships: { 4: { onSaleDays: [DAY] } } } : null },
-    // During the event fixtures the target has only ever been sold during events (the lock and alerts need that proof).
-    graph: buildGraph({ offers: f.offers, owned, ships }), plans, overrides: f.event ? { ...emptyOverrides(), ships: { 4: { availability: 'event-only' } } } : emptyOverrides(),
+    graph: buildGraph({ offers: f.offers, owned, ships }), plans, overrides: emptyOverrides(),
     saleEvents: f.event ? { rev: 1, events: [{ id: 'e', name: 'IAE 2956', from: '2026-11-14', to: f.eventTo ?? '2026-11-27' }] } : emptySaleEvents(), expected: f.expected ?? f.offers,
   };
 }
@@ -110,7 +109,7 @@ for (const [title, fixture] of Object.entries(FIXTURES)) {
     assert.deepEqual(cliAlerts.map(([k, t]) => [k, t.replaceAll(' -> ', ' → ')]), adviceAlerts, 'the CLI words the same alerts');
 
     // The decision graph words each step from the same advice: the expected sentence is built from the advice's alerts, lock and cover.
-    if (fixture.event && fixture.goal.lock !== 'off') assert.equal(adv.lockCode, 'event', 'the event fixture locks through the event reason');
+    if (fixture.event && fixture.goal.lock !== 'off') assert.equal(adv.lockCode, null, 'the event does not lock a Standard step');
     const g = decisionGraph(app, 'c1', { wanted: null, today: DAY, avail: session.avail(DAY) });
     assert.equal(g.steps.length, route.steps.length, 'the decision graph shows the best route');
     const WHY = { concept: 'target is a concept ship', expected: 'you expect its price to rise', on: 'lock is set to on' };
@@ -122,11 +121,13 @@ for (const [title, fixture] of Object.entries(FIXTURES)) {
       const last = i === route.steps.length - 1;
       if (step.kind !== 'standard') return assert.match(s.decision, step.kind === 'owned' ? /^Use your owned CCU/ : /^Buy Warbond /);
       let want;
-      if (locked) want = adv.lockCode === 'event' ? eventLockDecision(step.cash, adv.lockEvent) : `Buy Standard ${usd(step.cash)} later, or lock now: ${WHY[adv.lockCode]}.`;
-      else if (alert?.reason === 'event') want = `Buy Standard ${usd(step.cash)} before the sale ends: ${eventAlertText(alert)}.`;
+      if (locked) want = `Buy Standard ${usd(step.cash)} later, or lock now: ${WHY[adv.lockCode]}.`;
       else if (alert?.reason === 'pricier') want = `Buy Standard ${usd(step.cash)} before the price rises to ${usd(alert.expected)}.`;
       else if (adv.finish) want = `Buy Standard ${usd(step.cash)}: the chain is in finish mode.`;
-      else want = standardLaterText(step.cash, shipAvailability(session.avail(DAY), step.to).status);
+      else {
+        const availability = shipAvailability(session.avail(DAY), step.to);
+        want = (j.steps[i].filler ? waitReasonText('filler', { gap: j.steps[i].value }) : standardLaterText(step.cash)) + availabilityNote(availability);
+      }
       if (adv.dec.covered && last) want += ` ${adv.coverText}`;
       assert.equal(s.decision, want, `${k}`);
     });

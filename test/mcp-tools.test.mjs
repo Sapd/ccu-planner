@@ -316,9 +316,9 @@ test('virtual CCU lifecycle includes zero price, expiry and replacement by ID', 
 test('settings report credit, prices, marks and offer notes; clearing a mark keeps price', async () => {
   const w = base({ credit: 500 });
   await run('price_override', w.deps, { ship: 'Ironclad', price: 300 });
-  let r = await run('set_availability', w.deps, { ship: 'Ironclad', value: 'event-only', note: 'IAE' });
-  assert.match(r.text, /Ironclad availability: event-only/);
-  assert.equal(w.disk.overrides.ships[5].availabilityNote, 'IAE');
+  let r = await run('set_availability', w.deps, { ship: 'Ironclad', value: 'regular', note: 'November sync' });
+  assert.match(r.text, /Ironclad: Confirmed seen in the store outside sales/);
+  assert.equal(w.disk.overrides.ships[5].availabilityNote, 'November sync');
   const args = { from: 'Pulse', to: 'Ironclad' };
   r = await run('set_offer_end', w.deps, { ...args, end: '2026-12-01' });
   assert.match(r.text, /Pulse → Ironclad.*2026-12-01/);
@@ -326,9 +326,9 @@ test('settings report credit, prices, marks and offer notes; clearing a mark kee
   await run('set_offer_end', w.deps, { ...args, end: 'soon' });
   r = await run('settings', w.deps);
   assert.match(r.text, /credit \$5.*Token limit \$80/s);
-  assert.match(r.text, /Ironclad expected price \$300.*event-only IAE.*Pulse → Ironclad ends soon/s);
+  assert.match(r.text, /Ironclad expected price \$300.*Confirmed seen in the store outside sales\. November sync.*Pulse → Ironclad ends soon/s);
   assert.equal(r.data.offers[0].soon, true);
-  assert.equal(r.data.ships[0].availability, 'event-only');
+  assert.equal(r.data.ships[0].availability, 'regular');
   assert.equal(r.data.tokens.limitCents, 8000);
   await run('set_offer_end', w.deps, { ...args, end: 'clear' });
   await run('set_availability', w.deps, { ship: 'Ironclad', value: 'clear' });

@@ -1,9 +1,9 @@
 // What to do today, across all watch chains. Pure.
 import { startShip, startOf, diffRoutes, PRIORITY } from '../../../../src/logic/chains.mjs';
-import { startLineText, bestDiffers, waitReasonText, alertDetailText, neededBecauseText, paymentText, creditLineText, LIMITED_IGNORED_NOTE, standardPriceText, urgencyReasonText, onSaleText, buyCountText, forGoalsText, buyListEnd, otherGroupsLine } from '../../../../src/logic/describe.mjs';
+import { startLineText, bestDiffers, alertDetailText, neededBecauseText, paymentText, creditLineText, LIMITED_IGNORED_NOTE, standardPriceText, urgencyReasonText, onSaleText, buyCountText, forGoalsText, buyListEnd, otherGroupsLine } from '../../../../src/logic/describe.mjs';
 import { isSaturated } from '../../../../src/logic/urgency.mjs';
 import { tieNoteFor } from '../../../../src/logic/decision.mjs';
-import { localToday, ongoingEvent } from '../../../../src/logic/availability.mjs';
+import { localToday } from '../../../../src/logic/availability.mjs';
 import { sessionOf } from '../../../../src/logic/session.mjs';
 import { journey } from '../../../../src/logic/journey.mjs';
 import { edgeKey } from '../../../../src/logic/planner.mjs';
@@ -30,16 +30,13 @@ function computeTodayView(app, today) {
   const { plans, overrides, data, expected } = app;
   const session = sessionOf(app);
   const avail = session.avail(today);
-  const ongoing = ongoingEvent(avail.saleEvents, today);
-  const event = ongoing ? { name: ongoing.name, to: ongoing.to } : null;
   const goalChains = Object.values(plans.chains).sort((a, b) => priorityOf(a) - priorityOf(b) || String(a.name ?? a.id).localeCompare(String(b.name ?? b.id)) || a.id.localeCompare(b.id));
 
   const goals = [];
   const buys = [];
   const alerts = [];
-  const eventOnly = [];
   const waitGoals = [];
-  const noticeSrc = []; // { order, idx, from, to, goalId, kind: 'event'|'alert', text }
+  const noticeSrc = []; // { order, idx, from, to, goalId, text }
   let waitCount = 0;
   for (const chain of goalChains) {
     const proposal = session.proposal(chain.id, 1);
@@ -90,30 +87,19 @@ function computeTodayView(app, today) {
       if (x.alert != null) {
         alerts.push({ goalId: chain.id, step: x.step, text: x.alert });
         if (x.state === 'now') continue; // a step to buy today is in the buy list, not in the waiting notices
-        noticeSrc.push({ order, idx: route.steps.indexOf(x.step), from: x.step.from, to: x.step.to, goalId: chain.id, kind: 'alert', text: alertDetailText(x.alert, nm(x.step.from), nm(x.step.to)) });
+        noticeSrc.push({ order, idx: route.steps.indexOf(x.step), from: x.step.from, to: x.step.to, goalId: chain.id, text: alertDetailText(x.alert, nm(x.step.from), nm(x.step.to)) });
       }
     }
 
-    // Later Standard steps into a ship only known on sale during the ongoing event (watch goals only).
-    if (advice && !advice.finish) {
-      for (const a of advice.alerts) {
-        if (a.reason === 'event' && !advice.buys.some((b) => b.step === a.step)) {
-          const ev = { name: a.event.name, to: a.event.to };
-          eventOnly.push({ goalId: chain.id, step: a.step, event: ev });
-          noticeSrc.push({ order, idx: route.steps.indexOf(a.step), from: a.step.from, to: a.step.to, goalId: chain.id, kind: 'event', text: waitReasonText('event-only', { event: ev }) });
-        }
-      }
-    }
   }
 
-  // One line per distinct from-to pair; the event-only sentence wins over the alert text.
+  // One price notice per distinct from-to pair.
   const byPair = new Map();
   for (const n of noticeSrc.sort((a, b) => a.order - b.order || a.idx - b.idx)) {
     const k = `${n.from}>${n.to}`;
     let e = byPair.get(k);
-    if (!e) byPair.set(k, (e = { from: n.from, to: n.to, goals: [], text: n.text, eventOnly: n.kind === 'event' }));
+    if (!e) byPair.set(k, (e = { from: n.from, to: n.to, goals: [], text: n.text }));
     if (!e.goals.includes(n.goalId)) e.goals.push(n.goalId);
-    if (n.kind === 'event' && !e.eventOnly) { e.text = n.text; e.eventOnly = true; }
   }
   const notices = [...byPair.values()];
 
@@ -222,8 +208,6 @@ function computeTodayView(app, today) {
     waiting: {
       count: waitCount,
       goals: waitGoals,
-      event,
-      eventOnly,
       alerts,
       notices,
     },

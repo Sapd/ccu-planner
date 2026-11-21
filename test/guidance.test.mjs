@@ -42,7 +42,6 @@ test('lockTradeText words every lock reason', () => {
   const base = { targetName: 'Orion', cash: 5000 };
   assert.match(lockTradeText({ ...base, code: 'expected' }), /rises as you expect/);
   assert.match(lockTradeText({ ...base, code: 'on' }), /If Orion's price rises, waiting/);
-  assert.match(lockTradeText({ ...base, code: 'event', event: { name: 'IAE 2956' } }), /no longer on sale after IAE 2956, waiting costs the difference/);
   assert.match(lockTradeText({ ...base, code: 'concept', extraCash: 0 }), /limit the extra cost to at most \$0\.$/);
 });
 

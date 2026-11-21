@@ -4,7 +4,7 @@ import { usd } from '../../format.mjs';
 import { shortDay } from '../../availability.mjs';
 import {
   STATE_LABEL, LOCK_LABEL, MODE_CHOICE, LOCK_CHOICE, PRIORITY_CHOICE, NEW_CASH_LABEL,
-  eventAlertText, waitingCostText, acceptedStatusText, changeCauseText, changesDeltaText, meltTipText, noTokenReason, blockerItemText,
+  waitingCostText, acceptedStatusText, changeCauseText, changesDeltaText, meltTipText, noTokenReason, blockerItemText,
   blockerText, signedUsd, stepNumber,
 } from '../../describe.mjs';
 
@@ -27,17 +27,18 @@ const STATE_HELP = {
   own: 'Im Besitz: Du hast dieses Upgrade schon im Hangar. Hier gibt es nichts zu kaufen.',
   now: 'Jetzt kaufen: Kauf es heute. Das Angebot kann bald enden, und Warten könnte mehr kosten.',
   wait: 'Warten: Noch nicht kaufen. Ein Warbond in dieser Preisklasse würde diesen Schritt günstiger machen; die gibt es meist während Sales.',
-  norush: 'Im Angebot: Jetzt verfügbar, ohne Anzeichen für ein baldiges Ende. Kauf es, wann du möchtest.',
+  norush: 'Im Angebot: Beim letzten Sync im Angebot, ohne Hinweis auf ein baldiges Ende.',
   optional: 'Optional: eine Wette. Jetzt zu kaufen kann später Geld sparen, du kannst aber auch warten.',
   reserved: 'Reserviert: Wird von der reservierten Kette dieses Ziels gehalten, andere Ziele können es daher nicht nutzen.',
 };
 const LOCK_HELP = 'Jetzt kaufen, um den Preis zu sichern: Wenn du dieses Standard-Upgrade heute kaufst, steht sein Preis fest, bevor er steigt, auch wenn du es noch nicht brauchst.';
-const FILLER_HELP = 'Füller: Kein Warbond kann diesen Schritt günstiger machen, weil Warbonds in dieser Preisklasse stärker rabattiert sind, als der Schritt kostet. Kauf das Standard-Upgrade, wann du möchtest; Store-Guthaben funktioniert.';
+const FILLER_HELP = 'In diese Preislücke passt kein Warbond. Solange das Schiff im Store ist, kannst du das Standard-Upgrade mit Store-Guthaben kaufen.';
 const NO_PLEDGE_HELP = 'Das Startschiff, das du für dieses Ziel gewählt hast, ist nicht verfügbar: Es ist nicht mehr in deinem Hangar, zählt nicht mehr als Startschiff oder ein anderes Ziel hält es. Wähle ein anderes Startschiff.';
 const COUNTED = {
   msrp: (n) => `${n} Schiffspreise haben sich geändert`,
   'step-gone': (n) => `${n} Schritte werden nicht mehr angeboten`,
   'step-repriced': (n) => `${n} Schritte haben den Preis geändert`,
+  'in-store': (n) => `${n} Schiffe sind wieder im Store und ermöglichen heute weitere Routen`,
   'new-warbond': (n) => `nutzt jetzt ${n} neue Warbonds`,
   'copy-gone': (n) => `${n} deiner CCUs haben deinen Hangar verlassen`,
   'copy-new': (n) => `nutzt jetzt ${n} neue CCUs von dir`,
@@ -75,7 +76,7 @@ export const texts = {
   'Optional': 'Optional',
   'Reserved': 'Reserviert',
   'Buy now · locks the price': 'Jetzt kaufen · sichert den Preis',
-  'Filler · any time': 'Füller · jederzeit',
+  'Filler': 'Füller',
   'New cash still needed': 'Noch benötigtes neues Geld',
   'Direct upgrade at list value': 'Direktes Upgrade zum Listenwert',
   'New cash if the sales come back': 'Neues Geld, wenn die Sales zurückkommen',
@@ -104,7 +105,7 @@ export const texts = {
   'For a CCU you want to keep, melt or gift: no goal will use this copy, and plans find another way. Excluding it releases a reserved chain that holds it.': 'Für ein CCU, das du behalten, einschmelzen oder verschenken willst: Kein Ziel nutzt diese Kopie, und Pläne suchen einen anderen Weg. Wenn du sie ausschließt, wird eine reservierte Kette freigegeben, die sie hält.',
   'Optional, and nothing is bought. Reserving keeps this exact chain: it holds the CCUs, starting ship and store credit it uses so other goals cannot take them, and the planner stops switching it to a cheaper route (it tells you if a price changes). Leave it off to always get the cheapest plan. You can release it any time.': 'Optional, und es wird nichts gekauft. Mit dem Reservieren bleibt genau diese Kette erhalten: Sie hält die CCUs, das Startschiff und das Store-Guthaben, die sie nutzt, damit andere Ziele sie nicht nehmen können, und der Planer wechselt sie nicht mehr auf eine günstigere Route (er sagt dir Bescheid, wenn sich ein Preis ändert). Lass es aus, um immer den günstigsten Plan zu bekommen. Du kannst sie jederzeit freigeben.',
   'These offers may end soon, or you want the goal as soon as possible.': 'Diese Angebote enden vielleicht bald, oder du willst das Ziel so schnell wie möglich.',
-  'On sale now with no sign that they end soon. Buy when you like.': 'Aktuell im Angebot, ohne Anzeichen für ein baldiges Ende. Kauf, wann du möchtest.',
+  'On offer at the last sync, with no sign that it ends soon.': 'Beim letzten Sync im Angebot, ohne Hinweis auf ein baldiges Ende.',
   'Bets, not deadlines: you can also wait.': 'Wetten, keine Fristen: Du kannst auch warten.',
   'Warbond upgrades require new cash and are usually discounted, but they mostly appear during sales and can vanish.': 'Warbond-Upgrades brauchen neues Geld und sind meist rabattiert, erscheinen aber hauptsächlich während Sales und können wieder verschwinden.',
   'Standard upgrades use the regular price and can use store credit when offered.': 'Standard-Upgrades nutzen den regulären Preis und können, wenn angeboten, mit Store-Guthaben bezahlt werden.',
@@ -121,7 +122,7 @@ export const texts = {
   'Other ways: raise the starting ship price limit below, or mark another ship you own as a starting ship in the Hangar ("Use as starting ship").': 'Weitere Möglichkeiten: Erhöhe unten das Preislimit für Startschiffe oder markiere im Hangar ein anderes Schiff, das du besitzt, als Startschiff („Als Startschiff verwenden“).',
   'Starting ships are cheap ships you own that have Lifetime Insurance. A goal upgrades one of them; the upgraded ship keeps LTI.': 'Startschiffe sind günstige Schiffe, die du besitzt und die lebenslange Versicherung (Lifetime Insurance) haben. Ein Ziel wertet eines davon auf; das aufgewertete Schiff behält LTI.',
   'Start and target must differ.': 'Start und Ziel müssen sich unterscheiden.',
-  'No goal needs it and you could buy it again outside sale events.': 'Kein Ziel braucht es, und du könntest es außerhalb von Sale-Events wieder kaufen.',
+  'No goal needs it, a Standard offer was listed at the last sync, and the target was seen in the store on two syncs clear of any sale, or you confirmed it.': 'Kein Ziel braucht es. Beim letzten Sync gab es ein Standard-Angebot, und das Ziel wurde bei zwei Syncs außerhalb aller Sales im Store gesehen, oder du hast es bestätigt.',
   'Import from CCU Game': 'Aus CCU Game importieren',
   'Choose the saved file you downloaded from CCU Game. Nothing is added until you confirm.': 'Wähle die gespeicherte Datei, die du von CCU Game heruntergeladen hast. Es wird nichts hinzugefügt, bevor du bestätigst.',
   'New': 'Neu',
@@ -162,7 +163,7 @@ export const builders = {
     }
   },
 
-  meltHeadline: (p, hasOverrides) => `Einschmelz-Kandidaten: ${plural(p.candidates.length, 'ungenutztes CCU', 'ungenutzte CCUs')}, ${usd(p.candidateCredit)} Guthaben (keine Ersparnis, außerhalb von Sale-Events wieder kaufbar (an mindestens 2 Tagen außerhalb von Events im Angebot gesehen oder von dir als regulär markiert)${hasOverrides ? ' und zu deinen erwarteten Preisen' : ''}, kein Konzeptschiff, keine Extras, nicht reserviert)`,
+  meltHeadline: (p, hasOverrides) => `Einschmelz-Kandidaten: ${plural(p.candidates.length, 'ungenutztes CCU', 'ungenutzte CCUs')}, ${usd(p.candidateCredit)} Guthaben (keine Ersparnis${hasOverrides ? ' zu aktuellen oder erwarteten Preisen' : ''}, Standard-Angebot beim letzten Sync, Ziel bei zwei Syncs außerhalb aller Sales im Store gesehen oder bestätigt, kein Konzeptschiff, keine Extras, nicht reserviert)`,
 
   meltWithoutNote: (n) => (n ? `(${n} weitere würden ohne deine erwarteten Preise infrage kommen; sie bleiben, weil sie nach der Änderung Geld sparen)` : null),
 
@@ -181,29 +182,31 @@ export const builders = {
 
   assumptionsCoverText: (n) => `Deine Annahmen betreffen insgesamt ${plural(n, 'Standard-Angebot', 'Standard-Angebote')}.`,
 
-  eventAlertText: (a) => `bisher nur während Events verkauft (${a.event.name} bis ${shortDay(a.event.to)}); kein Warbond passt zu diesem Schritt, daher spart dir ein Kauf jetzt das Warten auf das nächste Event`,
-
-  meltEventHint: (event) => (event ? `Einschmelz-Vorschläge bleiben vorsichtig, bis nach dem Ende von ${event.name} ein Sync gelaufen ist.` : null),
-
-  availabilityText(a) {
-    const label = { regular: 'regulär', 'event-only': 'nur Events', unknown: 'unbekannt', 'off-sale': 'nicht im Angebot' }[a.status];
-    const days = a.daysOutside === 1 ? '1 Tag' : `${a.daysOutside} Tagen`;
-    return `${label}${a.override ? ' (von dir gesetzt)' : ''} · außerhalb von Events an ${days} im Angebot gesehen`;
+  availabilityNoteText(a) {
+    if (a.inStore === false) return `Beim letzten Sync (${shortDay(a.lastSyncDay)}) nicht im Store.`;
+    if (a.inStore && a.previousMiss) return `Seit ${shortDay(a.since)} im Store, beim Sync am ${shortDay(a.previousMiss)} nicht.`;
+    return '';
   },
 
-  eventLockWhy: (event) => `nur während ${event.name} im Angebot: jetzt sichern`,
-  eventBuyWhy: (event) => `nur während ${event.name} im Angebot: vor dem Ende kaufen`,
-  eventLockDecision: (cash, event) => `Standard ${usd(cash)} jetzt sichern: ${eventAlertText({ event })}.`,
+  availabilityText(a) {
+    if (a.inStore == null) return 'Kein Store-Sync aufgezeichnet.';
+    if (!a.inStore) return `Beim letzten Sync (${shortDay(a.lastSyncDay)}) nicht im Store.${a.lastSeen ? ` Zuletzt am ${shortDay(a.lastSeen)} gesehen.` : ''}`;
+    const current = a.previousMiss
+      ? `Seit ${shortDay(a.since)} im Store. Beim Sync am ${shortDay(a.previousMiss)} war das Schiff nicht im Store.`
+      : `Seit dem Sync am ${shortDay(a.since)} im Store.`;
+    if (a.seenOutsideEvents) return `${current} Außerhalb von Sale-Events im Store gesehen.`;
+    const during = a.seenIn
+      ? `jeweils während ${a.seenIn.name} (RSI-Banner bis ${shortDay(a.seenIn.to)})`
+      : 'jeweils während Sale-Events';
+    return `${current} An ${plural(a.seenDays, 'Sync-Tag', 'Sync-Tagen')} im Store gesehen, ${during}.`;
+  },
 
-  standardLaterText: (cash, status) => (status === 'regular'
-    ? `Standard ${usd(cash)} später kaufen: Das Angebot bleibt bestehen, und ein Warbond kann es ersetzen.`
-    : `Standard ${usd(cash)} später kaufen: Ein Warbond kann es ersetzen; bisher nicht bekannt, ob es außerhalb von Sale-Events im Angebot bleibt.`),
+  standardLaterText: (cash) => `Standard später für ${usd(cash)} kaufen. Store-Guthaben funktioniert.`,
 
   waitingCostText: (a) => (a.saves == null ? '' : a.saves === Infinity ? ' (Warten lässt keine Route übrig)' : ` (Warten kostet ${usd(a.saves)} mehr${a.together ? ' für diese Schritte zusammen' : ''})`),
 
   buyBeforeText(a, { name, arrow = '→', hint = '' }) {
     const path = pairOf(name, a.step.from, a.step.to, arrow);
-    if (a.reason === 'event') return `${path} ${usd(a.now)}: ${eventAlertText(a)}`;
     const after = { pricier: usd(a.expected), gone: 'kein Standard-Upgrade', concept: `mehr (Konzeptschiff, Preisanstieg noch nicht bekannt${hint})` }[a.reason];
     return `Kaufe vor ${a.reason === 'concept' ? 'dem Preisanstieg' : 'der Preisänderung'}: ${path} ${usd(a.now)} jetzt, danach ${after}${waitingCostText(a)}`;
   },
@@ -216,17 +219,14 @@ export const builders = {
 
   lockCoveredText: (fromName, targetName, extraCash) => `Preisanstieg abgedeckt: Dein CCU ${fromName} → ${targetName} begrenzt die Mehrkosten auf ${usd(extraCash)}`,
 
-  lockReasonText(code, { event = null } = {}) {
-    if (code === 'event') return event ? `Nur während ${event.name} im Angebot gesehen.` : null;
+  lockReasonText(code) {
     return { on: 'Du hast entschieden, den Preis dieses Schritts zu sichern.', expected: 'Der normale Preis dieses Schiffs wird voraussichtlich steigen.', concept: 'Dieses Schiff ist ein Konzept; sein Preis steigt meist, sobald es flugfähig wird.' }[code] ?? null;
   },
 
   waitReasonText(kind, { event = null, seen = null, cash = null, slot = null, gap = null } = {}) {
-    if (kind === 'slot') return `Warte auf einen Warbond auf ein beliebiges Schiff von ${usd(slot.fromMsrp)} bis ${usd(slot.toMsrp)} (${slot.fromName} auf ${slot.toName}). Er könnte hier bis zu ${usd(slot.save)} sparen.`;
-    if (kind === 'filler') return `Hier ist keine Ersparnis möglich: Warbonds in dieser Preisklasse sind um mehr als die Differenz von ${usd(gap)} rabattiert, daher passt keiner. Kauf das Standard-Upgrade, wann du möchtest; Store-Guthaben funktioniert.`;
-    if (kind === 'normal') return `Derzeit nur zum normalen Preis (${usd(cash)}). Warbonds dafür gibt es während Sales.`;
-    if (kind === 'off-store') return 'Derzeit nicht im Store. Kommt meist während Sales zurück.';
-    if (kind === 'event-only') return `Bisher nur während Events verkauft (jetzt ${event.name}, bis ${shortDay(event.to)}). Wenn du es verpasst, ist die nächste Chance meist das nächste Event.`;
+    if (kind === 'slot') return slot ? `Warte auf einen Warbond auf ein beliebiges Schiff von ${usd(slot.fromMsrp)} bis ${usd(slot.toMsrp)} (${slot.fromName} auf ${slot.toName}). Er könnte hier bis zu ${usd(slot.save)} sparen.` : 'Warte auf einen Warbond.';
+    if (kind === 'filler') return `In die Preislücke von ${usd(gap)} passt kein Warbond. Das Standard-Upgrade ist am günstigsten und lässt sich mit Store-Guthaben bezahlen.`;
+    if (kind === 'normal') return `Standardpreis ${usd(cash)}.`;
     if (kind === 'seen') return `Während ${event?.name ?? 'eines früheren Sales'} für ${usd(seen.cash)} gesehen.`;
     return null;
   },
@@ -301,10 +301,12 @@ export const builders = {
       case 'step-gone': return c.step === 'warbond' ? `Warbond ${pair()} wird nicht mehr angeboten` : `${pair()} wird nicht mehr verkauft`;
       case 'step-repriced': return `${c.step === 'warbond' ? 'Warbond ' : ''}${pair()} kostet jetzt ${usd(c.now)} statt ${usd(c.was)}`;
       case 'new-warbond': return `nutzt jetzt Warbond ${pair()} für ${usd(c.cash)}`;
+      case 'in-store': return `${name(c.shipId)} ist wieder im Store. Dadurch ist heute eine Route über dieses Schiff möglich`;
       case 'copy-gone': return `dein CCU ${pair()} ist nicht mehr in deinem Hangar`;
       case 'copy-new': return `nutzt jetzt dein neues CCU ${pair()}`;
       case 'taken': return c.by ? `${c.by} hat dein CCU ${pair()} genommen` : 'ein anderes Ziel hat ein gemeinsames CCU genommen';
       case 'order': return 'Planungsreihenfolge geändert';
+      case 'shared': return 'ergibt sich aus Änderungen bei anderen Zielen. Der gemeinsame Plan hat deine CCUs oder dein Store-Guthaben neu verteilt';
       default: return 'Keine Ursache gefunden';
     }
   },
@@ -376,7 +378,7 @@ export const builders = {
     switch (r.code) {
       case 'limited': return 'zeitlich begrenztes Angebot';
       case 'new': return 'neu im Sale';
-      case 'event-ends': return `${r.event.name} endet ${shortDay(r.event.to)}`;
+      case 'event-ends': return `Laut RSI-Banner endet ${r.event.name} am ${shortDay(r.event.to)}`;
       case 'price': return 'Warten kostet Geld';
       case 'note-soon': return 'du hast es als bald endend markiert';
       case 'note-ends': return `du hast es mit Ende ${shortDay(r.until)} markiert`;
@@ -389,20 +391,18 @@ export const builders = {
     const parts = [];
     if (kind === 'standard') parts.push('Jetzt verfügbar, keine Eile');
     else if (since) parts.push(`im Angebot seit ${shortDay(since)}`);
-    if (until) parts.push(untilBy === 'note' ? `läuft bis ${shortDay(until)} (deine Notiz)` : `Sale endet ${shortDay(until)}`);
+    if (until) parts.push(untilBy === 'note' ? `läuft bis ${shortDay(until)} (deine Notiz)` : untilBy === 'event' ? `Event-Ende laut RSI-Banner am ${shortDay(until)}` : `läuft bis ${shortDay(until)}`);
     return parts.join(' · ');
   },
 
-  lockTradeText({ targetName, cash, code, event = null, extraCash = null }) {
+  lockTradeText({ targetName, cash, code, extraCash = null }) {
     const cond = {
       concept: `Wenn der Preis von ${targetName} vor der Veröffentlichung steigt,`,
       expected: `Wenn der Preis von ${targetName} wie von dir erwartet steigt,`,
-      event: `Wenn ${targetName} nach ${event?.name ?? 'dem Sale'} nicht mehr im Angebot ist,`,
       on: `Wenn der Preis von ${targetName} steigt,`,
     }[code] ?? `Wenn der Preis von ${targetName} steigt,`;
-    const rise = code === 'event' ? 'die Differenz' : 'den Anstieg';
     const tail = extraCash != null ? `deine anderen Routen begrenzen die Mehrkosten auf höchstens ${usd(extraCash)}.` : 'keine deiner anderen Routen deckelt das.';
-    return `Optional: Jetzt für ${usd(cash)} kaufen, um diesen Preis zu behalten. ${cond} kostet das Warten ${rise}; ${tail}`;
+    return `Optional: Jetzt für ${usd(cash)} kaufen, um diesen Preis zu behalten. ${cond} kostet das Warten den Anstieg; ${tail}`;
   },
 
   estimateText: (typical) => `Geschätztes neues Geld, wenn Rabatte zurückkehren · ≈ ${usd(Math.round(typical / 100) * 100)}`,
@@ -426,7 +426,6 @@ export const builders = {
   },
 
   waitingHeadline: (steps, goals) => `Warten auf Sales · ${plural(goals, 'Ziel', 'Ziele')} · ${plural(steps, 'Upgrade', 'Upgrades')}`,
-  eventRiskText: (n, event) => `Heute ist nichts günstiger, aber ${plural(n, 'Upgrade könnte', 'Upgrades könnten')} nach ${event.name} (endet ${shortDay(event.to)}) verschwinden.`,
   meltTipText: (n, creditText) => `${n === 1 ? '1 CCU, das' : `${n} CCUs, die`} du nicht brauchst: einschmelzen für ${creditText} Store-Guthaben`,
 
   noTokenReason({ ltiCount = null, poolCount = null, limitCents = null } = {}) {
@@ -493,11 +492,8 @@ export const builders = {
     if (s === 'protected') return 'Du hast es als eines markiert, das du behalten willst.';
     if (s === 'not meltable') return 'RSI lässt dich dieses nicht einschmelzen.';
     if (s === 'paid value unknown') return 'Wir wissen nicht, was du bezahlt hast, und können daher nicht sagen, ob sich das Einschmelzen lohnt.';
-    if (s.startsWith('no Standard offer today')) return 'Der Store verkauft dieses Upgrade nicht mehr, du könntest es also nicht zurückbekommen.';
-    if (s.startsWith('buyable only during sale events')) return 'Der Store verkauft es nur während Sale-Events, du bekommst es also vielleicht nicht zurück.';
-    const after = /^not known to stay on sale after (.+?) \(seen on sale only during it\)$/.exec(s);
-    if (after) return `Es ist vielleicht nur während ${after[1]} im Angebot, du bekommst es also vielleicht nicht zurück.`;
-    if (s.startsWith('not known to stay on sale outside')) return 'Wir haben nicht genug Sales gesehen, um sicher zu sein, dass du es wieder kaufen könntest.';
+    if (s.startsWith('no Standard offer')) return 'Behalten: Beim letzten Sync gab es kein Standard-Angebot für dieses Upgrade.';
+    if (s === 'not yet seen in the store on two syncs clear of any sale') return 'Behalten: Das Schiff wurde noch nicht bei zwei Syncs außerhalb aller Sales im Store gesehen.';
     if (s.startsWith('cheaper than the store today')) return `Es kostet weniger als ein Kauf jetzt${savesIn(s)}, also behalte es.`;
     if (s.startsWith('will save after an expected price change')) return `Es wird weniger kosten als im Store, sobald die erwartete Preisänderung eintritt${savesIn(s)}.`;
     if (s.startsWith('into a concept ship')) return 'Es führt zu einem Konzeptschiff, dessen Preis vor der Veröffentlichung steigt.';
@@ -508,8 +504,8 @@ export const builders = {
     return s ? `Behalten: ${s}.` : 'Behalten.';
   },
 
-  noEventsNoticeStore: (saleEvents) => (saleEvents?.events?.length ? null : 'Keine Sale-Events eingetragen; Tage während Sales wie IAE zählen als normale Angebotstage. Trag den aktuellen Sale im Formular unten ein.'),
-  noEventsNoticeApp: (saleEvents) => (saleEvents?.events?.length ? null : 'Keine Sale-Events eingetragen; Tage während Sales wie IAE zählen als normale Angebotstage. Trag den aktuellen Sale im Store ein.'),
+  noEventsNoticeStore: (saleEvents) => (saleEvents?.events?.length ? null : 'Keine Sale-Events eingetragen. Alle Sync-Tage zählen als Tage außerhalb von Sale-Events. Trag den aktuellen Sale im Formular unten ein.'),
+  noEventsNoticeApp: (saleEvents) => (saleEvents?.events?.length ? null : 'Keine Sale-Events eingetragen. Alle Sync-Tage zählen als Tage außerhalb von Sale-Events. Trag den aktuellen Sale im Store ein.'),
   meltHeadlinePlain: ({ count, credit }) => (count ? `${meltTipText(count, usd(credit))}.` : 'Gerade lohnt sich nichts zum Einschmelzen.'),
   importConfirmLabel: (n) => (n === 1 ? '1 Ziel hinzufügen' : `${n} Ziele hinzufügen`),
   noMatchesText: (query) => `Keine Treffer für „${String(query ?? '').trim()}“.`,

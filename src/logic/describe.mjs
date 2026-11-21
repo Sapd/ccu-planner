@@ -38,7 +38,7 @@ function issueLineEn(i, { name, goalName, arrow = '→' }) {
 export const issueLine = loc('issueLine', issueLineEn);
 
 /** Headline of the melt candidates. */
-export const meltHeadline = loc('meltHeadline', (p, hasOverrides) => `Melt candidates: ${p.candidates.length} unused CCU(s), ${usd(p.candidateCredit)} credit (no saving, rebuyable outside sale events (seen on sale on ≥2 days outside events, or marked regular by you)${hasOverrides ? ' and at your expected prices' : ''}, not into a concept ship, no extras, not reserved)`);
+export const meltHeadline = loc('meltHeadline', (p, hasOverrides) => `Melt candidates: ${p.candidates.length} unused CCU(s), ${usd(p.candidateCredit)} credit (no saving${hasOverrides ? ' at current or expected prices' : ''}, Standard offer at the last sync, target seen in the store on two syncs clear of any sale, or confirmed, not into a concept ship, no extras, not reserved)`);
 
 /** Note on candidates that only your expected prices rule out, or null when there are none. */
 export const meltWithoutNote = loc('meltWithoutNote', (n) => (n ? `(${n} more would qualify without your expected prices; kept because they save money after the change)` : null));
@@ -91,39 +91,37 @@ export const priceLine = loc('priceLine', priceLineEn);
 /** Heading note of the expected prices: how many Standard offers the assumptions cover in all. */
 export const assumptionsCoverText = loc('assumptionsCoverText', (n) => `Your assumptions cover ${plural(n, 'Standard offer', 'Standard offers')} in all.`);
 
-/** Alert text for a Standard step only known on sale during the ongoing event (expectedChanges reason 'event'). */
-export const eventAlertText = loc('eventAlertText', (a) => `sold only during events so far (${a.event.name} until ${shortDay(a.event.to)}); no Warbond fits this step, so buying it now saves waiting for the next event`);
-
-/** The CLI's notice when no sale event is entered: sale days would then count as normal on-sale days. (The app's is NO_EVENTS_NOTICE_APP.) */
-export const NO_EVENTS_NOTICE = 'No sale events entered — days during sales like IAE count as normal on-sale days. Add the current event with: chain event add "<name>" <from> <to>.';
+/** The CLI's notice when no sale event is entered: no sync days are covered by a sale event. (The app's is NO_EVENTS_NOTICE_APP.) */
+export const NO_EVENTS_NOTICE = 'No sale events recorded. All sync days count as outside sale events. Add the current event with: chain event add "<name>" <from> <to>.';
 
 /** The notice for a sale-events document, or null once it has an event. */
 export const noEventsNotice = (saleEvents) => (saleEvents?.events?.length ? null : NO_EVENTS_NOTICE);
 
-/** Hint for the Melt tab: an event is on and its history is too short to trust, or null. */
-export const meltEventHint = loc('meltEventHint', (event) => (event ? `Melt suggestions stay conservative until a sync has run after ${event.name} ends.` : null));
-
-/** One availability row for the Prices tab and the CLI: status, days seen outside events, override mark. */
+/** What store syncs recorded for this ship. */
 function availabilityTextEn(a) {
-  const label = { regular: 'regular', 'event-only': 'event-only', unknown: 'unknown', 'off-sale': 'off sale' }[a.status];
-  const days = a.daysOutside === 1 ? '1 day' : `${a.daysOutside} days`;
-  return `${label}${a.override ? ' (set by you)' : ''} · seen on sale ${days} outside events`;
+  if (a.inStore == null) return 'No store sync recorded.';
+  if (!a.inStore) return `Not in the store at the last sync (${shortDay(a.lastSyncDay)}).${a.lastSeen ? ` Last seen ${shortDay(a.lastSeen)}.` : ''}`;
+  const current = a.previousMiss
+    ? `In the store since ${shortDay(a.since)}; not there at the ${shortDay(a.previousMiss)} sync.`
+    : `In the store since the ${shortDay(a.since)} sync.`;
+  if (a.seenOutsideEvents) return `${current} Seen in the store outside sale events.`;
+  const during = a.seenIn
+    ? `all during ${a.seenIn.name} (RSI's banner: until ${shortDay(a.seenIn.to)})`
+    : 'all during sale events';
+  return `${current} Seen in the store on ${plural(a.seenDays, 'sync day', 'sync days')}, ${during}.`;
 }
 export const availabilityText = loc('availabilityText', availabilityTextEn);
 
-/** Option reason for a Standard step into a ship only known on sale during the ongoing event, locked now. */
-export const eventLockWhy = loc('eventLockWhy', (event) => `only on sale during ${event.name}: lock now`);
+/** A step's short store note, only when something is notable: missing at the last sync, or back after a sync missed it. */
+function availabilityNoteTextEn(a) {
+  if (a.inStore === false) return `Not in the store at the last sync (${shortDay(a.lastSyncDay)}).`;
+  if (a.inStore && a.previousMiss) return `In the store since ${shortDay(a.since)}; not there at the ${shortDay(a.previousMiss)} sync.`;
+  return '';
+}
+export const availabilityNoteText = loc('availabilityNoteText', availabilityNoteTextEn);
+export const availabilityNote = (a) => { const s = availabilityNoteText(a); return s ? ` ${s}` : ''; };
 
-/** Option reason for a Standard step (not the target) into a ship only known on sale during the ongoing event. */
-export const eventBuyWhy = loc('eventBuyWhy', (event) => `only on sale during ${event.name}: buy before it ends`);
-
-/** Decision sentence for locking a Standard step now because the target is only known on sale during the ongoing event. */
-export const eventLockDecision = loc('eventLockDecision', (cash, event) => `Lock Standard ${usd(cash)} now: ${eventAlertText({ event })}.`);
-
-/** Decision sentence for a Standard step bought later; only a 'regular' ship is known to stay on sale. */
-export const standardLaterText = loc('standardLaterText', (cash, status) => (status === 'regular'
-  ? `Buy Standard ${usd(cash)} later: it stays on sale and a Warbond may replace it.`
-  : `Buy Standard ${usd(cash)} later: a Warbond may replace it; not yet known to stay on sale outside sale events.`));
+export const standardLaterText = loc('standardLaterText', (cash) => `Buy Standard ${usd(cash)} later. Store credit works.`);
 
 /** Label for plans shown from the current best proposal while the chain has a different reserved route. */
 export const BEST_DIFFERS_LABEL = N_('current best plan (differs from your reserved chain)');
@@ -140,7 +138,6 @@ export const waitingCostText = loc('waitingCostText', (a) => (a.saves == null ? 
 /** The "Buy before ..." warning of one alert (expectedChanges). `name` maps a ship id to its name; `hint` is appended to the concept warning (CLI). */
 function buyBeforeTextEn(a, { name, arrow = '→', hint = '' }) {
   const path = `${name(a.step.from)} ${arrow} ${name(a.step.to)}`;
-  if (a.reason === 'event') return `${path} ${usd(a.now)}: ${eventAlertText(a)}`;
   const after = { pricier: usd(a.expected), gone: 'no Standard upgrade', concept: `more (concept ship, rise not known yet${hint})` }[a.reason];
   return `Buy before the price ${a.reason === 'concept' ? 'rises' : 'changes'}: ${path} ${usd(a.now)} now, ${after} after${waitingCostText(a)}`;
 }
@@ -153,22 +150,22 @@ export const STATE_LABEL = { own: N_('Owned'), now: N_('Buy now'), wait: N_('Wai
 
 /** Chip label for a step that locks its price now. */
 export const LOCK_LABEL = N_('Buy now · locks the price');
-/** The label of a waiting step no Warbond can make cheaper: bought whenever, with store credit too. */
-export const FILLER_LABEL = N_('Filler · any time');
+/** The label of a waiting step no Warbond can make cheaper: it can use store credit when offered. */
+export const FILLER_LABEL = N_('Filler');
 
 /** What each chip means, shown as its tooltip. Same meaning as the glossary's "status" entry, one or two plain sentences each. */
 export const STATE_HELP = {
   own: 'Owned: you already have this upgrade in your hangar. Nothing to buy.',
   now: 'Buy now: buy it today. The offer may end soon, and waiting could cost more.',
   wait: 'Wait: don\'t buy yet. A Warbond in this price range would make this step cheaper; they mostly appear during sales.',
-  norush: 'On sale: available now with no sign that it ends soon. Buy whenever you like.',
+  norush: 'On sale: on offer at the last sync, with no sign that it ends soon.',
   optional: 'Optional: a bet. Buying now may save money later, but you can also wait.',
   reserved: 'Reserved: held for this goal by its reserved chain, so other goals cannot use it.',
 };
 /** Tooltip of a step that locks its price now. */
 export const LOCK_HELP = 'Buy now to lock the price: buying this Standard upgrade today fixes its price before it rises, even though you do not need it yet.';
 /** Tooltip of a filler step. */
-export const FILLER_HELP = 'Filler: no Warbond can make this step cheaper, because Warbonds at this price are discounted by more than the step costs. Buy the Standard upgrade whenever you like; store credit works.';
+export const FILLER_HELP = 'No Warbond fits this price gap. The Standard upgrade takes store credit and is available while the ship is in the store.';
 
 /** The tooltip for a chip: the filler and lock texts take precedence over the state's own. */
 function chipHelpEn(state, { lock = false, filler = false } = {}) {
@@ -181,24 +178,17 @@ export const chipHelp = loc('chipHelp', chipHelpEn);
 /** Shown where a lock would have been when an owned CCU into the target already caps a price rise. */
 export const lockCoveredText = loc('lockCoveredText', (fromName, targetName, extraCash) => `Price rise covered: your ${fromName} → ${targetName} CCU limits it to ${usd(extraCash)} more`);
 
-/** One plain sentence for a lockReason code ('on' | 'expected' | 'concept' | 'event'), or null. */
-function lockReasonTextEn(code, { event = null } = {}) {
-  if (code === 'event') return event ? `Only known on sale during ${event.name}.` : null;
+/** One plain sentence for a lockReason code ('on' | 'expected' | 'concept'), or null. */
+function lockReasonTextEn(code) {
   return { on: 'You chose to lock the price of this step.', expected: 'The normal price of this ship is expected to go up.', concept: 'This ship is a concept; its price usually rises when it becomes flyable.' }[code] ?? null;
 }
 export const lockReasonText = loc('lockReasonText', lockReasonTextEn);
 
-/**
- * Why a step waits: 'slot' (a Warbond into any ship in the price range could fill it), 'filler' (no Warbond fits:
- * buy the Standard upgrade whenever), 'normal' | 'off-store' | 'event-only' | 'seen' (a lower sale price was seen).
- * slot: { fromName, toName, fromMsrp, toMsrp, save } (cents); filler: { gap } (cents).
- */
+/** A Warbond slot, a filler, a Standard price, or a lower observed Warbond price. */
 function waitReasonTextEn(kind, { event = null, seen = null, cash = null, slot = null, gap = null } = {}) {
-  if (kind === 'slot') return `Wait for a Warbond into any ship from ${usd(slot.fromMsrp)} to ${usd(slot.toMsrp)} (${slot.fromName} to ${slot.toName}). One could save up to ${usd(slot.save)} here.`;
-  if (kind === 'filler') return `No saving possible here: Warbonds at this price are discounted by more than the ${usd(gap)} gap, so none fits. Buy the Standard upgrade whenever you like; store credit works.`;
-  if (kind === 'normal') return `Only at the normal price right now (${usd(cash)}). Warbonds for it show up during sales.`;
-  if (kind === 'off-store') return 'Not in the store right now. It usually comes back during sales.';
-  if (kind === 'event-only') return `Sold only during events so far (now ${event.name}, until ${shortDay(event.to)}). If you miss it, the next chance is usually the next event.`;
+  if (kind === 'slot') return slot ? `Wait for a Warbond into any ship from ${usd(slot.fromMsrp)} to ${usd(slot.toMsrp)} (${slot.fromName} to ${slot.toName}). One could save up to ${usd(slot.save)} here.` : 'Wait for a Warbond.';
+  if (kind === 'filler') return `No Warbond fits the ${usd(gap)} gap, so the Standard upgrade is the cheapest way. Store credit works.`;
+  if (kind === 'normal') return `Standard price: ${usd(cash)}.`;
   if (kind === 'seen') return `Seen for ${usd(seen.cash)} during ${event?.name ?? 'an earlier sale'}.`;
   return null;
 }
@@ -386,10 +376,12 @@ function changeCauseTextEn(c, { name, arrow = '→' }) {
     case 'step-gone': return c.step === 'warbond' ? `Warbond ${pair()} is no longer offered` : `${pair()} is no longer sold`;
     case 'step-repriced': return `${c.step === 'warbond' ? 'Warbond ' : ''}${pair()} went from ${usd(c.was)} to ${usd(c.now)}`;
     case 'new-warbond': return `now uses Warbond ${pair()} for ${usd(c.cash)}`;
+    case 'in-store': return `${name(c.shipId)} is in the store again, so a route through it is possible today`;
     case 'copy-gone': return `your ${pair()} CCU is no longer in your hangar`;
     case 'copy-new': return `now uses your new ${pair()} CCU`;
     case 'taken': return c.by ? `${c.by} took your ${pair()} CCU` : 'another goal took a shared CCU';
     case 'order': return 'Planning order changed';
+    case 'shared': return 'follows from changes to other goals. The shared plan reassigned your CCUs or store credit';
     default: return 'No cause found';
   }
 }
@@ -402,6 +394,7 @@ const COUNTED = {
   'step-gone': (n) => `${n} steps are no longer offered`,
   'step-repriced': (n) => `${n} steps changed price`,
   'new-warbond': (n) => `now uses ${n} new Warbonds`,
+  'in-store': (n) => `${n} ships are back in the store and open up routes today`,
   'copy-gone': (n) => `${n} of your CCUs left your hangar`,
   'copy-new': (n) => `now uses ${n} new CCUs of yours`,
 };
@@ -506,7 +499,7 @@ export const todayNothingHeadline = loc('todayNothingHeadline', (nothingWhy) => 
 /** The three groups of the buy list, in order. */
 export const BUY_GROUPS = {
   today: { title: N_('Buy now'), help: N_('These offers may end soon, or you want the goal as soon as possible.') },
-  norush: { title: N_('On sale'), help: N_('On sale now with no sign that they end soon. Buy when you like.') },
+  norush: { title: N_('On sale'), help: N_('On offer at the last sync, with no sign that it ends soon.') },
   optional: { title: N_('Optional'), help: N_('Bets, not deadlines: you can also wait.') },
 };
 
@@ -567,7 +560,7 @@ function urgencyReasonTextEn(r) {
   switch (r.code) {
     case 'limited': return 'limited-time offer';
     case 'new': return 'new during the sale';
-    case 'event-ends': return `${r.event.name} ends ${shortDay(r.event.to)}`;
+    case 'event-ends': return `RSI's banner says ${r.event.name} ends ${shortDay(r.event.to)}`;
     case 'price': return 'waiting costs money';
     case 'note-soon': return 'you marked it as ending soon';
     case 'note-ends': return `you marked it as ending ${shortDay(r.until)}`;
@@ -578,14 +571,14 @@ function urgencyReasonTextEn(r) {
 export const urgencyReasonText = loc('urgencyReasonText', urgencyReasonTextEn);
 
 /**
- * Where an offer stands in "On sale". A Warbond is a sale offer: "on sale since Nov 17 · sale ends Dec 2".
- * A Standard upgrade is always available: "Available now, no rush". Your own end day shows for either.
+ * Where an offer stands in "On sale". Dates come from the RSI event banner or an offer note.
+ * Standard offers can also have an offer note.
  */
 function onSaleTextEn({ kind = 'warbond', since = null, until = null, untilBy = null }) {
   const parts = [];
   if (kind === 'standard') parts.push('Available now, no rush');
   else if (since) parts.push(`on sale since ${shortDay(since)}`);
-  if (until) parts.push(untilBy === 'note' ? `runs until ${shortDay(until)} (your note)` : `sale ends ${shortDay(until)}`);
+  if (until) parts.push(untilBy === 'note' ? `runs until ${shortDay(until)} (your note)` : untilBy === 'event' ? `RSI's banner: event ends ${shortDay(until)}` : `runs until ${shortDay(until)}`);
   return parts.join(' · ');
 }
 export const onSaleText = loc('onSaleText', onSaleTextEn);
@@ -616,18 +609,16 @@ export const DONT_LOCK_LABEL = N_("Don't lock this goal");
 
 /**
  * The trade of a price lock, in one line: what it costs now and what waiting risks. `code` is the lockReason
- * ('on' | 'expected' | 'concept' | 'event'); `extraCash` is the most a covering route of yours would add (null: no cover).
+ * ('on' | 'expected' | 'concept'); `extraCash` is the most a covering route of yours would add (null: no cover).
  */
-function lockTradeTextEn({ targetName, cash, code, event = null, extraCash = null }) {
+function lockTradeTextEn({ targetName, cash, code, extraCash = null }) {
   const cond = {
     concept: `If ${targetName}'s price rises before release,`,
     expected: `If ${targetName}'s price rises as you expect,`,
-    event: `If ${targetName} is no longer on sale after ${event?.name ?? 'the sale'},`,
     on: `If ${targetName}'s price rises,`,
   }[code] ?? `If ${targetName}'s price rises,`;
-  const rise = code === 'event' ? 'the difference' : 'the rise';
   const tail = extraCash != null ? `your other routes limit the extra cost to at most ${usd(extraCash)}.` : 'none of your other routes caps it.';
-  return `Optional: buy now for ${usd(cash)} to keep this price. ${cond} waiting costs ${rise}; ${tail}`;
+  return `Optional: buy now for ${usd(cash)} to keep this price. ${cond} waiting costs the rise; ${tail}`;
 }
 export const lockTradeText = loc('lockTradeText', lockTradeTextEn);
 
@@ -665,8 +656,6 @@ export const nothingWhyText = loc('nothingWhyText', nothingWhyTextEn);
 /** Waiting panel headline. */
 export const waitingHeadline = loc('waitingHeadline', (steps, goals) => `Waiting for sales · ${plural(goals, 'goal', 'goals')} · ${plural(steps, 'upgrade', 'upgrades')}`);
 
-/** Today hero subline when nothing is cheaper today but event-only upgrades may disappear (n distinct from-to pairs). */
-export const eventRiskText = loc('eventRiskText', (n, event) => `Nothing is cheaper today, but ${n} upgrade${n === 1 ? '' : 's'} may disappear after ${event.name} (ends ${shortDay(event.to)}).`);
 
 /** An alert text (routeAdvice) without its own "From → To" pair, for lines that already show the ships. */
 export function alertDetailText(text, fromName, toName) {
@@ -781,11 +770,7 @@ function meltReasonPlainEn(keep) {
   if (s === 'protected') return 'You marked it as one to keep.';
   if (s === 'not meltable') return 'RSI does not let you melt this one.';
   if (s === 'paid value unknown') return "We don't know what you paid, so we can't tell if melting is worth it.";
-  if (s.startsWith('no Standard offer today')) return "The store no longer sells this upgrade, so you couldn't get it back.";
-  if (s.startsWith('buyable only during sale events')) return 'The store only sells it during sale events, so you might not get it back.';
-  const after = /^not known to stay on sale after (.+?) \(seen on sale only during it\)$/.exec(s);
-  if (after) return `It may only be on sale during ${after[1]}, so you might not get it back.`;
-  if (s.startsWith('not known to stay on sale outside')) return "We haven't seen enough sales to be sure you could buy it again.";
+  if (s.startsWith('no Standard offer')) return 'Kept: no Standard offer for this upgrade at the last sync.';
   if (s.startsWith('cheaper than the store today')) return `It costs less than buying it now${/\(.+\)/.exec(s) ? ` (saves ${/\((.+)\)/.exec(s)[1]})` : ''}, so keep it.`;
   if (s.startsWith('will save after an expected price change')) return `It will cost less than the store once the expected price change lands${/\(.+\)/.exec(s) ? ` (saves ${/\((.+)\)/.exec(s)[1]})` : ''}.`;
   if (s.startsWith('into a concept ship')) return "It leads to a concept ship, whose price rises before release.";
@@ -795,10 +780,10 @@ function meltReasonPlainEn(keep) {
 export const meltReasonPlain = loc('meltReasonPlain', meltReasonPlainEn);
 
 /** Plain reason shown on every melt candidate (display only). */
-export const MELT_CANDIDATE_PLAIN = N_('No goal needs it and you could buy it again outside sale events.');
+export const MELT_CANDIDATE_PLAIN = N_('No goal needs it, a Standard offer was listed at the last sync, and the target was seen in the store on two syncs clear of any sale, or you confirmed it.');
 
 /** App variant of the no-events notice: sale events are added in the Store section. */
-export const NO_EVENTS_NOTICE_APP = 'No sale events entered; days during sales like IAE count as normal on-sale days. Add the current sale in Store.';
+export const NO_EVENTS_NOTICE_APP = 'No sale events recorded. All sync days count as outside sale events. Add the current sale in Store.';
 /** Same notice for the panel inside Store itself, where the sale is added right there. */
 export const NO_EVENTS_NOTICE_STORE = NO_EVENTS_NOTICE_APP.replace('Add the current sale in Store.', 'Add the current sale in the form below.');
 export const noEventsNoticeStore = loc('noEventsNoticeStore', (saleEvents) => (saleEvents?.events?.length ? null : NO_EVENTS_NOTICE_STORE));

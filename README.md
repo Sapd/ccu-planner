@@ -72,13 +72,15 @@ everything in memory and leaves your own data alone; **Leave sample data** takes
   **Buy on RSI** link that opens the RSI website; the app buys nothing.
 - **Goals** are the ships you want. Each shows its chain of upgrades step by step: own, buy now, or wait.
   A waiting step either waits for a Warbond into any ship in its price range, or is a filler no Warbond
-  can make cheaper (buy it whenever, store credit works). An opened owned step lists which goals use your
+  can make cheaper (use store credit while the target ship is in the store). An opened owned step lists which goals use your
   other copies of that CCU. A goal's settings can make it route through a ship you pick.
 - **Hangar** lists your pledges and which unused CCUs are worth melting. Under Upgrades you can mark a CCU
   "Don't use in plans", and add **virtual CCUs**: upgrades you expect to get outside the store (from a
   friend, a trade or a coming sale) at a price you give; plans use them like cash-only Warbonds.
-- **Store** holds the current sale events and Warbond prices. Enter a running sale there so the planner
-  knows an offer is only around for now. Its **Browse store** tab lists RSI's whole public store (Pledge,
+- **Store** holds sale event dates and Warbond prices. Event dates label the days recorded by store syncs.
+  Price assumptions shows when each ship was seen. Melt suggestions require a Standard offer for the same
+  upgrade and a sighting of its target outside recorded sales. You can also confirm a sighting in Price assumptions.
+  The **Browse store** tab lists RSI's whole public store (Pledge,
   Subscriber, Concierge) with filters. Sync → Store catalog (or the tab's Refresh) fills it; signed in, it also
   gets the Subscriber store and Concierge items, which RSI shows only to a signed-in account.
 - **Advanced** has the Upgrade map, Compare routes and Price assumptions.

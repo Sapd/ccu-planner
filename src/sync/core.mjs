@@ -49,11 +49,12 @@ export async function sync(cmd, io, options = {}) {
   };
   async function syncCatalog() {
     const [d] = await client.upgrade({ operationName: 'initShipUpgrade' });
-    const out = { fetchedAt: new Date().toISOString(), app: d.app, manufacturers: d.manufacturers, ships: d.ships };
+    const observed = new Date();
+    const out = { fetchedAt: observed.toISOString(), app: d.app, manufacturers: d.manufacturers, ships: d.ships };
     await writeJson(join('catalog.json'), out);
-    // Which days each ship was on sale (Standard SKU): availability beyond sale events is learned from this.
+    // Record the day and time of the Standard SKU observations.
     const historyFile = join('sale-history.json');
-    await writeJson(historyFile, appendSaleHistory(await readJson(historyFile, { ships: {} }), onSaleShipIds(d.ships), localToday()));
+    await writeJson(historyFile, appendSaleHistory(await readJson(historyFile, { ships: {} }), onSaleShipIds(d.ships), localToday(observed), out.fetchedAt));
     log(`catalog: ${d.ships.length} ships, currency ${d.app.pricing.currencyCode}`);
     return out;
   }

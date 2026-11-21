@@ -33,7 +33,7 @@ import { addChain, acceptRoute, releaseChain, setMode, setObjective, setLock, PR
  *   setCredit { cents }
  *   setPrice { shipId, cents, note? }                    result: the override
  *   clearPrice { shipId }
- *   setAvailability { shipId, value: 'regular'|'event-only', note? }   result: the override
+ *   setAvailability { shipId, value: 'regular', note? }   result: the override
  *   clearAvailability { shipId }
  *   setOfferEnd { from, to, until?: 'YYYY-MM-DD', soon?: true }      your note on one upgrade pair's offer ("runs until" or "ends soon"; stored in overrides.pairs); result: the note
  *   clearOfferEnd { from, to }

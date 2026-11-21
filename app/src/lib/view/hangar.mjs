@@ -8,7 +8,7 @@ import { meltPlan, classifyCopies } from '../../../../src/logic/melt.mjs';
 import { hangarSummary, isUsd } from '../../../../src/logic/hangar.mjs';
 import { usd } from '../../../../src/logic/format.mjs';
 import { hasPriceOverrides, pricedShips } from '../../../../src/logic/prices.mjs';
-import { shipAvailability, localToday, ongoingEvent } from '../../../../src/logic/availability.mjs';
+import { shipAvailability, localToday } from '../../../../src/logic/availability.mjs';
 import { sessionOf } from '../../../../src/logic/session.mjs';
 import { N_ } from '../../../../src/logic/i18n.mjs';
 
@@ -89,10 +89,7 @@ function computeMeltView(app, today = localToday()) {
   const plan = meltPlan(app.data, app.plans, { protect, expected, overrides: app.overrides, avail, session });
   const without = hasOverrides ? meltPlan(app.data, app.plans, { protect, avail, session }).candidates.length - plan.candidates.length : 0;
   const kept = classifyCopies(app.data, app.plans, { protect, expected, avail }).filter((c) => !c.candidate);
-  // An event is on and some copies wait only for sale history: the suggestions are still conservative.
-  const event = ongoingEvent(avail.saleEvents, today);
-  const hintEvent = event && kept.some((c) => c.availability === 'unknown') ? event : null;
-  return { plan, without, kept, hasOverrides, hintEvent };
+  return { plan, without, kept, hasOverrides };
 }
 
 /** Melt plan, extra candidate count and kept copies, cached in the app's planning session per local day. */
@@ -100,14 +97,12 @@ export function meltView(app, { compute = computeMeltView, today = localToday() 
   return sessionOf(app).memo('melt', today, () => compute(app, today));
 }
 
-/** Prices-tab availability rows: every ship with a Standard SKU today (and any you marked), by name. */
+/** Store observations for catalog ships, by name. */
 export function availabilityRows(app, today = localToday()) {
   const ctx = sessionOf(app).avail(today);
-  const marked = (id) => ['regular', 'event-only'].includes(app.overrides.ships[id]?.availability);
   return [...app.data.ships.values()]
-    .filter((s) => s.standard || marked(s.id))
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map((s) => ({ shipId: s.id, name: s.name, ...shipAvailability(ctx, s.id), mark: app.overrides.ships[s.id]?.availability ?? 'auto' }));
+    .map((s) => ({ shipId: s.id, name: s.name, ...shipAvailability(ctx, s.id) }));
 }
 
 /** Category chips of the Hangar tab. `cats` are the pledge categories each chip covers (null = all). */
@@ -157,10 +152,10 @@ export function valueLabel(value) {
   return /^[A-Z]{3}$/.test(code) ? `${code} ${(value.cents / 100).toFixed(2)}` : `${value.cents} (${code} cents)`;
 }
 
-/** Availability rows split in two: ships with a verdict (or one you set), and ships the sync has not seen often enough yet. */
+/** Show observed or manually confirmed ships above the fold. */
 export function splitAvailability(rows) {
-  const unknown = rows.filter((r) => r.status === 'unknown' && r.mark === 'auto');
-  return { known: rows.filter((r) => !unknown.includes(r)), unknown };
+  const hasRecord = (r) => r.lastSeen != null || r.confirmedOutsideEvents;
+  return { known: rows.filter(hasRecord), unknown: rows.filter((r) => !hasRecord(r)) };
 }
 
 /** "1 upgrade" / "2 upgrades". */

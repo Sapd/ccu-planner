@@ -46,13 +46,13 @@ test('what is saved never has the feed in it: userSaleEvents strips the tagged e
   assert.ok(out.saleEvents.events.every((e) => !e.source) && out.saleEvents.feedAt === undefined);
 });
 
-test('the planner treats a feed event like one you entered: sale days inside it do not count as regular availability', () => {
+test('the planner treats a feed event like one you entered: sale days inside it do not count as outside observations', () => {
   const doc = mergeSaleEvents({ rev: 0, events: [] }, [IAE], 'at');
   const saleHistory = { ships: { 7: { onSaleDays: ['2026-11-15', '2026-11-25'] } } };
   const r = availability(7, { saleHistory, saleEvents: doc, today: '2026-12-10', standardNow: true });
-  assert.equal(r.daysOutside, 0);
-  assert.equal(r.status, 'event-only');
-  assert.equal(availability(7, { saleHistory, saleEvents: { rev: 0, events: [] }, today: '2026-12-10', standardNow: true }).daysOutside, 2, 'without it both days count as outside');
+  assert.equal(r.seenOutsideEvents, false);
+  assert.equal(r.seenIn.name, 'IAE 2956');
+  assert.equal(availability(7, { saleHistory, saleEvents: { rev: 0, events: [] }, today: '2026-12-10', standardNow: true }).seenOutsideEvents, true, 'without it both days count as outside');
 });
 
 test('feedCatalog is public only and keeps a picture only where the feed picture is saved (as feed/catalog/<id>.webp)', () => {

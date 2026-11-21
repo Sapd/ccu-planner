@@ -1,9 +1,7 @@
 // Price-change alerts for a route and what waiting costs. Pure.
 
 import { searchRoutes, edgeKey, buildGraph, withEdge, keepVirtual } from './planner.mjs';
-import { shipAvailability } from './availability.mjs';
 import { goalStarts } from './sharedPlan.mjs';
-import { warbondCanFit } from './warbondFit.mjs';
 
 
 // The graph as it will be after the price change: today's owned copies and tokens, the expected offers.
@@ -64,19 +62,16 @@ function waitingPenalty({ session, chainId }, expected, affected) {
 /**
  * Standard steps of a route whose price is expected to change.
  * reason: 'pricier' / 'cheaper' (your expected prices), 'gone' (target no longer
- * more expensive), 'event' (target only known on sale during the ongoing sale
- * event; the alert carries it as `event`), 'concept' (target is a concept ship
- * without your expected price: it will rise, by an unknown amount).
- * `avail` is an availCtx; without it no event is known.
+ * more expensive), or 'concept' (a concept ship without your expected price).
  *
  * `ctx` ({ session, chainId }) keeps the 'gone' and 'pricier' alerts of a route only when
  * waiting really costs this goal money: they then all carry `saves`, the extra cash (all-in cost for an
  * all-in goal) after the change against buying all of them now (Infinity: no route after the change; an
  * alert whose penalty is unknown stays without `saves`). `route` must be the goal's full route: every page
  * gets its alerts from routeAdvice, so they all get the same answer. `together` marks a penalty shared by
- * several steps. Without `ctx` nothing is checked. 'event' and 'concept' alerts are never checked: their future price is unknown.
+ * several steps. Without `ctx` nothing is checked. 'concept' alerts are never checked: their future price is unknown.
  */
-export function expectedChanges(route, expected, ships = null, avail = null, ctx = null) {
+export function expectedChanges(route, expected, ships = null, ctx = null) {
   const exp = new Map();
   for (const o of expected) if (o.kind === 'standard') exp.set(`${o.from}-${o.to}`, o);
   let alerts = [];
@@ -86,13 +81,12 @@ export function expectedChanges(route, expected, ships = null, avail = null, ctx
     const e = exp.get(`${s.from}-${s.to}`);
     if (!e) { alerts.push({ step: s, now: s.cash, expected: null, reason: 'gone' }); later += s.cash; continue; }
     later += e.cash;
-    const a = avail ? shipAvailability(avail, s.to) : null;
-    const event = a && a.status !== 'regular' ? a.event : null;
-    if (e.cash > s.cash) alerts.push({ step: s, now: s.cash, expected: e.cash, reason: 'pricier' });
-    // Only a ship proven to be sold during events alone, and only for a filler: a step a Warbond can still fill waits for one anyway.
-    else if (event && a.status === 'event-only' && warbondCanFit(ships?.get(s.from)?.msrp, ships?.get(s.to)?.msrp) === false) alerts.push({ step: s, now: s.cash, expected: e.cash === s.cash ? null : e.cash, reason: 'event', event });
-    else if (e.cash !== s.cash) alerts.push({ step: s, now: s.cash, expected: e.cash, reason: 'cheaper' });
-    else if (!e.assumed && ships?.get(s.to)?.concept) alerts.push({ step: s, now: s.cash, expected: null, reason: 'concept' });
+    const now = s.cash;
+    let reason = null;
+    if (e.cash > now) reason = 'pricier';
+    else if (e.cash !== now) reason = 'cheaper';
+    else if (!e.assumed && ships?.get(s.to)?.concept) reason = 'concept';
+    if (reason) alerts.push({ step: s, now, expected: e.cash === now ? null : e.cash, reason });
   }
   const dropped = [];
   const shown = alerts.filter((a) => a.reason === 'gone' || a.reason === 'pricier');

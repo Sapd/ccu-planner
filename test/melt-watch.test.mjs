@@ -32,7 +32,7 @@ test('classify: only unreserved, rebuyable, zero-saving copies without extras ar
   assert.match(byId.saves.keep, /cheaper/);
   assert.match(byId.ins.keep, /extras/);
   assert.match(byId.nomelt.keep, /not meltable/);
-  assert.match(byId.legacy.keep, /cannot be bought again/);
+  assert.match(byId.legacy.keep, /no Standard offer for this upgrade at the last sync/);
   assert.match(byId.res.keep, /reserved by c1/);
 });
 

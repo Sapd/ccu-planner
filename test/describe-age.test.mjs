@@ -64,7 +64,7 @@ test('meltReasonPlain gives a plain sentence for every KEEP reason', () => {
   assert.match(meltReasonPlain(`${KEEP.RESERVED} Idris goal`), /Idris goal/);
   assert.match(meltReasonPlain(`${KEEP.SAVES} ($40)`), /\$40/);
   assert.match(meltReasonPlain(`${KEEP.EXTRAS}: Paint`), /Paint/);
-  assert.match(meltReasonPlain(KEEP.UNKNOWN_AVAIL.replace('<event>', 'IAE 2956')), /IAE 2956/);
+  assert.equal(meltReasonPlain(KEEP.NO_OUTSIDE_OBSERVATION), 'Kept: not yet seen in the store on two syncs clear of any sale.');
 });
 
 import { meltHeadlinePlain, noEventsNoticeApp, noEventsNotice } from '../src/logic/describe.mjs';
@@ -84,14 +84,8 @@ test('the Store variant of the no-events notice points to the panel below', () =
   assert.equal(noEventsNoticeStore({ events: [{}] }), null);
 });
 
-import { eventRiskText, alertDetailText } from '../src/logic/describe.mjs';
-test('eventRiskText singular and plural', () => {
-  const ev = { name: 'IAE 2956', to: '2026-11-27' };
-  assert.equal(eventRiskText(1, ev), 'Nothing is cheaper today, but 1 upgrade may disappear after IAE 2956 (ends Nov 27).');
-  assert.equal(eventRiskText(6, ev), 'Nothing is cheaper today, but 6 upgrades may disappear after IAE 2956 (ends Nov 27).');
-});
+import { alertDetailText } from '../src/logic/describe.mjs';
 test('alertDetailText drops the ship pair from an alert', () => {
-  assert.equal(alertDetailText('Pulse → Syulen $40: only known on sale during IAE 2956 (ends Nov 27): buy before it ends', 'Pulse', 'Syulen'), 'Only known on sale during IAE 2956 (ends Nov 27): buy before it ends');
   assert.equal(alertDetailText('Buy before the price changes: Pulse → Syulen $40 now, $50 after', 'Pulse', 'Syulen'), 'Buy before the price changes: $40 now, $50 after');
 });
 

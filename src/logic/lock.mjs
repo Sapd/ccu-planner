@@ -1,13 +1,12 @@
 // Locking the target and covering a lock, and the split of a route by urgency. Pure.
 
 import { searchRoutes, edgeKey, cashNeeded } from './planner.mjs';
-import { shipAvailability } from './availability.mjs';
 import { goalStarts } from './sharedPlan.mjs';
 
 /**
  * Splits a route by urgency. Warbonds can disappear (they are sale offers), so
- * they are the only purchases worth making while waiting. Standard upgrades stay
- * available at the msrp difference and may later be replaced by a Warbond, so
+ * they are the only purchases worth making while waiting. Standard upgrades
+ * cost the MSRP difference and may later be replaced by a Warbond, so
  * they are deferred until the chain is finished.
  */
 export function splitRoute(route, { lock = false } = {}) {
@@ -32,8 +31,8 @@ export function splitRoute(route, { lock = false } = {}) {
 // that save nothing), so a lock need not cost new money.
 //   auto (default): lock when the target is a concept ship or you set a higher
 //                   expected price for it; on: always; off: never.
-/** Why this chain locks its target now ('on' | 'expected' | 'concept' | 'event'), or null. 'event': a sale event is on and the target has only ever been sold during events. */
-export function lockReason(chain, ships = null, overrides = null, avail = null) {
+/** Why this chain locks its target now ('on' | 'expected' | 'concept'), or null. */
+export function lockReason(chain, ships = null, overrides = null) {
   const lock = chain.lock ?? 'auto';
   if (lock === 'off') return null;
   if (lock === 'on') return 'on';
@@ -41,11 +40,6 @@ export function lockReason(chain, ships = null, overrides = null, avail = null) 
   const exp = overrides?.ships?.[chain.target]?.msrp;
   if (t && exp != null && exp > t.msrp) return 'expected';
   if (t?.concept) return 'concept';
-  if (avail) {
-    const a = shipAvailability(avail, chain.target);
-    // Only a target proven to be sold during events alone: a ship not seen outside one yet may simply be new to the history.
-    if (a.status === 'event-only' && a.event) return 'event';
-  }
   return null;
 }
 
@@ -150,10 +144,10 @@ export function lockCovered(cover, route) {
  * @returns {{ reason: string|null, cover: object|null, covered: boolean, coveredStep: object|null, lock: boolean }}
  * A covered step is bought later like any Standard step, but its price-rise alerts are dropped: the owned CCU caps the rise.
  */
-export function lockDecision(session, chain, route, { ships = null, overrides = null, avail = null } = {}) {
-  const reason = lockReason(chain, ships, overrides, avail);
+export function lockDecision(session, chain, route, { ships = null, overrides = null } = {}) {
+  const reason = lockReason(chain, ships, overrides);
   if (!reason || !route || !session) return { reason, cover: null, covered: false, coveredStep: null, lock: !!reason };
-  const lockIds = Object.values(session.plans.chains).filter((c) => (c.mode ?? 'watch') === 'watch' && lockReason(c, ships, overrides, avail)).map((c) => c.id);
+  const lockIds = Object.values(session.plans.chains).filter((c) => (c.mode ?? 'watch') === 'watch' && lockReason(c, ships, overrides)).map((c) => c.id);
   const cover = lockCover(session, chain.id, route, { lockIds });
   const covered = lockCovered(cover, route);
   return { reason, cover, covered, coveredStep: covered ? route.steps.at(-1) : null, lock: !covered };
